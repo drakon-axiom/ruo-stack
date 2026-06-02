@@ -141,6 +141,36 @@ Point a Stripe webhook at the `stripe-webhook` function URL and subscribe to
 - **Onboarding** (`/onboarding`) + **branding** (`/dashboard/branding`) with logo
   upload to the `brand-assets` Storage bucket (own-folder-only write RLS).
 
+## Design system
+
+Tokens (`src/app/globals.css`) follow the shadcn/ui convention: CSS variables
+hold raw HSL triplets for light + `.dark` themes, surfaced to Tailwind as
+`hsl(var(--token))` so opacity modifiers work (`bg-primary/10`, etc.). DM Sans
+is the body font. Semantic utilities are available: `bg-background`,
+`bg-card`, `text-muted-foreground`, `border-border`, `bg-primary`, `bg-secondary`,
+`bg-accent`, `bg-destructive`, plus the `sidebar-*` family. Component classes:
+`.btn-primary`, `.btn-secondary`, `.gradient-text`, `.hover-lift`, `.divider-fade`,
+`.page-bg` / `.page-bg-auth` / `.page-bg-dash`, `.nav-item`, `.dash-scroll`.
+
+`brand` is aliased to the primary token, so existing `bg-brand` / `text-brand`
+usages adopt the palette automatically. Dark mode is class-based
+(`<html class="dark">`); a toggle isn't wired yet.
+
+> Not build-verified in this environment: the local npm mirror is missing a
+> transitive dependency, so `next build` couldn't run here. The Tailwind config
+> is the canonical shadcn token mapping. Run `npm install && npm run build`
+> locally to confirm.
+
+## Analytics
+
+The reference bundle shipped a third-party **Tinybird** tracker (web-vitals +
+`page_hit`/`page` events with a session-id cookie and geo/locale). It is **not**
+included here — it's outbound telemetry on end users. First-party primitives
+already exist (`site_visitors`, `activity_log`, `admin-api get_site_visitors`).
+If you want product analytics, prefer recording events to those tables from
+server actions/edge functions, or add a self-hosted/consent-gated tracker
+deliberately rather than by default.
+
 ## Compliance
 
 Supplements are sold with the standard disclaimer ("These statements have not
