@@ -43,7 +43,15 @@ export default async function AdminPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <h1 className="text-2xl font-bold">Admin</h1>
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Admin</h1>
+        <a
+          href="/admin/fulfillment"
+          className="rounded bg-brand px-4 py-2 text-sm font-medium text-white"
+        >
+          Fulfillment →
+        </a>
+      </header>
       <section className="mt-6 grid gap-4 sm:grid-cols-3">
         <Stat label="Sellers" value={sellers ?? 0} />
         <Stat label="Open orders" value={openOrders ?? 0} />
