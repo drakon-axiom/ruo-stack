@@ -61,6 +61,12 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <a href="/dashboard/orders/new" className="text-sm text-brand hover:underline">
+            New order
+          </a>
+          <a href="/dashboard/stores" className="text-sm text-brand hover:underline">
+            Stores
+          </a>
           <a href="/dashboard/branding" className="text-sm text-brand hover:underline">
             Branding
           </a>

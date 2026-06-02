@@ -124,12 +124,22 @@ Point a Stripe webhook at the `stripe-webhook` function URL and subscribe to
 
 ## What's stubbed / next
 
-- `woo-sync` (and Shopify/Wix) need the real REST integrations wired in.
-- Credential encryption for `store_connections.credentials_encrypted` (use a KMS
-  or Supabase Vault — never store plaintext keys).
-- Onboarding flow, branding upload (Supabase Storage), referrals crediting,
-  AI/human support chat, realtime order notifications.
+- **Shopify / Wix** sync (WooCommerce is implemented in `woo-sync`).
+- Referrals crediting, AI/human support chat, realtime order notifications.
 - Generated DB types: `npm run db:types`.
+
+### Implemented
+
+- **WooCommerce** (`woo-sync`): `connect` / `test_connection` / `sync_products`
+  / `sync_orders` / `push_tracking` / `disconnect`. Store credentials are
+  AES-256-GCM encrypted (`_shared/crypto.ts`, key = `CREDENTIALS_ENC_KEY`)
+  before they hit `store_connections.credentials_encrypted`. Imported orders
+  are priced from OUR catalog by SKU match — unmatched SKUs raise an
+  `unsupported_product` alert and skip. Seller UI at `/dashboard/stores`.
+- **Manual order entry** (`/dashboard/orders/new`) drives `create-manual-order`:
+  catalog picker, saved-customers prefill, live wallet-debit total.
+- **Onboarding** (`/onboarding`) + **branding** (`/dashboard/branding`) with logo
+  upload to the `brand-assets` Storage bucket (own-folder-only write RLS).
 
 ## Compliance
 
