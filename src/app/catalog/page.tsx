@@ -31,25 +31,25 @@ export default async function CatalogPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       <h1 className="text-3xl font-bold">Catalog</h1>
-      <p className="mt-2 text-gray-600">
+      <p className="mt-2 text-muted-foreground">
         Wholesale cost is debited from your wallet on fulfillment. Suggested retail is a
         starting point — you set your own prices.
       </p>
 
       <div className="mt-8 space-y-8">
         {rows.length === 0 && (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             No products yet (sign in to view the catalog, or seed the database).
           </p>
         )}
         {rows.map((p) => (
           <div key={p.id} className="rounded-lg border">
-            <div className="border-b bg-gray-50 px-4 py-3">
-              <span className="text-xs uppercase tracking-wide text-gray-500">{p.category}</span>
+            <div className="border-b bg-muted/50 px-4 py-3">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">{p.category}</span>
               <h2 className="text-lg font-semibold">{p.name}</h2>
             </div>
             <table className="w-full text-sm">
-              <thead className="text-left text-gray-500">
+              <thead className="text-left text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2">Size</th>
                   <th className="px-4 py-2">SKU</th>

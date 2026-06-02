@@ -18,7 +18,7 @@ export default function HomePage() {
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           Sell supplements under your own brand.
         </h1>
-        <p className="mt-4 max-w-2xl text-lg text-gray-600">
+        <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
           ruo-stack is a white-label fulfillment platform. You run your storefront;
           we handle inventory, lot-tracked labeling, packaging, and shipping direct
           to your customers. You never touch product.
@@ -41,12 +41,12 @@ export default function HomePage() {
         ].map(([title, body]) => (
           <div key={title} className="rounded-lg border p-5">
             <h3 className="font-semibold">{title}</h3>
-            <p className="mt-2 text-sm text-gray-600">{body}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{body}</p>
           </div>
         ))}
       </section>
 
-      <footer className="border-t pt-8 text-xs text-gray-500">
+      <footer className="border-t pt-8 text-xs text-muted-foreground">
         These statements have not been evaluated by the FDA. Products are not intended to
         diagnose, treat, cure, or prevent any disease.
       </footer>

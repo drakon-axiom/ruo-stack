@@ -30,7 +30,7 @@ export default function CheckoutPage() {
   return (
     <main className="mx-auto max-w-md px-6 py-16">
       <h1 className="text-2xl font-bold">Add funds to your wallet</h1>
-      <p className="mt-2 text-sm text-gray-500">
+      <p className="mt-2 text-sm text-muted-foreground">
         Prepaid store credit. $1 minimum, never expires. Each fulfilled order debits
         wholesale cost + shipping.
       </p>
@@ -57,7 +57,7 @@ export default function CheckoutPage() {
         className="mt-4 w-full rounded border px-3 py-2"
       />
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <button
         onClick={topUp}

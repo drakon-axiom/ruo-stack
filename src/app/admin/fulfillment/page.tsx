@@ -61,7 +61,7 @@ export default async function FulfillmentPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Fulfillment</h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             {rows.length} order{rows.length === 1 ? '' : 's'} ready to ship. Select and buy labels.
           </p>
         </div>

@@ -65,7 +65,7 @@ export function FulfillmentTable({ orders }: { orders: FulfillOrder[] }) {
 
   if (orders.length === 0) {
     return (
-      <p className="rounded-lg border px-4 py-10 text-center text-sm text-gray-500">
+      <p className="rounded-lg border px-4 py-10 text-center text-sm text-muted-foreground">
         Nothing to ship right now.
       </p>
     );
@@ -81,27 +81,27 @@ export function FulfillmentTable({ orders }: { orders: FulfillOrder[] }) {
         >
           {busy ? 'Buying labels…' : `Buy ${selected.size} label${selected.size === 1 ? '' : 's'}`}
         </button>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-muted-foreground">
           Each selected order gets its own USPS label and flips to shipped.
         </span>
         <span
-          className="ml-auto flex items-center gap-1.5 text-xs text-gray-500"
+          className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground"
           title={live ? 'Live — updates automatically' : 'Connecting…'}
         >
           <span
             className={`inline-block h-2 w-2 rounded-full ${
-              live ? 'bg-emerald-500' : 'bg-gray-300'
+              live ? 'bg-emerald-500' : 'bg-muted-foreground/30'
             }`}
           />
           {live ? 'Live' : 'Connecting…'}
         </span>
       </div>
 
-      {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="mb-3 rounded bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-300">{error}</p>}
 
       <div className="overflow-hidden rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left text-gray-500">
+          <thead className="bg-muted/50 text-left text-muted-foreground">
             <tr>
               <th className="px-3 py-2">
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
@@ -129,7 +129,7 @@ export function FulfillmentTable({ orders }: { orders: FulfillOrder[] }) {
                   </td>
                   <td className="px-3 py-2 font-medium">{o.brand_name}</td>
                   <td className="px-3 py-2">{o.customer_name}</td>
-                  <td className="px-3 py-2 text-xs text-gray-600">{o.ship || '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{o.ship || '—'}</td>
                   <td className="px-3 py-2 text-xs">
                     {o.items.map((it, i) => (
                       <div key={i}>
@@ -141,11 +141,11 @@ export function FulfillmentTable({ orders }: { orders: FulfillOrder[] }) {
                   <td className="px-3 py-2 tabular-nums">${o.fulfillment_cost.toFixed(2)}</td>
                   <td className="px-3 py-2 text-xs">
                     {r?.tracking_number ? (
-                      <span className="text-emerald-600">✓ {r.tracking_number}</span>
+                      <span className="text-emerald-600 dark:text-emerald-400">✓ {r.tracking_number}</span>
                     ) : r?.error ? (
-                      <span className="text-red-600">{r.error}</span>
+                      <span className="text-red-600 dark:text-red-400">{r.error}</span>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-muted-foreground/70">—</span>
                     )}
                     <div className="mt-1">
                       <button

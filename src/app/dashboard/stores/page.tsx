@@ -79,22 +79,22 @@ export default function StoresPage() {
     await load();
   }
 
-  if (loading) return <main className="mx-auto max-w-2xl px-6 py-16 text-gray-500">Loading…</main>;
+  if (loading) return <main className="mx-auto max-w-2xl px-6 py-16 text-muted-foreground">Loading…</main>;
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="text-2xl font-bold">Store connection</h1>
-      <p className="mt-1 text-sm text-gray-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         Connect WooCommerce to auto-import orders and push tracking back.
       </p>
 
-      {msg && <p className="mt-4 rounded bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
-      {error && <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {msg && <p className="mt-4 rounded bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">{msg}</p>}
+      {error && <p className="mt-4 rounded bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-300">{error}</p>}
 
       {!conn ? (
         <section className="mt-6 space-y-4 rounded-lg border p-5">
           <h2 className="font-semibold">Connect WooCommerce</h2>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             In WooCommerce: <strong>WooCommerce → Settings → Advanced → REST API → Add key</strong>{' '}
             (Read/Write). Paste the consumer key & secret here. They’re encrypted before storage.
           </p>
@@ -116,12 +116,12 @@ export default function StoresPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-semibold">{conn.store_url}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Last synced:{' '}
                 {conn.last_synced_at ? new Date(conn.last_synced_at).toLocaleString() : 'never'}
               </p>
             </div>
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">Connected</span>
+            <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-300">Connected</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Action busy={busy} action="test_connection" onClick={() => call('test_connection', undefined, 'Connection OK.')}>
@@ -139,7 +139,7 @@ export default function StoresPage() {
             <button
               disabled={busy !== null}
               onClick={() => call('disconnect', undefined, 'Disconnected.')}
-              className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 disabled:opacity-50"
+              className="rounded border border-red-300 dark:border-red-900 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 disabled:opacity-50"
             >
               Disconnect
             </button>
@@ -148,16 +148,16 @@ export default function StoresPage() {
       )}
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold text-gray-700">Recent sync activity</h2>
+        <h2 className="text-sm font-semibold text-foreground">Recent sync activity</h2>
         <div className="mt-2 overflow-hidden rounded-lg border text-sm">
-          {logs.length === 0 && <p className="px-4 py-6 text-center text-gray-500">No sync activity yet.</p>}
+          {logs.length === 0 && <p className="px-4 py-6 text-center text-muted-foreground">No sync activity yet.</p>}
           {logs.map((l, i) => (
             <div key={i} className="flex items-center justify-between border-b px-4 py-2 last:border-0">
               <span className="font-mono text-xs">{l.kind}</span>
-              <span className={l.status === 'ok' ? 'text-emerald-600' : 'text-red-600'}>
+              <span className={l.status === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
                 {l.status === 'ok' ? `${l.items_synced ?? 0} synced` : l.error_message ?? 'error'}
               </span>
-              <span className="text-xs text-gray-400">{new Date(l.finished_at).toLocaleTimeString()}</span>
+              <span className="text-xs text-muted-foreground/70">{new Date(l.finished_at).toLocaleTimeString()}</span>
             </div>
           ))}
         </div>
@@ -215,7 +215,7 @@ function Action({
     <button
       disabled={busy !== null}
       onClick={onClick}
-      className="rounded border px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
+      className="rounded border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
     >
       {busy === action ? '…' : children}
     </button>

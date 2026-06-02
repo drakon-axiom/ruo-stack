@@ -21,7 +21,7 @@ export default async function AdminPage() {
     return (
       <main className="mx-auto max-w-2xl px-6 py-20 text-center">
         <h1 className="text-2xl font-bold">403 — Admins only</h1>
-        <p className="mt-2 text-gray-500">Your account doesn’t have admin access.</p>
+        <p className="mt-2 text-muted-foreground">Your account doesn’t have admin access.</p>
       </main>
     );
   }
@@ -64,11 +64,11 @@ export default async function AdminPage() {
           {(alerts ?? []).map((a, i) => (
             <li key={i} className="flex justify-between px-4 py-3 text-sm">
               <span className="font-mono text-xs">{a.category}</span>
-              <span className="text-gray-500">{new Date(a.created_at).toLocaleString()}</span>
+              <span className="text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
             </li>
           ))}
           {(alerts ?? []).length === 0 && (
-            <li className="px-4 py-6 text-center text-sm text-gray-500">All clear.</li>
+            <li className="px-4 py-6 text-center text-sm text-muted-foreground">All clear.</li>
           )}
         </ul>
       </section>
@@ -79,7 +79,7 @@ export default async function AdminPage() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border p-5">
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-1 text-3xl font-bold">{value}</p>
     </div>
   );

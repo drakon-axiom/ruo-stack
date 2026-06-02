@@ -128,7 +128,7 @@ export default function OnboardingPage() {
   }
 
   if (loading) {
-    return <main className="mx-auto max-w-xl px-6 py-16 text-gray-500">Loading…</main>;
+    return <main className="mx-auto max-w-xl px-6 py-16 text-muted-foreground">Loading…</main>;
   }
 
   return (
@@ -139,12 +139,12 @@ export default function OnboardingPage() {
           <li key={label} className="flex flex-1 items-center gap-2">
             <span
               className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                i <= step ? 'bg-brand text-white' : 'bg-gray-200 text-gray-500'
+                i <= step ? 'bg-brand text-white' : 'bg-muted text-muted-foreground'
               }`}
             >
               {i + 1}
             </span>
-            <span className={i === step ? 'font-medium' : 'text-gray-400'}>{label}</span>
+            <span className={i === step ? 'font-medium' : 'text-muted-foreground/70'}>{label}</span>
           </li>
         ))}
       </ol>
@@ -179,7 +179,7 @@ export default function OnboardingPage() {
 
         {step === 2 && (
           <>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Used as the “from” address on shipping labels and packaging.
             </p>
             <Field label="Return name *">
@@ -228,7 +228,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       </div>
 
       <div className="mt-8 flex justify-between">
@@ -303,7 +303,7 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border bg-white px-3 py-2 text-sm"
+      className="w-full rounded border bg-card px-3 py-2 text-sm"
     >
       <option value="">Select…</option>
       {options.map((o) => (
@@ -317,7 +317,7 @@ function Select({
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between border-b py-1.5 last:border-0">
-      <span className="text-gray-500">{k}</span>
+      <span className="text-muted-foreground">{k}</span>
       <span className="text-right font-medium">{v}</span>
     </div>
   );
