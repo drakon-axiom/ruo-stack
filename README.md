@@ -153,8 +153,11 @@ is the body font. Semantic utilities are available: `bg-background`,
 `.page-bg` / `.page-bg-auth` / `.page-bg-dash`, `.nav-item`, `.dash-scroll`.
 
 `brand` is aliased to the primary token, so existing `bg-brand` / `text-brand`
-usages adopt the palette automatically. Dark mode is class-based
-(`<html class="dark">`); a toggle isn't wired yet.
+usages adopt the palette automatically. Dark mode is class-based: a
+`ThemeToggle` component (`src/components/ThemeToggle.tsx`) flips
+`<html class="dark">` and persists to localStorage, and an inline script in
+the root layout applies the saved/system theme before hydration to avoid a
+flash. The toggle is in the landing nav and dashboard header.
 
 > Not build-verified in this environment: the local npm mirror is missing a
 > transitive dependency, so `next build` couldn't run here. The Tailwind config

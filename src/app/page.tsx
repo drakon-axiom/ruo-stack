@@ -1,14 +1,16 @@
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function HomePage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-16">
       <nav className="flex items-center justify-between pb-12">
         <span className="text-xl font-bold text-brand">ruo-stack</span>
-        <div className="flex gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm">
           <Link href="/catalog" className="hover:underline">Catalog</Link>
           <Link href="/pricing" className="hover:underline">Pricing</Link>
           <Link href="/login" className="rounded bg-brand px-3 py-1.5 text-white">Sign in</Link>
+          <ThemeToggle />
         </div>
       </nav>
 

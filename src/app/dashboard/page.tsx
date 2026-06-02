@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,7 @@ export default async function DashboardPage() {
           >
             {active ? 'Pro active' : 'Subscription inactive'}
           </span>
+          <ThemeToggle />
         </div>
       </header>
 
