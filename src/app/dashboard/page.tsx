@@ -29,8 +29,14 @@ export default async function DashboardPage() {
       .select('id, customer_name, status, fulfillment_cost, tracking_number, created_at')
       .order('created_at', { ascending: false })
       .limit(25),
-    supabase.from('profiles').select('brand_name, subscription_status, subscription_bypass').single(),
+    supabase
+      .from('profiles')
+      .select('brand_name, logo_url, onboarding_complete, subscription_status, subscription_bypass')
+      .single(),
   ]);
+
+  // Finish setup before using the dashboard.
+  if (profile && !profile.onboarding_complete) redirect('/onboarding');
 
   const balance = wallet?.balance ?? 0;
   const low = balance < (wallet?.low_balance_threshold ?? 0);
@@ -40,17 +46,32 @@ export default async function DashboardPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{profile?.brand_name ?? 'Your brand'}</h1>
-          <p className="text-sm text-gray-500">{user.email}</p>
+        <div className="flex items-center gap-3">
+          {profile?.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.logo_url}
+              alt=""
+              className="h-12 w-12 rounded-lg border object-contain"
+            />
+          )}
+          <div>
+            <h1 className="text-2xl font-bold">{profile?.brand_name ?? 'Your brand'}</h1>
+            <p className="text-sm text-gray-500">{user.email}</p>
+          </div>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs ${
-            active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-          }`}
-        >
-          {active ? 'Pro active' : 'Subscription inactive'}
-        </span>
+        <div className="flex items-center gap-3">
+          <a href="/dashboard/branding" className="text-sm text-brand hover:underline">
+            Branding
+          </a>
+          <span
+            className={`rounded-full px-3 py-1 text-xs ${
+              active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {active ? 'Pro active' : 'Subscription inactive'}
+          </span>
+        </div>
       </header>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
