@@ -160,14 +160,14 @@ export default function NewOrderPage() {
     setResult({ order_id: data.order_id, status: data.status });
   }
 
-  if (loading) return <main className="mx-auto max-w-2xl px-6 py-16 text-gray-500">Loading…</main>;
+  if (loading) return <main className="mx-auto max-w-2xl px-6 py-16 text-muted-foreground">Loading…</main>;
 
   if (result) {
     const parked = result.status === 'awaiting_funds';
     return (
       <main className="mx-auto max-w-md px-6 py-16 text-center">
         <h1 className="text-2xl font-bold">{parked ? 'Order parked' : 'Order created'}</h1>
-        <p className={`mt-3 rounded px-3 py-2 text-sm ${parked ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+        <p className={`mt-3 rounded px-3 py-2 text-sm ${parked ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'}`}>
           {parked
             ? '💰 Your wallet balance is too low — the order is awaiting funds. Top up and it will resume automatically.'
             : '📦 Order is processing. Buy a label when you’re ready to ship.'}
@@ -183,7 +183,7 @@ export default function NewOrderPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="text-2xl font-bold">New manual order</h1>
-      <p className="mt-1 text-sm text-gray-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         Cost is debited from your wallet on creation. Prices come from the catalog.
       </p>
 
@@ -195,7 +195,7 @@ export default function NewOrderPage() {
             <select
               onChange={(e) => applySavedCustomer(e.target.value)}
               defaultValue=""
-              className="rounded border bg-white px-2 py-1 text-xs"
+              className="rounded border bg-card px-2 py-1 text-xs"
             >
               <option value="">Use saved customer…</option>
               {saved.map((c) => (
@@ -232,7 +232,7 @@ export default function NewOrderPage() {
               <select
                 value={line.variant_id}
                 onChange={(e) => setLine(i, { variant_id: e.target.value })}
-                className="flex-1 rounded border bg-white px-2 py-2 text-sm"
+                className="flex-1 rounded border bg-card px-2 py-2 text-sm"
               >
                 <option value="">Select product…</option>
                 {variants.map((vr) => (
@@ -254,7 +254,7 @@ export default function NewOrderPage() {
               <button
                 onClick={() => removeLine(i)}
                 disabled={lines.length === 1}
-                className="px-2 text-gray-400 hover:text-red-600 disabled:opacity-30"
+                className="px-2 text-muted-foreground/70 hover:text-red-600 dark:text-red-400 disabled:opacity-30"
                 aria-label="Remove line"
               >
                 ✕
@@ -281,7 +281,7 @@ export default function NewOrderPage() {
           />
         </div>
         <div className="mt-3 flex items-center justify-between border-t pt-3">
-          <span className="text-sm text-gray-500">Items</span>
+          <span className="text-sm text-muted-foreground">Items</span>
           <span className="tabular-nums">${itemsTotal.toFixed(2)}</span>
         </div>
         <div className="mt-1 flex items-center justify-between text-lg font-semibold">
@@ -290,7 +290,7 @@ export default function NewOrderPage() {
         </div>
       </section>
 
-      {error && <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="mt-4 rounded bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-300">{error}</p>}
 
       <div className="mt-6 flex justify-end gap-3">
         <a href="/dashboard" className="rounded border px-4 py-2 text-sm">Cancel</a>

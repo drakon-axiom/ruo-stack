@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +58,7 @@ export default async function DashboardPage() {
           )}
           <div>
             <h1 className="text-2xl font-bold">{profile?.brand_name ?? 'Your brand'}</h1>
-            <p className="text-sm text-gray-500">{user.email}</p>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -72,31 +73,32 @@ export default async function DashboardPage() {
           </a>
           <span
             className={`rounded-full px-3 py-1 text-xs ${
-              active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+              active ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
             }`}
           >
             {active ? 'Pro active' : 'Subscription inactive'}
           </span>
+          <ThemeToggle />
         </div>
       </header>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
-        <div className={`rounded-lg border p-5 ${low ? 'border-amber-400 bg-amber-50' : ''}`}>
-          <p className="text-sm text-gray-500">Wallet balance</p>
+        <div className={`rounded-lg border p-5 ${low ? 'border-amber-400 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40' : ''}`}>
+          <p className="text-sm text-muted-foreground">Wallet balance</p>
           <p className="mt-1 text-3xl font-bold">${Number(balance).toFixed(2)}</p>
-          {low && <p className="mt-1 text-xs text-amber-700">Low balance — top up to avoid parked orders.</p>}
+          {low && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Low balance — top up to avoid parked orders.</p>}
           <a href="/checkout" className="mt-3 inline-block rounded bg-brand px-3 py-1.5 text-sm text-white">
             Add funds
           </a>
         </div>
         <div className="rounded-lg border p-5">
-          <p className="text-sm text-gray-500">Open orders</p>
+          <p className="text-sm text-muted-foreground">Open orders</p>
           <p className="mt-1 text-3xl font-bold">
             {(orders ?? []).filter((o) => !['delivered', 'fulfilled', 'cancelled', 'refunded'].includes(o.status)).length}
           </p>
         </div>
         <div className="rounded-lg border p-5">
-          <p className="text-sm text-gray-500">Recent orders</p>
+          <p className="text-sm text-muted-foreground">Recent orders</p>
           <p className="mt-1 text-3xl font-bold">{orders?.length ?? 0}</p>
         </div>
       </section>
@@ -105,7 +107,7 @@ export default async function DashboardPage() {
         <h2 className="text-lg font-semibold">Orders</h2>
         <div className="mt-3 overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-gray-500">
+            <thead className="bg-muted/50 text-left text-muted-foreground">
               <tr>
                 <th className="px-4 py-2">Customer</th>
                 <th className="px-4 py-2">Status</th>
@@ -126,7 +128,7 @@ export default async function DashboardPage() {
               ))}
               {(orders ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
                     No orders yet.
                   </td>
                 </tr>

@@ -59,15 +59,15 @@ export function LogoUpload({
   return (
     <div>
       <div className="flex items-center gap-4">
-        <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border bg-gray-50">
+        <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border bg-muted/50">
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="Brand logo" className="h-full w-full object-contain" />
           ) : (
-            <span className="text-xs text-gray-400">No logo</span>
+            <span className="text-xs text-muted-foreground/70">No logo</span>
           )}
         </div>
-        <label className="cursor-pointer rounded border px-3 py-2 text-sm hover:bg-gray-50">
+        <label className="cursor-pointer rounded border px-3 py-2 text-sm hover:bg-accent">
           {busy ? 'Uploading…' : value ? 'Replace logo' : 'Upload logo'}
           <input
             type="file"
@@ -81,8 +81,8 @@ export function LogoUpload({
           />
         </label>
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      <p className="mt-2 text-xs text-gray-500">
+      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      <p className="mt-2 text-xs text-muted-foreground">
         PNG, JPG, SVG, or WebP · max 2 MB · applies to future orders’ labels & packaging.
       </p>
     </div>

@@ -20,9 +20,9 @@ export default function PricingPage() {
       <div className="mx-auto mt-10 max-w-md rounded-2xl border p-8 text-left shadow-sm">
         <div className="flex items-baseline gap-1">
           <span className="text-4xl font-bold">$97</span>
-          <span className="text-gray-500">/mo</span>
+          <span className="text-muted-foreground">/mo</span>
         </div>
-        <p className="mt-1 text-sm text-gray-500">Cancel anytime. No contract.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Cancel anytime. No contract.</p>
         <ul className="mt-6 space-y-2 text-sm">
           {FEATURES.map((f) => (
             <li key={f} className="flex gap-2">

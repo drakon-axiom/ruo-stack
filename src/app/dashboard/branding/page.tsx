@@ -73,13 +73,13 @@ export default function BrandingPage() {
   }
 
   if (loading) {
-    return <main className="mx-auto max-w-xl px-6 py-16 text-gray-500">Loading…</main>;
+    return <main className="mx-auto max-w-xl px-6 py-16 text-muted-foreground">Loading…</main>;
   }
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <h1 className="text-2xl font-bold">Branding</h1>
-      <p className="mt-1 text-sm text-gray-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         Applies to future orders’ labels & packaging.
       </p>
 
@@ -108,8 +108,8 @@ export default function BrandingPage() {
           {userId && <LogoUpload userId={userId} value={logoUrl} onChange={setLogoUrl} />}
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {status === 'saved' && <p className="text-sm text-emerald-600">Saved.</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {status === 'saved' && <p className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</p>}
 
         <button
           onClick={save}
