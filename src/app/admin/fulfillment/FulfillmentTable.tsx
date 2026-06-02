@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh';
 
 export type FulfillOrder = {
   id: string;
@@ -23,6 +24,10 @@ export function FulfillmentTable({ orders }: { orders: FulfillOrder[] }) {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Record<string, LabelResult>>({});
   const [error, setError] = useState<string | null>(null);
+
+  // Live-refresh the list as orders enter/leave `processing`. router.refresh()
+  // re-runs the server component so brand + line-item joins stay correct.
+  const live = useRealtimeRefresh({ table: 'orders', onChange: () => router.refresh() });
 
   const allSelected = orders.length > 0 && selected.size === orders.length;
   const selectedIds = useMemo(() => [...selected], [selected]);
@@ -78,6 +83,17 @@ export function FulfillmentTable({ orders }: { orders: FulfillOrder[] }) {
         </button>
         <span className="text-xs text-gray-500">
           Each selected order gets its own USPS label and flips to shipped.
+        </span>
+        <span
+          className="ml-auto flex items-center gap-1.5 text-xs text-gray-500"
+          title={live ? 'Live — updates automatically' : 'Connecting…'}
+        >
+          <span
+            className={`inline-block h-2 w-2 rounded-full ${
+              live ? 'bg-emerald-500' : 'bg-gray-300'
+            }`}
+          />
+          {live ? 'Live' : 'Connecting…'}
         </span>
       </div>
 
