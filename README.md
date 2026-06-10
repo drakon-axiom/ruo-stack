@@ -40,6 +40,8 @@ supabase/
     0004_seed.sql          platform settings + sample lawful supplement catalog
     0005_storage.sql       brand-assets bucket (public read, own-folder-only write)
     0006_realtime.sql      Realtime on orders (RLS-honoring live order updates)
+    0007_fix_profile_guard.sql  guard only blocks authenticated sellers, not
+                                trusted service-role / SQL writes
   functions/
     create-wallet-checkout Stripe Checkout session for wallet top-up
     stripe-webhook         the ONLY writer of wallet credits + subscription status
@@ -144,6 +146,13 @@ Point a Stripe webhook at the `stripe-webhook` function URL and subscribe to
 
 ### Implemented
 
+- **Admin portal** (`src/app/admin/*`, `src/components/admin/*`): role-gated in
+  `admin/layout.tsx`. Overview (live platform stats + resolvable monitor
+  alerts), **Sellers** (subscription status, wallet float, order counts, grant/
+  revoke bypass), **Orders** (cross-tenant table + filters + a detail drawer for
+  status/tracking edits, wallet refunds, and internal notes), and Fulfillment.
+  Reads use the cross-tenant admin RLS policies; writes go through the
+  `admin-api` edge function (re-checks admin + audit-logs every action).
 - **App navigation** (`src/components/app-shell/`): a role-aware sidebar + top
   bar wraps every signed-in segment (dashboard, catalog, checkout, admin) via
   each segment's `layout.tsx`. Sellers see Dashboard / Catalog / New order /

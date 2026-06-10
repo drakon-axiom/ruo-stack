@@ -33,12 +33,49 @@ Deno.serve(async (req) => {
         return json({ ok: true });
 
       case 'list_subscribers': {
-        const { data, error } = await admin
+        const { data: profiles, error } = await admin
           .from('profiles')
-          .select('user_id, brand_name, subscription_status, subscription_bypass, created_at')
+          .select(
+            'user_id, brand_name, full_name, role, subscription_status, subscription_bypass, onboarding_complete, created_at'
+          )
           .order('created_at', { ascending: false });
         if (error) throw error;
-        return json({ subscribers: data });
+
+        // Enrich with email (auth.users — service role only), wallet balance,
+        // and order counts. Each map is one round-trip; counts are tallied in JS.
+        const [{ data: authList }, { data: wallets }, { data: orderRows }] =
+          await Promise.all([
+            admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+            admin.from('wallets').select('user_id, balance'),
+            admin.from('orders').select('user_id, status'),
+          ]);
+
+        const emailById = new Map(
+          (authList?.users ?? []).map((u) => [u.id, u.email ?? null])
+        );
+        const balanceById = new Map(
+          (wallets ?? []).map((w: { user_id: string; balance: number }) => [
+            w.user_id,
+            Number(w.balance),
+          ])
+        );
+        const CLOSED = new Set(['delivered', 'fulfilled', 'cancelled', 'refunded']);
+        const totalByUser = new Map<string, number>();
+        const openByUser = new Map<string, number>();
+        for (const o of (orderRows ?? []) as { user_id: string; status: string }[]) {
+          totalByUser.set(o.user_id, (totalByUser.get(o.user_id) ?? 0) + 1);
+          if (!CLOSED.has(o.status))
+            openByUser.set(o.user_id, (openByUser.get(o.user_id) ?? 0) + 1);
+        }
+
+        const subscribers = (profiles ?? []).map((p) => ({
+          ...p,
+          email: emailById.get(p.user_id) ?? null,
+          wallet_balance: balanceById.get(p.user_id) ?? 0,
+          order_count: totalByUser.get(p.user_id) ?? 0,
+          open_order_count: openByUser.get(p.user_id) ?? 0,
+        }));
+        return json({ subscribers });
       }
 
       case 'update_order': {

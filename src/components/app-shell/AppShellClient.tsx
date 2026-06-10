@@ -14,6 +14,8 @@ type IconName =
   | 'branding'
   | 'wallet'
   | 'admin'
+  | 'sellers'
+  | 'orders'
   | 'fulfillment';
 
 type NavItem = { label: string; href: string; icon: IconName };
@@ -35,6 +37,8 @@ const ADMIN_NAV: NavSection = {
   title: 'Admin',
   items: [
     { label: 'Overview', href: '/admin', icon: 'admin' },
+    { label: 'Sellers', href: '/admin/sellers', icon: 'sellers' },
+    { label: 'Orders', href: '/admin/orders', icon: 'orders' },
     { label: 'Fulfillment', href: '/admin/fulfillment', icon: 'fulfillment' },
   ],
 };
@@ -275,6 +279,23 @@ function Icon({ name }: { name: IconName }) {
           <path d="M22 12A10 10 0 1 1 12 2" />
           <path d="M12 12 22 2" />
           <path d="M16 2h6v6" />
+        </svg>
+      );
+    case 'sellers':
+      return (
+        <svg {...common}>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+    case 'orders':
+      return (
+        <svg {...common}>
+          <path d="M9 2h6a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h2V3a1 1 0 0 1 1-1z" />
+          <path d="M9 4h6" />
+          <path d="M9 11h6M9 15h4" />
         </svg>
       );
     case 'fulfillment':
