@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       .single();
     if (depErr) throw depErr;
 
-    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:3000';
+    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:3900';
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       success_url: `${siteUrl}/dashboard?topup=success`,

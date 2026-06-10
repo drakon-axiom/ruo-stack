@@ -15,7 +15,7 @@ debits wholesale cost + shipping.
 
 | Layer | Tech |
 |---|---|
-| Frontend | **Next.js 14** (App Router) + Tailwind |
+| Frontend | **Next.js 16** (App Router) + Tailwind |
 | Backend / BaaS | **Supabase** — Postgres, Auth, RLS, Edge Functions (Deno) |
 | Subscription + wallet billing | **Stripe** |
 | Shipping labels | **ShipStation** (USPS/UPS/FedEx) |
@@ -26,8 +26,11 @@ debits wholesale cost + shipping.
 ```
 src/
   app/                     Next.js routes (marketing, auth, dashboard, admin, checkout)
+  components/app-shell/    signed-in chrome: sidebar + top bar nav, sign-out
+  components/              ThemeToggle, LogoUpload
   lib/supabase/            client (browser) / server (RLS) / admin (service role)
   lib/stripe.ts            server Stripe client
+  lib/useRealtimeRefresh.ts  client hook: refresh on Supabase Realtime changes
   middleware.ts            session refresh + route gating
 supabase/
   migrations/
@@ -35,6 +38,8 @@ supabase/
     0002_rls.sql           Row-Level Security (multi-tenant isolation) + auth triggers
     0003_wallet_ledger.sql server-authoritative money: credit/debit/fulfill/refund RPCs
     0004_seed.sql          platform settings + sample lawful supplement catalog
+    0005_storage.sql       brand-assets bucket (public read, own-folder-only write)
+    0006_realtime.sql      Realtime on orders (RLS-honoring live order updates)
   functions/
     create-wallet-checkout Stripe Checkout session for wallet top-up
     stripe-webhook         the ONLY writer of wallet credits + subscription status
@@ -88,7 +93,7 @@ double-refund).
 
 ## Local development
 
-Prereqs: Node 18+, Docker (for Supabase local), the Supabase CLI.
+Prereqs: Node 20+ (Next.js 16), Docker (for Supabase local), the Supabase CLI.
 
 ```bash
 npm install
@@ -96,9 +101,9 @@ cp .env.example .env.local        # fill in keys
 
 # start local Supabase (Postgres + Auth + Edge runtime)
 supabase start
-supabase db reset                 # applies migrations 0001–0004
+supabase db reset                 # applies migrations 0001–0006
 
-npm run dev                       # http://localhost:3000
+npm run dev                       # http://localhost:3900
 ```
 
 To make yourself an admin locally, after signing up:
@@ -115,8 +120,11 @@ supabase db push                  # migrations
 supabase functions deploy         # edge functions
 
 # set function secrets (NOT committed)
+# CREDENTIALS_ENC_KEY = base64 of 32 random bytes (openssl rand -base64 32);
+# SUPABASE_URL / SUPABASE_*_KEY are auto-injected and must not be set here.
 supabase secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... \
-  SHIPSTATION_API_KEY=... SHIPSTATION_API_SECRET=... SITE_URL=https://...
+  SHIPSTATION_API_KEY=... SHIPSTATION_API_SECRET=... \
+  CREDENTIALS_ENC_KEY=... SITE_URL=https://...
 ```
 
 Point a Stripe webhook at the `stripe-webhook` function URL and subscribe to
@@ -125,11 +133,26 @@ Point a Stripe webhook at the `stripe-webhook` function URL and subscribe to
 ## What's stubbed / next
 
 - **Shopify / Wix** sync (WooCommerce is implemented in `woo-sync`).
-- Referrals crediting, AI/human support chat, realtime order notifications.
-- Generated DB types: `npm run db:types`.
+- Referrals crediting (`referral_code` exists; no crediting logic yet), AI/human
+  support chat.
+- Generated DB types: `npm run db:types` (not committed yet).
+- **Third-party keys** must be set before checkout, subscriptions, and label
+  purchase work: Stripe (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `STRIPE_PRO_PRICE_ID`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`) and ShipStation
+  (`SHIPSTATION_API_KEY`, `SHIPSTATION_API_SECRET`). A Stripe webhook endpoint
+  must also be pointed at the `stripe-webhook` function.
 
 ### Implemented
 
+- **App navigation** (`src/components/app-shell/`): a role-aware sidebar + top
+  bar wraps every signed-in segment (dashboard, catalog, checkout, admin) via
+  each segment's `layout.tsx`. Sellers see Dashboard / Catalog / New order /
+  Stores / Branding / Add funds; admins also get an Admin section. The top bar
+  carries the wallet-balance pill, subscription badge, theme toggle, and (on
+  mobile) a drawer toggle; the sidebar footer has sign-out.
+- **Realtime order updates** (`0006_realtime.sql` + `lib/useRealtimeRefresh.ts`):
+  RLS-honoring live updates wired into the admin fulfillment list as orders move
+  through the lifecycle.
 - **WooCommerce** (`woo-sync`): `connect` / `test_connection` / `sync_products`
   / `sync_orders` / `push_tracking` / `disconnect`. Store credentials are
   AES-256-GCM encrypted (`_shared/crypto.ts`, key = `CREDENTIALS_ENC_KEY`)
@@ -157,12 +180,10 @@ usages adopt the palette automatically. Dark mode is class-based: a
 `ThemeToggle` component (`src/components/ThemeToggle.tsx`) flips
 `<html class="dark">` and persists to localStorage, and an inline script in
 the root layout applies the saved/system theme before hydration to avoid a
-flash. The toggle is in the landing nav and dashboard header.
+flash. The toggle is in the landing nav and the signed-in app's top bar.
 
-> Not build-verified in this environment: the local npm mirror is missing a
-> transitive dependency, so `next build` couldn't run here. The Tailwind config
-> is the canonical shadcn token mapping. Run `npm install && npm run build`
-> locally to confirm.
+> Build-verified on Next.js 16.2.7 (`next build` passes; all routes compile and
+> prerender). The Tailwind config is the canonical shadcn token mapping.
 
 ## Analytics
 

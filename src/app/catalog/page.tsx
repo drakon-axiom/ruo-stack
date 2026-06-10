@@ -18,7 +18,7 @@ type ProductRow = {
 };
 
 export default async function CatalogPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   // Catalog is readable by any authenticated user (RLS: products_read).
   const { data: products } = await supabase
     .from('products')

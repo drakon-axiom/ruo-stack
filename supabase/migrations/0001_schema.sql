@@ -7,7 +7,7 @@
 -- All money movement goes through the wallet ledger (see 0003).
 -- ============================================================================
 
-create extension if not exists "pgcrypto";
+create extension if not exists "pgcrypto" with schema extensions;
 
 -- ----------------------------------------------------------------------------
 -- Enums
@@ -60,7 +60,7 @@ create table profiles (
   return_state text,
   return_zip text,
   return_phone text,
-  referral_code text unique default encode(gen_random_bytes(6), 'hex'),
+  referral_code text unique default encode(extensions.gen_random_bytes(6), 'hex'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

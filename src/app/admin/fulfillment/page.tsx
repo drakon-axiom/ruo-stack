@@ -5,7 +5,7 @@ import { FulfillmentTable, type FulfillOrder } from './FulfillmentTable';
 export const dynamic = 'force-dynamic';
 
 export default async function FulfillmentPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
