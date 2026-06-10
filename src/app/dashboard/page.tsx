@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +15,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -41,12 +40,10 @@ export default async function DashboardPage() {
 
   const balance = wallet?.balance ?? 0;
   const low = balance < (wallet?.low_balance_threshold ?? 0);
-  const active =
-    profile?.subscription_status === 'active' || profile?.subscription_bypass;
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {profile?.logo_url && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -61,25 +58,12 @@ export default async function DashboardPage() {
             <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <a href="/dashboard/orders/new" className="text-sm text-brand hover:underline">
-            New order
-          </a>
-          <a href="/dashboard/stores" className="text-sm text-brand hover:underline">
-            Stores
-          </a>
-          <a href="/dashboard/branding" className="text-sm text-brand hover:underline">
-            Branding
-          </a>
-          <span
-            className={`rounded-full px-3 py-1 text-xs ${
-              active ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
-            }`}
-          >
-            {active ? 'Pro active' : 'Subscription inactive'}
-          </span>
-          <ThemeToggle />
-        </div>
+        <a
+          href="/dashboard/orders/new"
+          className="rounded bg-brand px-4 py-2 text-sm font-medium text-white"
+        >
+          New order
+        </a>
       </header>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
