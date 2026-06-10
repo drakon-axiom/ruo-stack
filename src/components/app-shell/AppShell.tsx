@@ -21,12 +21,16 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   if (user) {
     const [{ data: profile }, { data: wallet }] = await Promise.all([
+      // Filter by user_id explicitly: an admin can read EVERY profile/wallet via
+      // the admin RLS policies, so without this .single()/.maybeSingle() would
+      // match many rows, error, and fall back to the seller defaults.
       supabase
         .from('profiles')
         .select('brand_name, logo_url, role, subscription_status, subscription_bypass')
+        .eq('user_id', user.id)
         .single(),
       // Admins may not have a wallet row — don't throw if it's missing.
-      supabase.from('wallets').select('balance').maybeSingle(),
+      supabase.from('wallets').select('balance').eq('user_id', user.id).maybeSingle(),
     ]);
     brandName = profile?.brand_name ?? null;
     logoUrl = profile?.logo_url ?? null;

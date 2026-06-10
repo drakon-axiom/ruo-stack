@@ -21,17 +21,25 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login?next=/dashboard');
 
-  // RLS guarantees these only return the signed-in seller's rows.
+  // Scope to the signed-in user explicitly. RLS scopes sellers to their own
+  // rows, but an admin can read every seller's rows — so without these filters
+  // .single() would match many rows (error) and orders would leak cross-tenant.
   const [{ data: wallet }, { data: orders }, { data: profile }] = await Promise.all([
-    supabase.from('wallets').select('balance, low_balance_threshold').single(),
+    supabase
+      .from('wallets')
+      .select('balance, low_balance_threshold')
+      .eq('user_id', user.id)
+      .maybeSingle(),
     supabase
       .from('orders')
       .select('id, customer_name, status, fulfillment_cost, tracking_number, created_at')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(25),
     supabase
       .from('profiles')
       .select('brand_name, logo_url, onboarding_complete, subscription_status, subscription_bypass')
+      .eq('user_id', user.id)
       .single(),
   ]);
 
