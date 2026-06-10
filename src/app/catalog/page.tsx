@@ -39,7 +39,7 @@ export default async function CatalogPage() {
       <div className="mt-8 space-y-8">
         {rows.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No products yet (sign in to view the catalog, or seed the database).
+            No products in the catalog yet (seed the database to populate it).
           </p>
         )}
         {rows.map((p) => (

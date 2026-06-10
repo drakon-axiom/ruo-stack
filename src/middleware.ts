@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const protectedPrefixes = ['/dashboard', '/admin', '/onboarding', '/checkout'];
+  const protectedPrefixes = ['/dashboard', '/admin', '/onboarding', '/checkout', '/catalog'];
   const needsAuth = protectedPrefixes.some((p) => path.startsWith(p));
 
   if (needsAuth && !user) {
