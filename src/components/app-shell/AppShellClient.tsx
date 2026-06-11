@@ -69,10 +69,9 @@ export function AppShellClient({
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const sections: NavSection[] = [SELLER_NAV];
-  if (role === 'admin') sections.push(ADMIN_NAV);
-
+  // Admins and sellers use entirely separate portals — never both nav sets.
   const isAdmin = role === 'admin';
+  const sections: NavSection[] = isAdmin ? [ADMIN_NAV] : [SELLER_NAV];
 
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -91,7 +90,7 @@ export function AppShellClient({
             {brandName ?? 'ruo-stack'}
           </p>
           <p className="truncate text-xs text-muted-foreground">
-            {isAdmin ? 'Admin' : 'Seller'}
+            {isAdmin ? 'Admin console' : 'Seller'}
           </p>
         </div>
       </div>

@@ -25,12 +25,32 @@ function LoginForm() {
         ? supabase.auth.signInWithPassword({ email, password })
         : supabase.auth.signUp({ email, password });
     const { error } = await fn;
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setError(error.message);
       return;
     }
-    router.push(next);
+
+    // Route by role so admins land in the admin portal and sellers in theirs.
+    // Middleware also enforces this, but doing it here avoids a redirect hop.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    let dest = next;
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      if (profile?.role === 'admin') {
+        dest = next.startsWith('/admin') ? next : '/admin';
+      } else {
+        dest = next.startsWith('/admin') ? '/dashboard' : next;
+      }
+    }
+    setBusy(false);
+    router.push(dest);
     router.refresh();
   }
 
