@@ -1,0 +1,31 @@
+# Minimal Supabase config for LOCAL dev (`supabase start`). The production
+# project (kcgqabbiihtfxczhpyfs) is configured in the dashboard.
+project_id = "ruostack"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+# In PRODUCTION, turn the Data API (PostgREST) OFF — the Fastify API is the only
+# DB consumer. Direct supabase-js is used only for brand Auth + Storage.
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:3903"
+additional_redirect_urls = ["http://localhost:3903"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_confirmations = true
+
+# Custom Access Token Hook — injects realm:'brand' + brand_id from the
+# server-owned brand_user_role table. Enable the same hook in the dashboard for
+# the production project (Auth → Hooks → Custom Access Token).
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"

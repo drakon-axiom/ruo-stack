@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-bg text-text font-sans antialiased;
+  margin: 0;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-pill bg-teal px-3.5 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-teal-bright disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-pill border border-line2 bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-muted transition hover:text-text;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-pill border border-danger/50 bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-danger transition hover:bg-danger/10;
+  }
+  .card {
+    @apply rounded-card border border-line bg-card;
+  }
+  .input {
+    @apply w-full rounded-[10px] border border-line bg-card px-3 py-2 text-[13px] text-text placeholder:text-faint outline-none focus:border-teal;
+  }
+  .label {
+    @apply text-[11px] uppercase tracking-[0.1em] text-faint;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-pill border border-line2 bg-card2 px-2.5 py-0.5 text-[12px] text-muted;
+  }
+  .tab {
+    @apply rounded-pill border border-line2 bg-card2 px-3 py-1 text-[12.5px] text-muted transition;
+  }
+  .tab-on {
+    @apply border-teal bg-teal text-white;
+  }
+}

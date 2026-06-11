@@ -1,5 +1,5 @@
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.js
 
@@ -33,3 +33,16 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# monorepo build artifacts
+dist/
+**/dist/
+.turbo/
+coverage/
+
+# prisma generated client
+packages/db/generated/
+**/.prisma/
+
+# vite
+**/.vite/
