@@ -367,6 +367,7 @@ model SubscriptionState {
   price                Int                     @default(0) // cents
   status               SubscriptionStateStatus @default(none)
   currentPeriodEnd     DateTime?               @map("current_period_end")
+  cancelAtPeriodEnd    Boolean                 @default(false) @map("cancel_at_period_end")
   createdAt            DateTime                @default(now()) @map("created_at")
   updatedAt            DateTime                @updatedAt @map("updated_at")
 

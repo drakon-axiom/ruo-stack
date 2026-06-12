@@ -199,6 +199,7 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
           priceId,
           price: item?.price?.unit_amount ?? undefined,
           currentPeriodEnd,
+          cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
         };
       }
       if (sub.status === 'past_due' || sub.status === 'unpaid') {

@@ -153,6 +153,7 @@ interface Sub {
   current_plan: 'starter' | 'pro' | 'volume';
   billed_plan: string;
   current_period_end: string | null;
+  cancel_at_period_end: boolean;
   plans: PlanCard[];
 }
 
@@ -244,7 +245,13 @@ function SubscriptionSection() {
 
       <div className="mt-3 flex items-center justify-between text-[12px] text-muted">
         <span>
-          {sub?.current_period_end && status === 'active' && <>Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>}
+          {sub?.current_period_end && status === 'active' && (
+            sub.cancel_at_period_end ? (
+              <span className="text-amber">Ends {new Date(sub.current_period_end).toLocaleDateString()} — won't renew.</span>
+            ) : (
+              <>Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>
+            )
+          )}
         </span>
         {onPaid && <button className="text-teal hover:underline" onClick={manage}>Manage billing →</button>}
       </div>

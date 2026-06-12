@@ -98,6 +98,7 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
       current_plan: current, // what they're entitled to right now
       billed_plan: sub?.plan ?? 'starter', // what Stripe is billing (may differ if past_due)
       current_period_end: sub?.currentPeriodEnd ?? null,
+      cancel_at_period_end: sub?.cancelAtPeriodEnd ?? false,
       capabilities: PLANS[current].capabilities,
       // The catalogue the plan-picker renders.
       plans: PLAN_LIST.map((p) => ({

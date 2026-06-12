@@ -20,6 +20,8 @@ export interface PlanCapabilities {
   maxOrdersPerMonth: number | null;
   /** Shipping pricing mode (flat rate vs live carrier rates; Phase 2 rate engine). */
   shipping: 'flat' | 'live';
+  /** Same-day shipping cutoff (CST) — later tiers ship later in the day. */
+  shippingCutoff: string;
 }
 
 export interface PlanDef {
@@ -43,11 +45,12 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     priceCents: 0,
     paid: false,
     wholesaleField: 'wholesaleStarter',
-    capabilities: { wholesale: true, storeConnections: false, maxOrdersPerMonth: 20, shipping: 'flat' },
+    capabilities: { wholesale: true, storeConnections: false, maxOrdersPerMonth: 20, shipping: 'flat', shippingCutoff: '10 AM CST' },
     features: [
       'Wholesale pricing — Starter rate',
       'Manual orders — up to 20 / month',
       'Flat-rate shipping',
+      '10 AM CST shipping cutoff',
       'No store connections',
     ],
   },
@@ -58,11 +61,12 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     paid: true,
     stripePriceEnv: 'STRIPE_PRO_PRICE_ID',
     wholesaleField: 'wholesalePro',
-    capabilities: { wholesale: true, storeConnections: true, maxOrdersPerMonth: null, shipping: 'live' },
+    capabilities: { wholesale: true, storeConnections: true, maxOrdersPerMonth: null, shipping: 'live', shippingCutoff: '12 PM CST' },
     features: [
       'Better wholesale pricing — Pro rate',
       'Unlimited orders',
       'Live carrier rates',
+      '12 PM CST shipping cutoff',
       'Store connections (WooCommerce, Wix)',
     ],
   },
@@ -73,11 +77,12 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     paid: true,
     stripePriceEnv: 'STRIPE_VOLUME_PRICE_ID',
     wholesaleField: 'wholesaleVolume',
-    capabilities: { wholesale: true, storeConnections: true, maxOrdersPerMonth: null, shipping: 'live' },
+    capabilities: { wholesale: true, storeConnections: true, maxOrdersPerMonth: null, shipping: 'live', shippingCutoff: '2 PM CST' },
     features: [
       'Best wholesale pricing — Volume rate',
       'Unlimited orders',
       'Live carrier rates',
+      '2 PM CST shipping cutoff',
       'Store connections (WooCommerce, Wix)',
       'Priority fulfillment',
     ],

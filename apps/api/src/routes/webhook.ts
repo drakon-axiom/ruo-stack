@@ -153,6 +153,7 @@ async function dispatch(db: PrismaClient, event: NormalizedEvent, ip: string): P
           ? {
               price: event.price,
               currentPeriodEnd: event.currentPeriodEnd ? new Date(event.currentPeriodEnd * 1000) : null,
+              cancelAtPeriodEnd: event.cancelAtPeriodEnd ?? false,
             }
           : {}),
       });

@@ -14,6 +14,7 @@ export interface SubscriptionUpdate {
   stripeSubscriptionId?: string | null;
   price?: number; // cents
   currentPeriodEnd?: Date | null;
+  cancelAtPeriodEnd?: boolean;
 }
 
 export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionUpdate): Promise<void> {
@@ -27,6 +28,7 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
         stripeSubscriptionId: u.stripeSubscriptionId ?? null,
         price: u.price ?? 0,
         currentPeriodEnd: u.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: u.cancelAtPeriodEnd ?? false,
       },
       update: {
         status: u.status,
@@ -34,6 +36,7 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
         ...(u.stripeSubscriptionId !== undefined ? { stripeSubscriptionId: u.stripeSubscriptionId } : {}),
         ...(u.price !== undefined ? { price: u.price } : {}),
         ...(u.currentPeriodEnd !== undefined ? { currentPeriodEnd: u.currentPeriodEnd } : {}),
+        ...(u.cancelAtPeriodEnd !== undefined ? { cancelAtPeriodEnd: u.cancelAtPeriodEnd } : {}),
       },
     });
     // Coarse mirror: 'pro' while on any active paid tier, else 'none'.
