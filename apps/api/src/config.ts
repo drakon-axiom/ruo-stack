@@ -1,4 +1,14 @@
+import { config as loadDotenv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
+
+// Load the monorepo-root .env regardless of cwd (works from src via tsx and from
+// dist). Skipped under tests, where env is set explicitly in test/setup.ts.
+// `override:false` (dotenv default) means real exported vars always win.
+if (process.env.NODE_ENV !== 'test') {
+  loadDotenv({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../..', '.env') });
+}
 
 /**
  * All secrets via env, validated with zod at boot. The app REFUSES TO START if
