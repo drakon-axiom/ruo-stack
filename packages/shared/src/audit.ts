@@ -21,6 +21,11 @@ export const AUDIT_ACTIONS = {
   walletManualAdjustment: 'wallet.manual_adjustment',
   subscriptionCheckoutStarted: 'subscription.checkout_started',
   subscriptionStatusChanged: 'subscription.status_changed',
+  // Orders (Phase 1):
+  orderCreated: 'order.created',
+  orderCancelled: 'order.cancelled',
+  orderShipped: 'order.shipped',
+  orderDelivered: 'order.delivered',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

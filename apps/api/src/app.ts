@@ -5,7 +5,9 @@ import { loadConfig } from './config.js';
 import { HttpError } from './errors.js';
 import { brandRoutes } from './routes/brand.js';
 import { brandBillingRoutes } from './routes/brand-billing.js';
+import { brandOrderRoutes } from './routes/brand-orders.js';
 import { adminAuthRoutes } from './routes/admin-auth.js';
+import { adminFulfillmentRoutes } from './routes/admin-fulfillment.js';
 import { adminCatalogRoutes } from './routes/admin-catalog.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
 import { webhookRoutes } from './routes/webhook.js';
@@ -45,9 +47,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Brand realm (Supabase Auth JWTs) and admin realm (option a) routes.
   await app.register(brandRoutes);
   await app.register(brandBillingRoutes);
+  await app.register(brandOrderRoutes);
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
   await app.register(adminUsersRoutes);
+  await app.register(adminFulfillmentRoutes);
   // Webhook: own encapsulated scope (raw-body parser) — register last.
   await app.register(webhookRoutes);
 

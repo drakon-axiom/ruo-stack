@@ -12,7 +12,7 @@ import { loadConfig } from '../config.js';
 import { writeAudit } from '../audit.js';
 import { requireBrand } from '../middleware/guards.js';
 import { BadRequest, NotFound } from '../errors.js';
-import { getBalance } from '../services/wallet.js';
+import { getWalletSummary } from '../services/wallet.js';
 import { effectivePlan } from '../services/subscription.js';
 
 /**
@@ -140,12 +140,14 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   // ── Wallet balance + ledger ────────────────────────────────────────────────
   app.get('/api/brand/wallet', { preHandler: requireBrand }, async (req) => {
     const { brandId } = req.brand!;
-    const [balance, entries] = await Promise.all([
-      getBalance(prisma, brandId),
+    const [summary, entries] = await Promise.all([
+      getWalletSummary(prisma, brandId),
       prisma.walletLedger.findMany({ where: { brandId }, orderBy: { seq: 'desc' }, take: 50 }),
     ]);
     return {
-      balance_cents: balance,
+      balance_cents: summary.balance,
+      held_cents: summary.held,
+      available_cents: summary.available,
       entries: entries.map((e) => ({
         id: e.id,
         type: e.type,

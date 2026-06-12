@@ -132,6 +132,7 @@ model Brand {
   subscriptionState  SubscriptionState?
   walletLedger       WalletLedger[]
   brandProductPrices BrandProductPrice[]
+  orders             Order[]
 
   @@map("brand")
 }
@@ -278,6 +279,7 @@ model CatalogProduct {
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
   brandPrices BrandProductPrice[]
+  orderItems  OrderItem[]
 
   @@index([status])
   @@index([isPublished])
@@ -356,6 +358,33 @@ enum WalletTxnType {
   @@map("wallet_txn_type")
 }
 
+enum OrderSource {
+  manual
+  woocommerce
+  wix
+
+  @@map("order_source")
+}
+
+enum OrderStatus {
+  ready_for_fulfillment
+  processing
+  shipped
+  delivered
+  cancelled
+
+  @@map("order_status")
+}
+
+enum OrderBlocker {
+  none
+  needs_address
+  needs_customer_info
+  awaiting_funds
+
+  @@map("order_blocker")
+}
+
 /// One per brand. Driven ONLY by billing webhooks (invoice.paid / payment_failed
 /// / subscription.*). Source of truth for membership; Brand.subscription_status
 /// is a convenience mirror.
@@ -415,4 +444,62 @@ model BrandProductPrice {
   @@unique([brandId, productId])
   @@index([brandId])
   @@map("brand_product_price")
+}
+
+// ── Orders (Phase 1: manual-first) ────────────────────────────────────────────
+// Funds model: placing an order reserves funds implicitly (held = sum of open
+// orders); shipping CAPTURES the wallet (a capture ledger entry). Insufficient
+// available funds → blocker awaiting_funds.
+
+/// A brand's order. Line items snapshot the brand's tier wholesale at order time.
+model Order {
+  id                 String       @id @default(uuid()) @db.Uuid
+  brandId            String       @map("brand_id") @db.Uuid
+  source             OrderSource  @default(manual)
+  status             OrderStatus  @default(ready_for_fulfillment)
+  blocker            OrderBlocker @default(none)
+  externalOrderId    String?      @map("external_order_id") // store order id (Woo/Wix; Phase 1.5)
+
+  // Shipping recipient (manual entry; Customer/Address Book is a later slice).
+  recipientName  String  @map("recipient_name")
+  recipientEmail String? @map("recipient_email")
+  recipientPhone String? @map("recipient_phone")
+  address1       String  @map("address1")
+  address2       String? @map("address2")
+  city           String
+  state          String
+  zip            String
+  country        String  @default("US")
+
+  wholesaleTotalCents Int       @map("wholesale_total_cents")
+  shippingTotalCents  Int       @map("shipping_total_cents")
+  walletChargeCents   Int       @map("wallet_charge_cents")
+  trackingNumber      String?   @map("tracking_number")
+  carrier             String?
+  shippedAt           DateTime? @map("shipped_at")
+  deliveredAt         DateTime? @map("delivered_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  brand Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  items OrderItem[]
+
+  @@index([brandId, status])
+  @@index([status])
+  @@map("order")
+}
+
+model OrderItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  orderId           String   @map("order_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  qty               Int
+  unitWholesaleCents Int     @map("unit_wholesale_cents") // snapshot at the brand's tier
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product CatalogProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_item")
 }

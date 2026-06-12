@@ -5,6 +5,7 @@ import { Login } from './screens/Login.js';
 import { Catalog } from './screens/Catalog.js';
 import { AdminUsers } from './screens/AdminUsers.js';
 import { AuditLog } from './screens/AuditLog.js';
+import { Fulfillment } from './screens/Fulfillment.js';
 import { EmptyState, PageHeader } from './components/ui.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -30,7 +31,7 @@ export function App() {
       <Route path="/admins" element={<Protected><AdminUsers /></Protected>} />
       <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
       <Route path="/overview" element={<Protected><ComingSoon title="Overview" /></Protected>} />
-      <Route path="/fulfillment" element={<Protected><ComingSoon title="Fulfillment Queue" /></Protected>} />
+      <Route path="/fulfillment" element={<Protected><Fulfillment /></Protected>} />
       <Route path="/exceptions" element={<Protected><ComingSoon title="Exceptions Console" /></Protected>} />
       <Route path="/claims" element={<Protected><ComingSoon title="Claims Queue" /></Protected>} />
       <Route path="/brands" element={<Protected><ComingSoon title="Brand Manager" /></Protected>} />

@@ -16,6 +16,41 @@ export async function getBalance(db: PrismaClient, brandId: string): Promise<num
   return last?.balanceAfter ?? 0;
 }
 
+/** Funds reserved by open (placed-but-not-shipped) orders — an implicit hold. */
+export async function getHeld(db: PrismaClient, brandId: string): Promise<number> {
+  const agg = await db.order.aggregate({
+    where: { brandId, status: { in: ['ready_for_fulfillment', 'processing'] }, blocker: 'none' },
+    _sum: { walletChargeCents: true },
+  });
+  return agg._sum.walletChargeCents ?? 0;
+}
+
+/** balance − held. Insufficient available → an order lands in awaiting_funds. */
+export async function getWalletSummary(
+  db: PrismaClient,
+  brandId: string,
+): Promise<{ balance: number; held: number; available: number }> {
+  const [balance, held] = await Promise.all([getBalance(db, brandId), getHeld(db, brandId)]);
+  return { balance, held, available: balance - held };
+}
+
+/**
+ * Capture an order's wallet charge on ship — debits the balance. Idempotent on
+ * the order id, so re-shipping/retries can't double-charge.
+ */
+export async function captureOrder(
+  db: PrismaClient,
+  order: { id: string; brandId: string; walletChargeCents: number },
+): Promise<void> {
+  await appendEntry(db, {
+    brandId: order.brandId,
+    type: 'capture',
+    amount: -order.walletChargeCents,
+    externalId: `order:${order.id}:capture`,
+    reason: `Order ${order.id} fulfillment`,
+  });
+}
+
 export interface AppendEntryInput {
   brandId: string;
   type: WalletTxnType;

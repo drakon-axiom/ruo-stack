@@ -11,6 +11,8 @@ interface Entry {
 }
 interface WalletData {
   balance_cents: number;
+  held_cents: number;
+  available_cents: number;
   entries: Entry[];
 }
 
@@ -52,15 +54,15 @@ export function Wallet() {
 
       <div className="mt-5 grid grid-cols-3 gap-3">
         <div className="surface p-4">
-          <div className="text-[26px] font-extrabold text-teal">{data ? dollars(data.balance_cents) : '—'}</div>
-          <div className="text-[12px] text-muted">Available balance</div>
+          <div className="text-[26px] font-extrabold text-teal">{data ? dollars(data.available_cents) : '—'}</div>
+          <div className="text-[12px] text-muted">Available {data && data.held_cents > 0 ? `(${dollars(data.held_cents)} held)` : ''}</div>
         </div>
         <div className="surface p-4">
-          <div className="text-[26px] font-extrabold">{dollars(deposited)}</div>
-          <div className="text-[12px] text-muted">Total deposited</div>
+          <div className="text-[26px] font-extrabold">{data ? dollars(data.balance_cents) : '—'}</div>
+          <div className="text-[12px] text-muted">Total balance</div>
         </div>
         <div className="surface p-4">
-          <div className="text-[26px] font-extrabold">{dollars(spent)}</div>
+          <div className="text-[26px] font-extrabold">{dollars(-spent)}</div>
           <div className="text-[12px] text-muted">Total spent</div>
         </div>
       </div>

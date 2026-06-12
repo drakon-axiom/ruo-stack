@@ -9,9 +9,9 @@ const GROUPS: { group: string; items: { to: string; label: string; phase0?: bool
     group: 'Core',
     items: [
       { to: '/app/overview', label: 'Overview' },
-      { to: '/app/orders', label: 'Orders' },
+      { to: '/app/orders', label: 'Orders', phase0: true },
       { to: '/app/tracking', label: 'Tracking' },
-      { to: '/app/action-required', label: 'Action Required' },
+      { to: '/app/action-required', label: 'Action Required', phase0: true },
       { to: '/app/customers', label: 'Customers' },
       { to: '/app/address-book', label: 'Address Book' },
       { to: '/app/wallet', label: 'Wallet', phase0: true },

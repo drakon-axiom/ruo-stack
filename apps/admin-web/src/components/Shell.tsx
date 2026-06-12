@@ -10,7 +10,7 @@ const NAV: { to: string; label: string; phase0: boolean }[] = [
   { to: '/admins', label: 'Admin Users & Roles', phase0: true },
   { to: '/audit', label: 'Audit Log', phase0: true },
   { to: '/overview', label: 'Overview', phase0: false },
-  { to: '/fulfillment', label: 'Fulfillment Queue', phase0: false },
+  { to: '/fulfillment', label: 'Fulfillment Queue', phase0: true },
   { to: '/exceptions', label: 'Exceptions Console', phase0: false },
   { to: '/claims', label: 'Claims Queue', phase0: false },
   { to: '/brands', label: 'Brand Manager', phase0: false },
