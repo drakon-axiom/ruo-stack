@@ -17,6 +17,11 @@ function bearer(req: FastifyRequest): string {
  */
 export const requireBrand: preHandlerHookHandler = async (req: FastifyRequest, _reply: FastifyReply) => {
   const principal = await verifyBrandToken(bearer(req));
+  // A suspended brand is locked out of all brand routes (operator action).
+  const { prisma } = getClients();
+  const brand = await prisma.brand.findUnique({ where: { id: principal.brandId }, select: { status: true } });
+  if (!brand) throw Unauthorized('Brand not found');
+  if (brand.status === 'suspended') throw Forbidden('This account is suspended — contact support');
   req.brand = principal;
 };
 

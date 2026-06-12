@@ -22,6 +22,13 @@ enum SubscriptionStatus {
   @@map("subscription_status")
 }
 
+enum BrandStatus {
+  active
+  suspended
+
+  @@map("brand_status")
+}
+
 enum BrandMemberRole {
   owner
   staff
@@ -115,6 +122,7 @@ model UserProfile {
 model Brand {
   id                 String             @id @default(uuid()) @db.Uuid
   brandName          String             @map("brand_name")
+  status             BrandStatus        @default(active)
   logoUrl            String?            @map("logo_url")
   website            String?
   salesChannel       String?            @map("sales_channel")

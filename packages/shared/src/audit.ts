@@ -15,6 +15,8 @@ export const AUDIT_ACTIONS = {
   adminActivated: 'admin.activated',
   brandProfileUpdated: 'brand.profile_updated',
   brandSignup: 'brand.signup',
+  brandSuspended: 'brand.suspended',
+  brandActivated: 'brand.activated',
   // Money layer (Phase 1):
   walletTopupStarted: 'wallet.topup_started',
   walletDeposit: 'wallet.deposit',

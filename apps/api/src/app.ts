@@ -8,6 +8,8 @@ import { brandBillingRoutes } from './routes/brand-billing.js';
 import { brandOrderRoutes } from './routes/brand-orders.js';
 import { adminAuthRoutes } from './routes/admin-auth.js';
 import { adminFulfillmentRoutes } from './routes/admin-fulfillment.js';
+import { adminOverviewRoutes } from './routes/admin-overview.js';
+import { adminBrandRoutes } from './routes/admin-brands.js';
 import { adminCatalogRoutes } from './routes/admin-catalog.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
 import { webhookRoutes } from './routes/webhook.js';
@@ -52,6 +54,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminCatalogRoutes);
   await app.register(adminUsersRoutes);
   await app.register(adminFulfillmentRoutes);
+  await app.register(adminOverviewRoutes);
+  await app.register(adminBrandRoutes);
   // Webhook: own encapsulated scope (raw-body parser) — register last.
   await app.register(webhookRoutes);
 

@@ -6,14 +6,14 @@ import { logout } from '../lib/api.js';
 // Phase 0 active destinations + later-phase items (disabled) so the IA is
 // visible without implying it's built.
 const NAV: { to: string; label: string; phase0: boolean }[] = [
+  { to: '/overview', label: 'Overview', phase0: true },
+  { to: '/fulfillment', label: 'Fulfillment Queue', phase0: true },
+  { to: '/brands', label: 'Brand Manager', phase0: true },
   { to: '/catalog', label: 'Catalog Manager', phase0: true },
   { to: '/admins', label: 'Admin Users & Roles', phase0: true },
   { to: '/audit', label: 'Audit Log', phase0: true },
-  { to: '/overview', label: 'Overview', phase0: false },
-  { to: '/fulfillment', label: 'Fulfillment Queue', phase0: true },
   { to: '/exceptions', label: 'Exceptions Console', phase0: false },
   { to: '/claims', label: 'Claims Queue', phase0: false },
-  { to: '/brands', label: 'Brand Manager', phase0: false },
   { to: '/ledger', label: 'Ledger & Reconciliation', phase0: false },
 ];
 

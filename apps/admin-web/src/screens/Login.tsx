@@ -22,7 +22,7 @@ export function Login() {
   function finish(access: string, refreshToken: string) {
     setTokens(access, refreshToken);
     refresh();
-    navigate('/catalog');
+    navigate('/overview');
   }
 
   async function submitCredentials(e: React.FormEvent) {
