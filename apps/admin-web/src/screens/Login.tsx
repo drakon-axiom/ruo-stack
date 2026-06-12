@@ -40,8 +40,11 @@ export function Login() {
         setStage('enroll');
       } else if (r.access_token && r.refresh_token) {
         finish(r.access_token, r.refresh_token);
-      } else {
+      } else if (r.mfa_required) {
+        // Password OK; MFA already enrolled → prompt for the 6-digit code.
         setStage('totp');
+      } else {
+        setErr('Unexpected login response');
       }
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : 'Login failed');

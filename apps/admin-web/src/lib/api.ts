@@ -83,6 +83,7 @@ export async function api<T = unknown>(
 // ── Auth flows (option a) ────────────────────────────────────────────────────
 export interface LoginResult {
   mfa_enrollment_required?: boolean;
+  mfa_required?: boolean;
   enrollment_token?: string;
   access_token?: string;
   refresh_token?: string;

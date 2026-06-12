@@ -86,7 +86,9 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    if (!body.totp) throw Unauthorized('TOTP required');
+    // Password is valid but no code supplied yet → tell the client to prompt for
+    // the TOTP code (a 200, not a 401, so the UI can advance to the code step).
+    if (!body.totp) return reply.code(200).send({ mfa_required: true });
     if (!admin.mfaSecret) throw Unauthorized('MFA misconfigured');
     const secret = decryptSecret(admin.mfaSecret, cfg.MFA_ENCRYPTION_KEY);
     if (!authenticator.check(body.totp, secret)) throw Unauthorized('Invalid TOTP');
