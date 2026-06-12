@@ -131,22 +131,92 @@ export function Account() {
         <button className="btn-ghost" onClick={resetPassword}>Send password reset</button>
       </Section>
 
-      <Section title="Subscription">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="pill border-amber/40 bg-amber/10 text-amber">{me.brand.subscription_status === 'pro' ? 'Pro' : 'No plan'}</span>
-            <p className="mt-2 text-[13px] text-muted">Pro ($97/mo) unlocks wholesale pricing + fulfillment.</p>
-          </div>
-          <button className="btn-ghost opacity-60" disabled title="Stripe Customer Portal arrives in Phase 1">
-            Manage subscription (soon)
-          </button>
-        </div>
-      </Section>
+      <SubscriptionSection />
 
       <Section title="Referrals">
         <p className="text-[13px] text-muted">Your referral code:</p>
         <div className="mt-1 font-mono text-[15px] text-teal">{me.brand.referral_code}</div>
       </Section>
     </>
+  );
+}
+
+interface Sub {
+  status: 'none' | 'active' | 'past_due' | 'suspended' | 'cancelled';
+  price_cents: number;
+  current_period_end: string | null;
+  is_pro: boolean;
+}
+
+const SUB_PILL: Record<string, string> = {
+  active: 'border-success/40 bg-success/10 text-success',
+  past_due: 'border-amber/40 bg-amber/10 text-amber',
+  suspended: 'border-danger/40 bg-danger/10 text-danger',
+  cancelled: 'border-line2 bg-card2 text-muted',
+  none: 'border-amber/40 bg-amber/10 text-amber',
+};
+
+function SubscriptionSection() {
+  const [sub, setSub] = useState<Sub | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api<Sub>('/api/brand/subscription').then(setSub).catch(() => setErr('Could not load subscription'));
+  }, []);
+
+  async function subscribe() {
+    setErr('');
+    setBusy(true);
+    try {
+      const { url } = await api<{ url: string }>('/api/brand/billing/subscribe', { method: 'POST' });
+      window.location.href = url;
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not start checkout');
+      setBusy(false);
+    }
+  }
+  async function manage() {
+    setErr('');
+    setBusy(true);
+    try {
+      const { url } = await api<{ url: string }>('/api/brand/billing/portal-session', { method: 'POST' });
+      window.location.href = url;
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not open billing portal');
+      setBusy(false);
+    }
+  }
+
+  const status = sub?.status ?? 'none';
+  const label = status === 'none' ? 'No plan' : status === 'active' ? 'Pro' : status.replace('_', ' ');
+
+  return (
+    <Section title="Subscription">
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+
+      {status === 'suspended' && (
+        <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+          Your Pro membership is suspended for non-payment. Fulfillment features are paused — update your payment method to restore them.
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <span className={`pill ${SUB_PILL[status]}`}>{label}</span>
+          <p className="mt-2 text-[13px] text-muted">
+            Pro ($97/mo) unlocks wholesale pricing + fulfillment.
+            {sub?.current_period_end && status === 'active' && (
+              <> Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>
+            )}
+          </p>
+        </div>
+        {status === 'active' || status === 'past_due' || status === 'suspended' ? (
+          <button className="btn-ghost" onClick={manage} disabled={busy}>{busy ? '…' : 'Manage subscription'}</button>
+        ) : (
+          <button className="btn" onClick={subscribe} disabled={busy}>{busy ? '…' : 'Subscribe to Pro'}</button>
+        )}
+      </div>
+    </Section>
   );
 }

@@ -8,6 +8,7 @@ import type {
   NormalizedEvent,
   PaymentsAdapter,
   RefundCreditInput,
+  SubscriptionCheckoutInput,
 } from '@ruostack/shared';
 import { STATEMENT_DESCRIPTORS } from '@ruostack/shared';
 
@@ -30,6 +31,15 @@ export class StripeAdapter implements PaymentsAdapter {
   constructor(private readonly config: StripeAdapterConfig) {
     this.stripe = new Stripe(config.secretKey);
     this.webhookSecret = config.webhookSecret;
+  }
+
+  async createCustomer(input: { brandId: string; email?: string; name?: string }): Promise<{ customerId: string }> {
+    const c = await this.stripe.customers.create({
+      email: input.email,
+      name: input.name,
+      metadata: { brand_id: input.brandId },
+    });
+    return { customerId: c.id };
   }
 
   async createSubscription(
@@ -56,6 +66,25 @@ export class StripeAdapter implements PaymentsAdapter {
       ...(input.metadata ? { metadata: input.metadata } : {}),
     });
     return { subscriptionId: sub.id, status: sub.status };
+  }
+
+  /** Pro membership signup via hosted Checkout (subscription mode). */
+  async createSubscriptionCheckout(
+    input: SubscriptionCheckoutInput,
+  ): Promise<{ url: string; sessionId: string }> {
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: input.customerId,
+      line_items: [{ price: input.priceId, quantity: 1 }],
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      subscription_data: {
+        metadata: { brand_id: input.brandId, kind: 'membership' },
+      },
+      metadata: { brand_id: input.brandId, kind: 'membership' },
+    });
+    if (!session.url) throw new Error('Stripe did not return a Checkout URL');
+    return { url: session.url, sessionId: session.id };
   }
 
   /** Wallet top-up → live (test-mode) hosted Checkout URL. */
@@ -154,25 +183,29 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription;
       const customerId = typeof sub.customer === 'string' ? sub.customer : undefined;
+      const brandId = sub.metadata?.brand_id;
       if (sub.status === 'active' || sub.status === 'trialing') {
         // current_period_end sits on the Subscription in older API versions and
         // on the item in newer ones — read defensively across SDK versions.
+        const item = sub.items.data[0];
         const currentPeriodEnd =
           (sub as unknown as { current_period_end?: number }).current_period_end ??
-          (sub.items.data[0] as unknown as { current_period_end?: number } | undefined)?.current_period_end;
+          (item as unknown as { current_period_end?: number } | undefined)?.current_period_end;
         return {
           kind: 'subscription.activated',
           externalId,
           subscriptionId: sub.id,
+          brandId,
           customerId,
+          price: item?.price?.unit_amount ?? undefined,
           currentPeriodEnd,
         };
       }
       if (sub.status === 'past_due' || sub.status === 'unpaid') {
-        return { kind: 'subscription.past_due', externalId, subscriptionId: sub.id, customerId };
+        return { kind: 'subscription.past_due', externalId, subscriptionId: sub.id, brandId, customerId };
       }
       if (sub.status === 'paused') {
-        return { kind: 'subscription.suspended', externalId, subscriptionId: sub.id, customerId };
+        return { kind: 'subscription.suspended', externalId, subscriptionId: sub.id, brandId, customerId };
       }
       return { kind: 'unknown', externalId, rawType: `${event.type}:${sub.status}` };
     }
@@ -182,6 +215,7 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
         kind: 'subscription.cancelled',
         externalId,
         subscriptionId: sub.id,
+        brandId: sub.metadata?.brand_id,
         customerId: typeof sub.customer === 'string' ? sub.customer : undefined,
       };
     }

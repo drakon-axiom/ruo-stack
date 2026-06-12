@@ -14,10 +14,10 @@ export type Cents = number;
 export type NormalizedEvent =
   | { kind: 'wallet.topup_succeeded'; externalId: string; brandId?: string; amount?: Cents; currency?: string; customerId?: string }
   | { kind: 'wallet.topup_failed'; externalId: string; brandId?: string; amount?: Cents; reason?: string; customerId?: string }
-  | { kind: 'subscription.activated'; externalId: string; subscriptionId: string; customerId?: string; currentPeriodEnd?: number }
-  | { kind: 'subscription.past_due'; externalId: string; subscriptionId: string; customerId?: string }
-  | { kind: 'subscription.suspended'; externalId: string; subscriptionId: string; customerId?: string }
-  | { kind: 'subscription.cancelled'; externalId: string; subscriptionId: string; customerId?: string }
+  | { kind: 'subscription.activated'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string; price?: Cents; currentPeriodEnd?: number }
+  | { kind: 'subscription.past_due'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string }
+  | { kind: 'subscription.suspended'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string }
+  | { kind: 'subscription.cancelled'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string }
   | { kind: 'dispute.opened'; externalId: string; amount?: Cents; chargeId?: string }
   | { kind: 'refund.processed'; externalId: string; amount?: Cents; chargeId?: string }
   | { kind: 'unknown'; externalId: string; rawType: string };
@@ -26,6 +26,14 @@ export interface CreateSubscriptionInput {
   customerId: string;
   priceId: string;
   metadata?: Record<string, string>;
+}
+
+export interface SubscriptionCheckoutInput {
+  customerId: string;
+  priceId: string;
+  brandId: string;
+  successUrl: string;
+  cancelUrl: string;
 }
 
 export interface CreateCheckoutInput {
@@ -53,12 +61,16 @@ export interface DisputeInput {
 }
 
 export interface PaymentsAdapter {
+  /** Create/ensure a processor customer for a brand (returns the customer id). */
+  createCustomer(input: { brandId: string; email?: string; name?: string }): Promise<{ customerId: string }>;
   createSubscription(input: CreateSubscriptionInput): Promise<{ subscriptionId: string; status: string }>;
   cancelSubscription(subscriptionId: string): Promise<void>;
   updateSubscription(
     subscriptionId: string,
     input: Partial<CreateSubscriptionInput>,
   ): Promise<{ subscriptionId: string; status: string }>;
+  /** Pro membership signup via hosted Checkout (subscription mode; collects card). */
+  createSubscriptionCheckout(input: SubscriptionCheckoutInput): Promise<{ url: string; sessionId: string }>;
   /** Wallet top-up. Returns a live (test-mode) hosted checkout URL. */
   createCheckout(input: CreateCheckoutInput): Promise<{ url: string; sessionId: string }>;
   /** Phase 1 brand self-service portal; define the seam now. */

@@ -15,8 +15,12 @@ export const AUDIT_ACTIONS = {
   adminActivated: 'admin.activated',
   brandProfileUpdated: 'brand.profile_updated',
   brandSignup: 'brand.signup',
-  // Phase 1+ seams (declared; not written in Phase 0):
+  // Money layer (Phase 1):
+  walletTopupStarted: 'wallet.topup_started',
+  walletDeposit: 'wallet.deposit',
   walletManualAdjustment: 'wallet.manual_adjustment',
+  subscriptionCheckoutStarted: 'subscription.checkout_started',
+  subscriptionStatusChanged: 'subscription.status_changed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

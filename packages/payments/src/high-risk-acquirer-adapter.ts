@@ -5,6 +5,7 @@ import type {
   NormalizedEvent,
   PaymentsAdapter,
   RefundCreditInput,
+  SubscriptionCheckoutInput,
 } from '@ruostack/shared';
 
 /**
@@ -18,8 +19,14 @@ export class HighRiskAcquirerAdapter implements PaymentsAdapter {
     throw new Error(`NotImplemented: HighRiskAcquirer.${method}`);
   }
 
+  createCustomer(_input: { brandId: string; email?: string; name?: string }): Promise<{ customerId: string }> {
+    return this.fail('createCustomer');
+  }
   createSubscription(_input: CreateSubscriptionInput): Promise<{ subscriptionId: string; status: string }> {
     return this.fail('createSubscription');
+  }
+  createSubscriptionCheckout(_input: SubscriptionCheckoutInput): Promise<{ url: string; sessionId: string }> {
+    return this.fail('createSubscriptionCheckout');
   }
   cancelSubscription(_subscriptionId: string): Promise<void> {
     return this.fail('cancelSubscription');

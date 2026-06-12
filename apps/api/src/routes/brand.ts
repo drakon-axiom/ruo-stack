@@ -177,8 +177,16 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
 
   // ── Read-only catalog projection (published products only) ────────────────
   // Proves the seam: the brand catalog is a READ PROJECTION of CatalogProduct,
-  // never independently written.
-  app.get('/api/brand/catalog', { preHandler: requireBrand }, async () => {
+  // never independently written. Pro gating: wholesale pricing is visible only
+  // to active-Pro brands (membership gates wholesale pricing + fulfillment).
+  app.get('/api/brand/catalog', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    const sub = await prisma.subscriptionState.findUnique({
+      where: { brandId },
+      select: { status: true },
+    });
+    const isPro = sub?.status === 'active';
+
     const products = await prisma.catalogProduct.findMany({
       where: { isPublished: true },
       orderBy: { name: 'asc' },
@@ -197,6 +205,10 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
         coaId: true,
       },
     });
-    return { products };
+    return {
+      pro: isPro,
+      // Wholesale cost is gated behind Pro; suggested retail stays visible.
+      products: products.map((p) => ({ ...p, wholesaleCost: isPro ? p.wholesaleCost : null })),
+    };
   });
 }

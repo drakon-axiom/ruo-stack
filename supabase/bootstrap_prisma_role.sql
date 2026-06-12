@@ -32,6 +32,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE prisma IN SCHEMA public GRANT ALL ON TABLES   
 ALTER DEFAULT PRIVILEGES FOR ROLE prisma IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE prisma IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
 
+-- 5. Migrations run as `postgres` (DIRECT_URL), so objects they create are owned
+--    by postgres — grant the runtime `prisma` role + API roles access to them,
+--    both now and for future migration-created objects. Without this the runtime
+--    prisma role gets "permission denied" on tables added by later migrations.
+GRANT ALL ON ALL TABLES    IN SCHEMA public TO prisma, anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO prisma, anon, authenticated, service_role;
+GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO prisma, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES    TO prisma, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO prisma, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO prisma, anon, authenticated, service_role;
+
 -- NOTE: the `init` migration intentionally omits `CREATE SCHEMA public` (it
 -- already exists on Supabase, and CREATE SCHEMA needs CREATE-on-database which
 -- the app role does not hold).

@@ -4,6 +4,7 @@ import { Shell } from './components/Shell.js';
 import { Signup, Login, Forgot, Reset } from './screens/Auth.js';
 import { Account } from './screens/Account.js';
 import { Catalog } from './screens/Catalog.js';
+import { Wallet } from './screens/Wallet.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -31,7 +32,6 @@ const COMING = [
   ['action-required', 'Action Required'],
   ['customers', 'Customers'],
   ['address-book', 'Address Book'],
-  ['wallet', 'Wallet'],
   ['store', 'My Store'],
   ['coas', 'COAs'],
   ['branding', 'Branding'],
@@ -51,6 +51,7 @@ export function App() {
 
       <Route path="/app/account" element={<Protected><Account /></Protected>} />
       <Route path="/app/catalog" element={<Protected><Catalog /></Protected>} />
+      <Route path="/app/wallet" element={<Protected><Wallet /></Protected>} />
       {COMING.map(([slug, title]) => (
         <Route key={slug} path={`/app/${slug}`} element={<Protected><ComingSoon title={title} /></Protected>} />
       ))}

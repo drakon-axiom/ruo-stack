@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 import { loadConfig } from './config.js';
 import { HttpError } from './errors.js';
 import { brandRoutes } from './routes/brand.js';
+import { brandBillingRoutes } from './routes/brand-billing.js';
 import { adminAuthRoutes } from './routes/admin-auth.js';
 import { adminCatalogRoutes } from './routes/admin-catalog.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
@@ -43,6 +44,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Brand realm (Supabase Auth JWTs) and admin realm (option a) routes.
   await app.register(brandRoutes);
+  await app.register(brandBillingRoutes);
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
   await app.register(adminUsersRoutes);

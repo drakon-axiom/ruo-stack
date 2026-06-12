@@ -126,9 +126,11 @@ model Brand {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  members       BrandMember[]
-  userRoles     BrandUserRole[]
-  taxExemptions BrandTaxExemption[]
+  members           BrandMember[]
+  userRoles         BrandUserRole[]
+  taxExemptions     BrandTaxExemption[]
+  subscriptionState SubscriptionState?
+  walletLedger      WalletLedger[]
 
   @@map("brand")
 }
@@ -312,4 +314,73 @@ model BrandTaxExemption {
 
   @@index([brandId])
   @@map("brand_tax_exemption")
+}
+
+// ── Money layer (Phase 1) ─────────────────────────────────────────────────────
+// Membership and wallet are DIFFERENT money concerns and never commingle
+// (architecture §4.1): a membership charge never touches WalletLedger; a wallet
+// deposit never touches SubscriptionState.
+
+enum SubscriptionStateStatus {
+  none
+  active
+  past_due
+  suspended
+  cancelled
+
+  @@map("subscription_state_status")
+}
+
+enum WalletTxnType {
+  deposit
+  hold
+  hold_release
+  capture
+  refund_credit
+  referral_credit
+  manual_adjustment
+
+  @@map("wallet_txn_type")
+}
+
+/// One per brand. Driven ONLY by billing webhooks (invoice.paid / payment_failed
+/// / subscription.*). Source of truth for membership; Brand.subscription_status
+/// is a convenience mirror.
+model SubscriptionState {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  brandId              String                  @unique @map("brand_id") @db.Uuid
+  stripeSubscriptionId String?                 @map("stripe_subscription_id")
+  plan                 String                  @default("pro")
+  price                Int                     @default(0) // cents
+  status               SubscriptionStateStatus @default(none)
+  currentPeriodEnd     DateTime?               @map("current_period_end")
+  createdAt            DateTime                @default(now()) @map("created_at")
+  updatedAt            DateTime                @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@map("subscription_state")
+}
+
+/// Append-only prepaid wallet ledger. `balance_after` is the running available
+/// balance after this entry; current balance = the row with the greatest `seq`.
+/// Non-refundable / non-withdrawable by design (closed-loop; payments §2) — there
+/// is deliberately no withdrawal entry type. Idempotent on external_id (the
+/// processor event id) so a replayed webhook can't double-credit.
+model WalletLedger {
+  id           String        @id @default(uuid()) @db.Uuid
+  seq          BigInt        @default(autoincrement()) @unique
+  brandId      String        @map("brand_id") @db.Uuid
+  type         WalletTxnType
+  amount       Int // signed delta, cents
+  balanceAfter Int           @map("balance_after") // cents
+  externalId   String?       @unique @map("external_id") // processor event id (idempotency)
+  reason       String?
+  createdBy    String?       @map("created_by") @db.Uuid // AdminUser.id for manual_adjustment
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId, seq])
+  @@map("wallet_ledger")
 }
