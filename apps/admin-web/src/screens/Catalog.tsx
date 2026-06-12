@@ -12,7 +12,9 @@ interface Product {
   unit?: string | null;
   name: string;
   descriptionTemplate?: string | null;
-  wholesaleCost: number;
+  wholesaleStarter: number;
+  wholesalePro: number;
+  wholesaleVolume: number;
   suggestedRetail: number;
   status: 'in_stock' | 'soon' | 'out_of_stock';
   isPublished: boolean;
@@ -122,7 +124,7 @@ export function Catalog() {
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
                 <th className="px-4 py-3">SKU</th>
                 <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Cost</th>
+                <th className="px-4 py-3">Wholesale (S / P / V)</th>
                 <th className="px-4 py-3">Retail</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Published</th>
@@ -137,7 +139,9 @@ export function Catalog() {
                 >
                   <td className="px-4 py-3 font-mono text-[12px] text-teal-bright">{p.canonicalSku}</td>
                   <td className="px-4 py-3 text-text">{p.name}</td>
-                  <td className="px-4 py-3">{dollars(p.wholesaleCost)}</td>
+                  <td className="px-4 py-3 text-[12px] text-muted">
+                    {dollars(p.wholesaleStarter)} / {dollars(p.wholesalePro)} / {dollars(p.wholesaleVolume)}
+                  </td>
                   <td className="px-4 py-3 text-success">{dollars(p.suggestedRetail)}</td>
                   <td className="px-4 py-3"><StatusPill value={p.status} /></td>
                   <td className="px-4 py-3 text-muted">{p.isPublished ? '🔒 yes' : 'draft'}</td>
@@ -179,7 +183,9 @@ function EditDrawer({
 }) {
   const [sku, setSku] = useState(product.canonicalSku);
   const [name, setName] = useState(product.name);
-  const [cost, setCost] = useState((product.wholesaleCost / 100).toString());
+  const [costS, setCostS] = useState((product.wholesaleStarter / 100).toString());
+  const [costP, setCostP] = useState((product.wholesalePro / 100).toString());
+  const [costV, setCostV] = useState((product.wholesaleVolume / 100).toString());
   const [retail, setRetail] = useState((product.suggestedRetail / 100).toString());
   const [weight, setWeight] = useState(product.weight?.toString() ?? '');
   const [packaging, setPackaging] = useState(product.packagingRule ?? '');
@@ -197,7 +203,9 @@ function EditDrawer({
         body: {
           ...(product.isPublished ? {} : { canonical_sku: sku }),
           name,
-          wholesale_cost: toCents(cost),
+          wholesale_starter: toCents(costS),
+          wholesale_pro: toCents(costP),
+          wholesale_volume: toCents(costV),
           suggested_retail: toCents(retail),
           weight: weight ? parseFloat(weight) : undefined,
           packaging_rule: packaging || undefined,
@@ -264,14 +272,21 @@ function EditDrawer({
       <Field label="Name">
         <input className="input" value={name} disabled={!writable} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Wholesale cost ($)">
-          <input className="input" value={cost} disabled={!writable} onChange={(e) => setCost(e.target.value)} />
+      <div className="mb-1 mt-1 text-[11px] uppercase tracking-[0.1em] text-faint">Wholesale cost by plan ($)</div>
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Starter">
+          <input className="input" value={costS} disabled={!writable} onChange={(e) => setCostS(e.target.value)} />
         </Field>
-        <Field label="Suggested retail ($)">
-          <input className="input" value={retail} disabled={!writable} onChange={(e) => setRetail(e.target.value)} />
+        <Field label="Pro">
+          <input className="input" value={costP} disabled={!writable} onChange={(e) => setCostP(e.target.value)} />
+        </Field>
+        <Field label="Volume">
+          <input className="input" value={costV} disabled={!writable} onChange={(e) => setCostV(e.target.value)} />
         </Field>
       </div>
+      <Field label="Suggested retail ($)">
+        <input className="input" value={retail} disabled={!writable} onChange={(e) => setRetail(e.target.value)} />
+      </Field>
       <Field label="Stock status">
         <select className="input" value={status} disabled={!writable} onChange={(e) => changeStock(e.target.value as Product['status'])}>
           <option value="in_stock">in_stock</option>
@@ -298,7 +313,9 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [compound, setCompound] = useState('');
-  const [cost, setCost] = useState('');
+  const [costS, setCostS] = useState('');
+  const [costP, setCostP] = useState('');
+  const [costV, setCostV] = useState('');
   const [retail, setRetail] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -313,7 +330,9 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           canonical_sku: sku,
           name,
           compound,
-          wholesale_cost: toCents(cost),
+          wholesale_starter: toCents(costS),
+          wholesale_pro: toCents(costP),
+          wholesale_volume: toCents(costV),
           suggested_retail: toCents(retail),
         },
       });
@@ -345,14 +364,21 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       <Field label="Compound">
         <input className="input" value={compound} onChange={(e) => setCompound(e.target.value)} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Wholesale cost ($)">
-          <input className="input" value={cost} onChange={(e) => setCost(e.target.value)} />
+      <div className="mb-1 text-[11px] uppercase tracking-[0.1em] text-faint">Wholesale cost by plan ($)</div>
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Starter">
+          <input className="input" value={costS} onChange={(e) => setCostS(e.target.value)} />
         </Field>
-        <Field label="Suggested retail ($)">
-          <input className="input" value={retail} onChange={(e) => setRetail(e.target.value)} />
+        <Field label="Pro">
+          <input className="input" value={costP} onChange={(e) => setCostP(e.target.value)} />
+        </Field>
+        <Field label="Volume">
+          <input className="input" value={costV} onChange={(e) => setCostV(e.target.value)} />
         </Field>
       </div>
+      <Field label="Suggested retail ($)">
+        <input className="input" value={retail} onChange={(e) => setRetail(e.target.value)} />
+      </Field>
       <p className="text-[11px] text-faint">SKU is editable until you publish. Publishing locks it permanently.</p>
     </Drawer>
   );

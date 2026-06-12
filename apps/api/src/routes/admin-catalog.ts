@@ -67,7 +67,9 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
           unit: body.unit,
           name: body.name,
           descriptionTemplate: body.description_template,
-          wholesaleCost: body.wholesale_cost,
+          wholesaleStarter: body.wholesale_starter,
+          wholesalePro: body.wholesale_pro,
+          wholesaleVolume: body.wholesale_volume,
           suggestedRetail: body.suggested_retail,
           status: body.status,
           weight: body.weight,
@@ -120,7 +122,9 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
       unit: 'unit',
       name: 'name',
       description_template: 'descriptionTemplate',
-      wholesale_cost: 'wholesaleCost',
+      wholesale_starter: 'wholesaleStarter',
+      wholesale_pro: 'wholesalePro',
+      wholesale_volume: 'wholesaleVolume',
       suggested_retail: 'suggestedRetail',
       status: 'status',
       weight: 'weight',
@@ -207,7 +211,9 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
 function snapshot(p: {
   canonicalSku: string;
   name: string;
-  wholesaleCost: number;
+  wholesaleStarter: number;
+  wholesalePro: number;
+  wholesaleVolume: number;
   suggestedRetail: number;
   status: string;
   isPublished: boolean;
@@ -215,7 +221,9 @@ function snapshot(p: {
   return {
     canonical_sku: p.canonicalSku,
     name: p.name,
-    wholesale_cost: p.wholesaleCost,
+    wholesale_starter: p.wholesaleStarter,
+    wholesale_pro: p.wholesalePro,
+    wholesale_volume: p.wholesaleVolume,
     suggested_retail: p.suggestedRetail,
     status: p.status,
     is_published: p.isPublished,

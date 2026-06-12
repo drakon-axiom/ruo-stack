@@ -44,8 +44,11 @@ export const CatalogCreateSchema = z.object({
   unit: z.string().max(30).optional(),
   name: z.string().min(1).max(200),
   description_template: z.string().max(5000).optional(),
-  wholesale_cost: z.number().int().nonnegative(), // cents
-  suggested_retail: z.number().int().nonnegative(), // cents
+  // Tiered wholesale cost (cents) — one per plan; higher tiers get better rates.
+  wholesale_starter: z.number().int().nonnegative(),
+  wholesale_pro: z.number().int().nonnegative(),
+  wholesale_volume: z.number().int().nonnegative(),
+  suggested_retail: z.number().int().nonnegative(), // cents (operator suggestion)
   status: CatalogStatusEnum.default('soon'),
   weight: z.number().nonnegative().optional(),
   length: z.number().nonnegative().optional(),

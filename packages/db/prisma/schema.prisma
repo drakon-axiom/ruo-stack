@@ -129,8 +129,9 @@ model Brand {
   members           BrandMember[]
   userRoles         BrandUserRole[]
   taxExemptions     BrandTaxExemption[]
-  subscriptionState SubscriptionState?
-  walletLedger      WalletLedger[]
+  subscriptionState  SubscriptionState?
+  walletLedger       WalletLedger[]
+  brandProductPrices BrandProductPrice[]
 
   @@map("brand")
 }
@@ -259,8 +260,10 @@ model CatalogProduct {
   unit                String?
   name                String
   descriptionTemplate String?       @map("description_template")
-  wholesaleCost       Int           @map("wholesale_cost") // cents
-  suggestedRetail     Int           @map("suggested_retail") // cents
+  wholesaleStarter    Int           @map("wholesale_starter") // cents — Starter tier rate
+  wholesalePro        Int           @map("wholesale_pro") // cents — Pro tier rate
+  wholesaleVolume     Int           @map("wholesale_volume") // cents — Volume tier rate
+  suggestedRetail     Int           @map("suggested_retail") // cents (operator suggestion; brand can override)
   status              CatalogStatus @default(soon) // stock state
   isPublished         Boolean       @default(false) @map("is_published")
   weight              Float?
@@ -273,6 +276,8 @@ model CatalogProduct {
   updatedBy           String?       @map("updated_by") @db.Uuid
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  brandPrices BrandProductPrice[]
 
   @@index([status])
   @@index([isPublished])
@@ -331,6 +336,14 @@ enum SubscriptionStateStatus {
   @@map("subscription_state_status")
 }
 
+enum PlanTier {
+  starter
+  pro
+  volume
+
+  @@map("plan_tier")
+}
+
 enum WalletTxnType {
   deposit
   hold
@@ -350,7 +363,7 @@ model SubscriptionState {
   id                   String                  @id @default(uuid()) @db.Uuid
   brandId              String                  @unique @map("brand_id") @db.Uuid
   stripeSubscriptionId String?                 @map("stripe_subscription_id")
-  plan                 String                  @default("pro")
+  plan                 PlanTier                @default(starter)
   price                Int                     @default(0) // cents
   status               SubscriptionStateStatus @default(none)
   currentPeriodEnd     DateTime?               @map("current_period_end")
@@ -383,4 +396,22 @@ model WalletLedger {
 
   @@index([brandId, seq])
   @@map("wallet_ledger")
+}
+
+/// A brand's own retail price for a product — overrides CatalogProduct.suggested_retail.
+/// The brand sets this in their portal; defaults to the operator suggestion if absent.
+model BrandProductPrice {
+  id          String   @id @default(uuid()) @db.Uuid
+  brandId     String   @map("brand_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  retailCents Int      @map("retail_cents")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  brand   Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  product CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, productId])
+  @@index([brandId])
+  @@map("brand_product_price")
 }

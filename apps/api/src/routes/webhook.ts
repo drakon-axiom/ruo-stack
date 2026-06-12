@@ -1,10 +1,20 @@
 import type { FastifyInstance } from 'fastify';
-import { Prisma, type PrismaClient } from '@ruostack/db';
+import { Prisma, type PlanTier, type PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type NormalizedEvent } from '@ruostack/shared';
 import { getClients } from '../clients.js';
+import { loadConfig } from '../config.js';
 import { writeAudit } from '../audit.js';
 import { appendEntry } from '../services/wallet.js';
 import { upsertSubscriptionState } from '../services/subscription.js';
+
+/** Map a Stripe price id to a plan tier (configured per-tier price ids). */
+function planForPrice(priceId?: string): PlanTier | undefined {
+  if (!priceId) return undefined;
+  const cfg = loadConfig();
+  if (priceId === cfg.STRIPE_VOLUME_PRICE_ID) return 'volume';
+  if (priceId === cfg.STRIPE_PRO_PRICE_ID) return 'pro';
+  return undefined;
+}
 
 /**
  * Stripe webhook receiver. Own encapsulated plugin scope so the raw-body parser
@@ -137,6 +147,7 @@ async function dispatch(db: PrismaClient, event: NormalizedEvent, ip: string): P
       await upsertSubscriptionState(db, {
         brandId,
         status,
+        plan: planForPrice(event.priceId),
         stripeSubscriptionId: event.subscriptionId,
         ...(event.kind === 'subscription.activated'
           ? {

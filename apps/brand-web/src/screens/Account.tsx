@@ -141,38 +141,45 @@ export function Account() {
   );
 }
 
+interface PlanCard {
+  key: 'starter' | 'pro' | 'volume';
+  name: string;
+  price_cents: number;
+  paid: boolean;
+  features: string[];
+}
 interface Sub {
   status: 'none' | 'active' | 'past_due' | 'suspended' | 'cancelled';
-  price_cents: number;
+  current_plan: 'starter' | 'pro' | 'volume';
+  billed_plan: string;
   current_period_end: string | null;
-  is_pro: boolean;
+  plans: PlanCard[];
 }
-
-const SUB_PILL: Record<string, string> = {
-  active: 'border-success/40 bg-success/10 text-success',
-  past_due: 'border-amber/40 bg-amber/10 text-amber',
-  suspended: 'border-danger/40 bg-danger/10 text-danger',
-  cancelled: 'border-line2 bg-card2 text-muted',
-  none: 'border-amber/40 bg-amber/10 text-amber',
-};
 
 function SubscriptionSection() {
   const [sub, setSub] = useState<Sub | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  function load() {
     api<Sub>('/api/brand/subscription').then(setSub).catch(() => setErr('Could not load subscription'));
-  }, []);
+  }
+  useEffect(load, []);
 
-  async function subscribe() {
+  async function choose(plan: PlanCard) {
     setErr('');
     setBusy(true);
     try {
-      const { url } = await api<{ url: string }>('/api/brand/billing/subscribe', { method: 'POST' });
-      window.location.href = url;
+      if (plan.paid) {
+        const { url } = await api<{ url: string }>('/api/brand/billing/subscribe', { method: 'POST', body: { plan: plan.key } });
+        window.location.href = url;
+      } else {
+        // Downgrade to free Starter = cancel the paid plan in the Stripe portal.
+        const { url } = await api<{ url: string }>('/api/brand/billing/portal-session', { method: 'POST' });
+        window.location.href = url;
+      }
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Could not start checkout');
+      setErr(e instanceof ApiError ? e.message : 'Could not continue');
       setBusy(false);
     }
   }
@@ -188,34 +195,58 @@ function SubscriptionSection() {
     }
   }
 
+  const current = sub?.current_plan ?? 'starter';
   const status = sub?.status ?? 'none';
-  const label = status === 'none' ? 'No plan' : status === 'active' ? 'Pro' : status.replace('_', ' ');
+  const onPaid = current === 'pro' || current === 'volume';
+  const dollars = (c: number) => (c === 0 ? 'Free' : `$${c / 100}/mo`);
 
   return (
     <Section title="Subscription">
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
 
+      {status === 'past_due' && (
+        <div className="mb-4 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-amber">
+          Payment failed — update your payment method to keep your plan. You're on Starter access until it clears.
+        </div>
+      )}
       {status === 'suspended' && (
         <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
-          Your Pro membership is suspended for non-payment. Fulfillment features are paused — update your payment method to restore them.
+          Membership suspended for non-payment — fulfillment features are paused. Update your payment method to restore them.
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <span className={`pill ${SUB_PILL[status]}`}>{label}</span>
-          <p className="mt-2 text-[13px] text-muted">
-            Pro ($97/mo) unlocks wholesale pricing + fulfillment.
-            {sub?.current_period_end && status === 'active' && (
-              <> Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>
-            )}
-          </p>
-        </div>
-        {status === 'active' || status === 'past_due' || status === 'suspended' ? (
-          <button className="btn-ghost" onClick={manage} disabled={busy}>{busy ? '…' : 'Manage subscription'}</button>
-        ) : (
-          <button className="btn" onClick={subscribe} disabled={busy}>{busy ? '…' : 'Subscribe to Pro'}</button>
-        )}
+      <div className="grid grid-cols-3 gap-3">
+        {(sub?.plans ?? []).map((p) => {
+          const isCurrent = p.key === current;
+          return (
+            <div key={p.key} className={`rounded-card border p-4 ${isCurrent ? 'border-teal bg-teal/5' : 'border-lline dark:border-line'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[15px] font-semibold">{p.name}</span>
+                {isCurrent && <span className="pill border-teal/40 bg-teal/10 text-teal">Current</span>}
+              </div>
+              <div className="mt-1 text-[20px] font-extrabold">{dollars(p.price_cents)}</div>
+              <ul className="mt-3 space-y-1.5 text-[12px] text-muted">
+                {p.features.map((f) => (
+                  <li key={f} className="flex gap-1.5"><span className="text-teal">✓</span>{f}</li>
+                ))}
+              </ul>
+              <button
+                className={`mt-4 w-full ${isCurrent ? 'btn-ghost opacity-60' : 'btn'}`}
+                disabled={isCurrent || busy}
+                onClick={() => choose(p)}
+              >
+                {isCurrent ? 'Current plan' : p.paid ? `Choose ${p.name}` : 'Downgrade to Starter'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between text-[12px] text-muted">
+        <span>
+          {sub?.current_period_end && status === 'active' && <>Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>}
+        </span>
+        {onPaid && <button className="text-teal hover:underline" onClick={manage}>Manage billing →</button>}
       </div>
     </Section>
   );

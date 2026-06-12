@@ -31,7 +31,6 @@ export function getClients(): Clients {
   const payments = new StripeAdapter({
     secretKey: cfg.STRIPE_SECRET_KEY,
     webhookSecret: cfg.STRIPE_WEBHOOK_SECRET,
-    membershipPriceId: cfg.STRIPE_MEMBERSHIP_PRICE_ID,
   });
 
   _clients = {

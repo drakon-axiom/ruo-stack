@@ -42,7 +42,8 @@ export const EnvSchema = z.object({
   // Stripe (behind PaymentsAdapter only).
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
-  STRIPE_MEMBERSHIP_PRICE_ID: z.string().optional(),
+  STRIPE_PRO_PRICE_ID: z.string().optional(),
+  STRIPE_VOLUME_PRICE_ID: z.string().optional(),
 
   // API.
   API_PORT: z.coerce.number().int().positive().default(3901),

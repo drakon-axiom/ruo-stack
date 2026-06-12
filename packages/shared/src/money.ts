@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PAID_PLAN_KEYS } from './plans.js';
 
 /** Wallet ledger entry types (architecture §4.1). Phase 1 exercises deposit /
  * refund_credit / manual_adjustment; hold/capture arrive with the order pipe. */
@@ -25,6 +26,14 @@ export const WalletTopupSchema = z.object({
   }),
 });
 export type WalletTopup = z.infer<typeof WalletTopupSchema>;
+
+/** Subscribe to a PAID plan (Starter is free — selected by cancelling, not here). */
+export const SubscribeSchema = z.object({ plan: z.enum(PAID_PLAN_KEYS) });
+export type Subscribe = z.infer<typeof SubscribeSchema>;
+
+/** A brand's own retail price for a product (overrides the operator suggestion). */
+export const BrandRetailSchema = z.object({ retail_cents: z.number().int().nonnegative().max(100_000_000) });
+export type BrandRetail = z.infer<typeof BrandRetailSchema>;
 
 /** Finance-only manual wallet adjustment (architecture §1.2; audited). */
 export const WalletAdjustSchema = z.object({

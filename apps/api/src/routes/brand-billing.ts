@@ -1,11 +1,19 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { AUDIT_ACTIONS, STATEMENT_DESCRIPTORS, WalletTopupSchema } from '@ruostack/shared';
+import {
+  AUDIT_ACTIONS,
+  PLANS,
+  PLAN_LIST,
+  STATEMENT_DESCRIPTORS,
+  SubscribeSchema,
+  WalletTopupSchema,
+} from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { loadConfig } from '../config.js';
 import { writeAudit } from '../audit.js';
 import { requireBrand } from '../middleware/guards.js';
 import { BadRequest, NotFound } from '../errors.js';
 import { getBalance } from '../services/wallet.js';
+import { effectivePlan } from '../services/subscription.js';
 
 /**
  * Brand-facing money layer (Phase 1): Pro membership + prepaid wallet. Core never
@@ -41,17 +49,20 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
     return customerId;
   }
 
-  // ── Subscribe to Pro (hosted Checkout, subscription mode) ──────────────────
+  // ── Subscribe to a PAID plan (Pro/Volume) via hosted Checkout ──────────────
+  // Starter is the free default — selected by cancelling a paid plan in the portal.
   app.post('/api/brand/billing/subscribe', { preHandler: requireBrand }, async (req) => {
     const { brandId, userId } = req.brand!;
-    if (!cfg.STRIPE_MEMBERSHIP_PRICE_ID) {
-      throw BadRequest('membership_price_unconfigured', 'STRIPE_MEMBERSHIP_PRICE_ID is not set');
-    }
+    const { plan } = SubscribeSchema.parse(req.body);
+    const priceEnv = PLANS[plan].stripePriceEnv!; // paid plans always have one
+    const priceId = cfg[priceEnv];
+    if (!priceId) throw BadRequest('plan_price_unconfigured', `${priceEnv} is not set`);
+
     const customerId = await ensureCustomer(brandId);
     const { successUrl, cancelUrl } = returnUrls(req, '/app/account');
     const { url, sessionId } = await payments.createSubscriptionCheckout({
       customerId,
-      priceId: cfg.STRIPE_MEMBERSHIP_PRICE_ID,
+      priceId,
       brandId,
       successUrl,
       cancelUrl,
@@ -62,7 +73,7 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
       action: AUDIT_ACTIONS.subscriptionCheckoutStarted,
       targetType: 'brand',
       targetId: brandId,
-      after: { session_id: sessionId },
+      after: { plan, session_id: sessionId },
       ip: req.ip,
     });
     return { url };
@@ -77,16 +88,25 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
     return { url };
   });
 
-  // ── Subscription state ─────────────────────────────────────────────────────
+  // ── Subscription state + the plan catalogue for the picker ─────────────────
   app.get('/api/brand/subscription', { preHandler: requireBrand }, async (req) => {
     const { brandId } = req.brand!;
     const sub = await prisma.subscriptionState.findUnique({ where: { brandId } });
+    const current = effectivePlan(sub); // effective tier (starter unless active)
     return {
       status: sub?.status ?? 'none',
-      plan: sub?.plan ?? 'pro',
-      price_cents: sub?.price ?? 0,
+      current_plan: current, // what they're entitled to right now
+      billed_plan: sub?.plan ?? 'starter', // what Stripe is billing (may differ if past_due)
       current_period_end: sub?.currentPeriodEnd ?? null,
-      is_pro: sub?.status === 'active',
+      capabilities: PLANS[current].capabilities,
+      // The catalogue the plan-picker renders.
+      plans: PLAN_LIST.map((p) => ({
+        key: p.key,
+        name: p.name,
+        price_cents: p.priceCents,
+        paid: p.paid,
+        features: p.features,
+      })),
     };
   });
 

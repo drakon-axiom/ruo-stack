@@ -1,13 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
+import { z } from 'zod';
 import {
   AUDIT_ACTIONS,
   BrandProfilePatchSchema,
+  BrandRetailSchema,
   BrandSignupSchema,
+  wholesaleFieldFor,
 } from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
 import { requireBrand } from '../middleware/guards.js';
+import { effectivePlan } from '../services/subscription.js';
 import { BadRequest, Conflict, NotFound } from '../errors.js';
 
 const NAME_LOCK_DAYS = 7;
@@ -176,39 +180,80 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Read-only catalog projection (published products only) ────────────────
-  // Proves the seam: the brand catalog is a READ PROJECTION of CatalogProduct,
-  // never independently written. Pro gating: wholesale pricing is visible only
-  // to active-Pro brands (membership gates wholesale pricing + fulfillment).
+  // The brand catalog is a READ PROJECTION of CatalogProduct, never independently
+  // written. Every tier gets wholesale pricing — the *rate* is the brand's tier
+  // (Starter/Pro/Volume). Retail is the brand's own override, defaulting to the
+  // operator's suggested retail.
   app.get('/api/brand/catalog', { preHandler: requireBrand }, async (req) => {
     const { brandId } = req.brand!;
     const sub = await prisma.subscriptionState.findUnique({
       where: { brandId },
-      select: { status: true },
+      select: { plan: true, status: true },
     });
-    const isPro = sub?.status === 'active';
+    const plan = effectivePlan(sub);
+    const wf = wholesaleFieldFor(plan); // 'wholesaleStarter' | 'wholesalePro' | 'wholesaleVolume'
 
-    const products = await prisma.catalogProduct.findMany({
-      where: { isPublished: true },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        canonicalSku: true,
-        name: true,
-        compound: true,
-        dose: true,
-        unit: true,
-        descriptionTemplate: true,
-        wholesaleCost: true,
-        suggestedRetail: true,
-        status: true,
-        images: true,
-        coaId: true,
-      },
-    });
+    const [products, brandPrices] = await Promise.all([
+      prisma.catalogProduct.findMany({
+        where: { isPublished: true },
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          canonicalSku: true,
+          name: true,
+          compound: true,
+          dose: true,
+          unit: true,
+          descriptionTemplate: true,
+          wholesaleStarter: true,
+          wholesalePro: true,
+          wholesaleVolume: true,
+          suggestedRetail: true,
+          status: true,
+          images: true,
+          coaId: true,
+        },
+      }),
+      prisma.brandProductPrice.findMany({ where: { brandId }, select: { productId: true, retailCents: true } }),
+    ]);
+    const retailMap = new Map(brandPrices.map((b) => [b.productId, b.retailCents]));
+
     return {
-      pro: isPro,
-      // Wholesale cost is gated behind Pro; suggested retail stays visible.
-      products: products.map((p) => ({ ...p, wholesaleCost: isPro ? p.wholesaleCost : null })),
+      plan,
+      products: products.map((p) => ({
+        id: p.id,
+        canonicalSku: p.canonicalSku,
+        name: p.name,
+        compound: p.compound,
+        dose: p.dose,
+        unit: p.unit,
+        descriptionTemplate: p.descriptionTemplate,
+        status: p.status,
+        images: p.images,
+        coaId: p.coaId,
+        wholesale_cents: p[wf], // the brand's tier rate
+        suggested_retail_cents: p.suggestedRetail,
+        retail_cents: retailMap.get(p.id) ?? p.suggestedRetail, // brand override or suggestion
+        retail_is_custom: retailMap.has(p.id),
+      })),
     };
+  });
+
+  // ── Brand sets its own retail price for a product (overrides suggestion) ───
+  app.patch('/api/brand/catalog/:id/retail', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const { retail_cents } = BrandRetailSchema.parse(req.body);
+    const product = await prisma.catalogProduct.findFirst({
+      where: { id, isPublished: true },
+      select: { id: true },
+    });
+    if (!product) throw NotFound('Product not found');
+    await prisma.brandProductPrice.upsert({
+      where: { brandId_productId: { brandId, productId: id } },
+      create: { brandId, productId: id, retailCents: retail_cents },
+      update: { retailCents: retail_cents },
+    });
+    return { ok: true };
   });
 }

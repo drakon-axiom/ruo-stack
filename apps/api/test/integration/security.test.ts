@@ -69,7 +69,7 @@ describe.skipIf(!RUN)('security spine (DB integration)', () => {
       method: 'POST',
       url: '/api/admin/catalog',
       headers: auth,
-      payload: { canonical_sku: `SKU-${randomToken(4)}`, compound: 'Test', name: 'Test', wholesale_cost: 1000, suggested_retail: 3000 },
+      payload: { canonical_sku: `SKU-${randomToken(4)}`, compound: 'Test', name: 'Test', wholesale_starter: 1000, wholesale_pro: 900, wholesale_volume: 800, suggested_retail: 3000 },
     });
     expect(created.statusCode).toBe(201);
     const id = created.json().id;

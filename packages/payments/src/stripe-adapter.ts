@@ -15,8 +15,6 @@ import { STATEMENT_DESCRIPTORS } from '@ruostack/shared';
 export interface StripeAdapterConfig {
   secretKey: string;
   webhookSecret: string;
-  /** Membership recurring price (Phase 1 flows; held for createSubscription). */
-  membershipPriceId?: string;
 }
 
 /**
@@ -184,10 +182,11 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
       const sub = event.data.object as Stripe.Subscription;
       const customerId = typeof sub.customer === 'string' ? sub.customer : undefined;
       const brandId = sub.metadata?.brand_id;
+      const item = sub.items?.data?.[0];
+      const priceId = item?.price?.id;
       if (sub.status === 'active' || sub.status === 'trialing') {
         // current_period_end sits on the Subscription in older API versions and
         // on the item in newer ones — read defensively across SDK versions.
-        const item = sub.items.data[0];
         const currentPeriodEnd =
           (sub as unknown as { current_period_end?: number }).current_period_end ??
           (item as unknown as { current_period_end?: number } | undefined)?.current_period_end;
@@ -197,15 +196,16 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
           subscriptionId: sub.id,
           brandId,
           customerId,
+          priceId,
           price: item?.price?.unit_amount ?? undefined,
           currentPeriodEnd,
         };
       }
       if (sub.status === 'past_due' || sub.status === 'unpaid') {
-        return { kind: 'subscription.past_due', externalId, subscriptionId: sub.id, brandId, customerId };
+        return { kind: 'subscription.past_due', externalId, subscriptionId: sub.id, brandId, customerId, priceId };
       }
       if (sub.status === 'paused') {
-        return { kind: 'subscription.suspended', externalId, subscriptionId: sub.id, brandId, customerId };
+        return { kind: 'subscription.suspended', externalId, subscriptionId: sub.id, brandId, customerId, priceId };
       }
       return { kind: 'unknown', externalId, rawType: `${event.type}:${sub.status}` };
     }
@@ -217,6 +217,7 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
         subscriptionId: sub.id,
         brandId: sub.metadata?.brand_id,
         customerId: typeof sub.customer === 'string' ? sub.customer : undefined,
+        priceId: sub.items?.data?.[0]?.price?.id,
       };
     }
     case 'charge.dispute.created': {

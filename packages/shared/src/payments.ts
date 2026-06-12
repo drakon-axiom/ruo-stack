@@ -14,10 +14,10 @@ export type Cents = number;
 export type NormalizedEvent =
   | { kind: 'wallet.topup_succeeded'; externalId: string; brandId?: string; amount?: Cents; currency?: string; customerId?: string }
   | { kind: 'wallet.topup_failed'; externalId: string; brandId?: string; amount?: Cents; reason?: string; customerId?: string }
-  | { kind: 'subscription.activated'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string; price?: Cents; currentPeriodEnd?: number }
-  | { kind: 'subscription.past_due'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string }
-  | { kind: 'subscription.suspended'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string }
-  | { kind: 'subscription.cancelled'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string }
+  | { kind: 'subscription.activated'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string; priceId?: string; price?: Cents; currentPeriodEnd?: number }
+  | { kind: 'subscription.past_due'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string; priceId?: string }
+  | { kind: 'subscription.suspended'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string; priceId?: string }
+  | { kind: 'subscription.cancelled'; externalId: string; subscriptionId: string; brandId?: string; customerId?: string; priceId?: string }
   | { kind: 'dispute.opened'; externalId: string; amount?: Cents; chargeId?: string }
   | { kind: 'refund.processed'; externalId: string; amount?: Cents; chargeId?: string }
   | { kind: 'unknown'; externalId: string; rawType: string };
