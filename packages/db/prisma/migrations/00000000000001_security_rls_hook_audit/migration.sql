@@ -148,8 +148,13 @@ $$;
 GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
 GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
 REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) FROM authenticated, anon, public;
--- The hook reads brand_user_role; allow the auth admin to read it.
+-- The hook reads brand_user_role; allow the auth admin to read it. Because
+-- brand_user_role has FORCE RLS and supabase_auth_admin is NOT bypassrls (and
+-- has no auth.uid() while minting a token), a permissive SELECT policy for the
+-- auth admin is required or the hook reads zero rows and injects no claims.
 GRANT SELECT ON public.brand_user_role TO supabase_auth_admin;
+CREATE POLICY "auth_admin_read_brand_user_role" ON "brand_user_role"
+  FOR SELECT TO supabase_auth_admin USING (true);
 
 -- ── 5. Storage ───────────────────────────────────────────────────────────────
 -- The brand-logo bucket + path-scoped policies live in `supabase/storage_setup.sql`,

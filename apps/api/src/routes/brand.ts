@@ -31,13 +31,15 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/brand/signup', async (req, reply) => {
     const body = BrandSignupSchema.parse(req.body);
 
-    // 1. Create the Supabase auth.users row (service role). Email confirmation /
-    //    password reset are delivered by Supabase Auth per project SMTP config
-    //    (local dev: inbucket). We do not duplicate credentials in `public`.
+    // 1. Create the Supabase auth.users row (service role). We auto-confirm the
+    //    email at creation: signup is a controlled server-side flow and no
+    //    transactional SMTP is configured, so requiring an (undeliverable)
+    //    confirmation email would dead-end the user. Once SMTP is wired, switch
+    //    to email_confirm:false + Supabase's confirmation flow.
     const created = await supabaseAdmin.auth.admin.createUser({
       email: body.email,
       password: body.password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { full_name: body.full_name },
     });
     if (created.error || !created.data.user) {
