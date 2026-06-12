@@ -9,5 +9,6 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export default defineConfig({
   plugins: [react()],
   envDir: repoRoot,
-  server: { port: 3903 },
+  // host:true binds 0.0.0.0 so the dev server is reachable over the LAN/Tailscale.
+  server: { host: true, port: 3903 },
 });

@@ -3,7 +3,10 @@ import { supabase } from './supabase.js';
 // Brand API client. The Bearer token is the Supabase access token (carrying the
 // realm:'brand' + brand_id claims injected by custom_access_token_hook). Signup
 // is the one unauthenticated call (it creates the auth user + brand atomically).
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3901';
+// Derive the API origin from the host that served this page (so it works from
+// localhost, a LAN IP, or a Tailscale IP) unless VITE_API_BASE_URL overrides it.
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:3901`;
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -16,7 +19,11 @@ export async function api<T = unknown>(
   opts: { method?: string; body?: unknown; auth?: boolean } = {},
 ): Promise<T> {
   const { method = 'GET', body, auth = true } = opts;
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  const hasBody = body !== undefined;
+  const headers: Record<string, string> = {};
+  // Only set the JSON content-type when a body is actually sent — Fastify rejects
+  // an empty body when content-type is application/json (e.g. bodyless POSTs).
+  if (hasBody) headers['content-type'] = 'application/json';
   if (auth) {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -25,7 +32,7 @@ export async function api<T = unknown>(
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: hasBody ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
     let code = 'error';
