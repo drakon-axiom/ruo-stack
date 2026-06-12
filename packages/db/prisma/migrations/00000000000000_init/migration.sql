@@ -1,5 +1,7 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
+-- NOTE: Prisma's default `CREATE SCHEMA IF NOT EXISTS "public"` is intentionally
+-- omitted — on Supabase the `public` schema already exists (owned by the `prisma`
+-- role), and issuing CREATE SCHEMA requires CREATE-on-database, which the
+-- non-superuser app role does not (and should not) hold.
 
 -- CreateEnum
 CREATE TYPE "subscription_status" AS ENUM ('none', 'pro');

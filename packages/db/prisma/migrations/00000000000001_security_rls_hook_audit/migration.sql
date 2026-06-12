@@ -151,27 +151,9 @@ REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) FROM authentic
 -- The hook reads brand_user_role; allow the auth admin to read it.
 GRANT SELECT ON public.brand_user_role TO supabase_auth_admin;
 
--- ── 5. Storage: brand-logo bucket + path-scoped write policy ─────────────────
--- Stand up the bucket now (the Branding screen is later). A brand may write only
--- under its own brand_id/ prefix. Claims-evidence photos reuse this pattern later.
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('brand-logos', 'brand-logos', true)
-ON CONFLICT (id) DO NOTHING;
-
-CREATE POLICY "brand_logo_write_own_prefix" ON storage.objects
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    bucket_id = 'brand-logos'
-    AND (storage.foldername(name))[1] IN (
-      SELECT public.current_user_brand_ids()::text
-    )
-  );
-
-CREATE POLICY "brand_logo_update_own_prefix" ON storage.objects
-  FOR UPDATE TO authenticated
-  USING (
-    bucket_id = 'brand-logos'
-    AND (storage.foldername(name))[1] IN (
-      SELECT public.current_user_brand_ids()::text
-    )
-  );
+-- ── 5. Storage ───────────────────────────────────────────────────────────────
+-- The brand-logo bucket + path-scoped policies live in `supabase/storage_setup.sql`,
+-- NOT here. `storage.objects` is owned by `supabase_storage_admin`; the RLS-bypassing
+-- `prisma` role that runs these migrations cannot CREATE POLICY on it, so storage is
+-- provisioned out-of-band (bucket via the Storage API, policies as the storage admin).
+-- It still depends on public.current_user_brand_ids() defined above.
