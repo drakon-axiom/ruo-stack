@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   AUDIT_ACTIONS,
   OrderCreateSchema,
+  OrderEditSchema,
   OrderQuoteSchema,
   PLANS,
   wholesaleFieldFor,
@@ -12,6 +13,7 @@ import { writeAudit } from '../audit.js';
 import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { getWalletSummary } from '../services/wallet.js';
+import { applyOrderEdit } from '../services/order-edit.js';
 import { computeParcel, priceShipping, type ParcelProduct } from '../services/shipping.js';
 import { BadRequest, Conflict, NotFound } from '../errors.js';
 
@@ -195,6 +197,17 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     return serializeOrder(order);
   });
 
+  // ── Edit (pre-ship) — re-prices + re-reserves; warns the UI if exported ────
+  app.patch('/api/brand/orders/:id', { preHandler: requireBrand }, async (req) => {
+    const { brandId, userId } = req.brand!;
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const edit = OrderEditSchema.parse(req.body);
+    const order = await prisma.order.findFirst({ where: { id, brandId }, include: { items: true } });
+    if (!order) throw NotFound('Order not found');
+    const updated = await applyOrderEdit(prisma, order, edit, { type: 'brand', id: userId, ip: req.ip });
+    return serializeOrder(updated);
+  });
+
   // ── Cancel (pre-ship only) — releases the reservation ─────────────────────
   app.post('/api/brand/orders/:id/cancel', { preHandler: requireBrand }, async (req) => {
     const { brandId, userId } = req.brand!;
@@ -245,6 +258,7 @@ type OrderRow = {
   shippingServiceCode: string | null;
   trackingNumber: string | null;
   carrier: string | null;
+  exportedAt: Date | null;
   shippedAt: Date | null;
   deliveredAt: Date | null;
   createdAt: Date;
@@ -273,6 +287,7 @@ function serializeOrder(o: OrderRow) {
     shipping_service_code: o.shippingServiceCode,
     tracking_number: o.trackingNumber,
     carrier: o.carrier,
+    exported_at: o.exportedAt,
     shipped_at: o.shippedAt,
     delivered_at: o.deliveredAt,
     created_at: o.createdAt,

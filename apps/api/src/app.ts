@@ -12,6 +12,7 @@ import { adminOverviewRoutes } from './routes/admin-overview.js';
 import { adminBrandRoutes } from './routes/admin-brands.js';
 import { adminCatalogRoutes } from './routes/admin-catalog.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
+import { shipstationCustomStoreRoutes } from './routes/shipstation-custom-store.js';
 import { webhookRoutes } from './routes/webhook.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -56,6 +57,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminFulfillmentRoutes);
   await app.register(adminOverviewRoutes);
   await app.register(adminBrandRoutes);
+  // ShipStation Custom Store: own scope (raw-body parser for shipnotify XML).
+  await app.register(shipstationCustomStoreRoutes);
   // Webhook: own encapsulated scope (raw-body parser) — register last.
   await app.register(webhookRoutes);
 

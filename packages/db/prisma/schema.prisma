@@ -488,6 +488,7 @@ model Order {
   carrier             String?
   labelUrl            String?   @map("label_url")
   labelCostCents      Int?      @map("label_cost_cents") // actual carrier cost (RUOStack's)
+  exportedAt          DateTime? @map("exported_at") // first time ShipStation pulled it via the custom-store export
   shippedAt           DateTime? @map("shipped_at")
   deliveredAt         DateTime? @map("delivered_at")
   createdAt           DateTime  @default(now()) @map("created_at")

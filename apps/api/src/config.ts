@@ -57,6 +57,11 @@ export const EnvSchema = z.object({
   SHIPSTATION_API_SECRET: z.string().optional(),
   // Carrier codes to rate against (comma-sep); if absent, all configured carriers.
   SHIPSTATION_CARRIER_CODES: z.string().optional(),
+  // ShipStation Custom Store (fulfillment). ShipStation polls our export endpoint
+  // and POSTs shipnotify, authenticating with HTTP Basic using these credentials.
+  // When unset, the custom-store endpoint refuses all requests (401).
+  SHIPSTATION_STORE_USER: z.string().optional(),
+  SHIPSTATION_STORE_PASS: z.string().optional(),
   // Default true so dev/verification never buys real postage. Set false for prod.
   SHIPSTATION_TEST_LABELS: z
     .string()

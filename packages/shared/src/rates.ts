@@ -30,39 +30,5 @@ export interface RatesAdapter {
   getRates(input: RateQuoteInput): Promise<RateOption[]>;
 }
 
-// ── Label buying ──────────────────────────────────────────────────────────────
-export interface ShipAddress {
-  name: string;
-  phone?: string;
-  addressLine1: string;
-  addressLine2?: string;
-  cityLocality: string;
-  stateProvince: string;
-  postalCode: string;
-  countryCode: string;
-  residential?: boolean;
-}
-
-export interface LabelBuyInput {
-  serviceCode: string;
-  testLabel: boolean;
-  shipFrom: ShipAddress;
-  shipTo: ShipAddress;
-  weightOz: number;
-  lengthIn?: number;
-  widthIn?: number;
-  heightIn?: number;
-}
-
-export interface LabelResult {
-  trackingNumber: string;
-  carrier: string;
-  serviceCode: string;
-  labelUrl: string | null;
-  costCents: number;
-}
-
-export interface LabelsAdapter {
-  readonly source: string;
-  buyLabel(input: LabelBuyInput): Promise<LabelResult>;
-}
+// Note: shipping LABELS are bought inside ShipStation during fulfillment (Custom
+// Store model), so there is no LabelsAdapter — this seam quotes rates only.

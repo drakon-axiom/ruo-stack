@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -9,9 +10,12 @@ interface Order {
   id: string;
   status: string;
   blocker: string;
-  recipient: { name: string; city: string; state: string };
+  recipient: { name: string; email: string | null; address1: string; address2: string | null; city: string; state: string; zip: string; country: string };
   wallet_charge_cents: number;
+  shipping_service_code: string | null;
   tracking_number: string | null;
+  carrier: string | null;
+  exported_at: string | null;
   created_at: string;
   items: OrderItem[];
 }
@@ -19,13 +23,20 @@ interface CatalogProduct { id: string; name: string; dose?: string | null; unit?
 interface ShipOption { carrier: string; service: string; service_code: string; amount_cents: number; est_days: number | null }
 interface Quote { plan: string; wholesale_cents: number; shipping_source: string; shipping_options: ShipOption[]; recommended_service_code: string }
 
-const STATUS_PILL: Record<string, string> = {
-  ready_for_fulfillment: 'border-amber/40 bg-amber/10 text-amber',
-  processing: 'border-amber/40 bg-amber/10 text-amber',
-  shipped: 'border-teal/40 bg-teal/10 text-teal',
-  delivered: 'border-success/40 bg-success/10 text-success',
-  cancelled: 'border-line2 bg-card2 text-muted',
+const TONE: Record<string, string> = {
+  amber: 'border-amber/40 bg-amber/10 text-amber',
+  slate: 'border-lline bg-card2 text-muted dark:border-line2',
+  teal: 'border-teal/40 bg-teal/10 text-teal',
+  success: 'border-success/40 bg-success/10 text-success',
+  muted: 'border-line2 bg-card2 text-muted',
 };
+
+function FulfillmentBadge({ order }: { order: { status: string; blocker: string; exported_at: string | null } }) {
+  const meta = FULFILLMENT_META[fulfillmentState(order)];
+  return <span className={`pill ${TONE[meta.tone]}`} title={meta.label}>{meta.icon} {meta.label}</span>;
+}
+
+const isEditable = (o: Order) => o.status === 'ready_for_fulfillment' || o.status === 'processing';
 
 type Filter = 'all' | 'ready_for_fulfillment' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -33,6 +44,7 @@ export function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
 
   function load() {
@@ -93,6 +105,7 @@ export function Orders() {
                 <th className="px-4 py-3">Charge</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Tracking</th>
+                <th className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody>
@@ -101,11 +114,11 @@ export function Orders() {
                   <td className="px-4 py-3 font-medium">{o.recipient.name}<span className="text-muted"> · {o.recipient.city}, {o.recipient.state}</span></td>
                   <td className="px-4 py-3 text-muted">{o.items.reduce((s, i) => s + i.qty, 0)}</td>
                   <td className="px-4 py-3">{dollars(o.wallet_charge_cents)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`pill ${STATUS_PILL[o.status]}`}>{o.status.replace(/_/g, ' ')}</span>
-                    {o.blocker !== 'none' && <span className="ml-1 pill border-amber/40 bg-amber/10 text-amber">{o.blocker.replace(/_/g, ' ')}</span>}
-                  </td>
+                  <td className="px-4 py-3"><FulfillmentBadge order={o} /></td>
                   <td className="px-4 py-3 font-mono text-[12px] text-teal">{o.tracking_number ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    {isEditable(o) && <button className="btn-ghost text-[12px]" onClick={() => setEditing(o)}>Edit</button>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -113,24 +126,40 @@ export function Orders() {
         </div>
       )}
 
-      {creating && <NewOrder onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />}
+      {creating && <OrderDrawer onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />}
+      {editing && <OrderDrawer editing={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </>
   );
 }
 
-function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: () => void; onSaved: () => void }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
-  const [lines, setLines] = useState<{ product_id: string; qty: number }[]>([]);
-  const [r, setR] = useState({ recipient_name: '', recipient_email: '', address1: '', address2: '', city: '', state: '', zip: '', country: 'US' });
+  const [lines, setLines] = useState<{ product_id: string; qty: number }[]>(
+    editing ? editing.items.map((i) => ({ product_id: i.product_id, qty: i.qty })) : [],
+  );
+  const [r, setR] = useState(
+    editing
+      ? {
+          recipient_name: editing.recipient.name,
+          recipient_email: editing.recipient.email ?? '',
+          address1: editing.recipient.address1,
+          address2: editing.recipient.address2 ?? '',
+          city: editing.recipient.city,
+          state: editing.recipient.state,
+          zip: editing.recipient.zip,
+          country: editing.recipient.country,
+        }
+      : { recipient_name: '', recipient_email: '', address1: '', address2: '', city: '', state: '', zip: '', country: 'US' },
+  );
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [service, setService] = useState('');
+  const [service, setService] = useState(editing?.shipping_service_code ?? '');
   const [quoting, setQuoting] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirmExported, setConfirmExported] = useState(false);
 
   useEffect(() => { api<{ products: CatalogProduct[] }>('/api/brand/catalog').then((x) => setCatalog(x.products)); }, []);
 
-  // Fetch live shipping rates when items + destination are ready.
   const canQuote = lines.length > 0 && r.zip.length >= 5 && r.state.length >= 2;
   const quoteKey = JSON.stringify({ lines, zip: r.zip, state: r.state });
   useEffect(() => {
@@ -138,7 +167,7 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     let active = true;
     setQuoting(true);
     api<Quote>('/api/brand/orders/quote', { method: 'POST', body: { items: lines, zip: r.zip, state: r.state } })
-      .then((q) => { if (active) { setQuote(q); setService(q.recommended_service_code); } })
+      .then((q) => { if (active) { setQuote(q); setService((s) => s || q.recommended_service_code); } })
       .catch(() => { if (active) setQuote(null); })
       .finally(() => { if (active) setQuoting(false); });
     return () => { active = false; };
@@ -156,14 +185,19 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   }
 
   async function submit() {
+    // Editing an already-exported order: warn that changes won't reach ShipStation.
+    if (editing?.exported_at && !confirmExported) { setConfirmExported(true); return; }
     setErr('');
     setBusy(true);
     try {
-      await api('/api/brand/orders', { method: 'POST', body: { items: lines, ...r, recipient_email: r.recipient_email || undefined, service_code: service || undefined } });
+      const body = { items: lines, ...r, recipient_email: r.recipient_email || undefined, service_code: service || undefined };
+      if (editing) await api(`/api/brand/orders/${editing.id}`, { method: 'PATCH', body });
+      else await api('/api/brand/orders', { method: 'POST', body });
       onSaved();
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Could not create order');
+      setErr(e instanceof ApiError ? e.message : 'Could not save order');
       setBusy(false);
+      setConfirmExported(false);
     }
   }
 
@@ -173,11 +207,16 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={onClose}>
       <div className="flex h-full w-full max-w-md flex-col border-l border-lline bg-white dark:border-line dark:bg-bg2" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-lline px-5 py-4 dark:border-line">
-          <h2 className="text-[16px] font-semibold">New manual order</h2>
+          <h2 className="text-[16px] font-semibold">{editing ? 'Edit order' : 'New manual order'}</h2>
           <button onClick={onClose} className="text-faint hover:text-text">✕</button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+          {editing?.exported_at && (
+            <div className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[12px] text-amber">
+              This order is already at the shipping platform. Edits update your record but won't be pushed to ShipStation automatically — contact support to change the shipment.
+            </div>
+          )}
 
           <div>
             <div className="mb-2 flex items-center justify-between">
@@ -232,12 +271,27 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
             <div className="flex justify-between text-muted"><span>Shipping{quote && quote.shipping_source !== 'flat' ? ' (live)' : ''}</span><span>{quote ? dollars(shipping) : '—'}</span></div>
             <div className="flex justify-between font-semibold"><span>Wallet charge</span><span>{quote ? dollars(charge) : '—'}</span></div>
           </div>
-          <button className="btn w-full" disabled={!valid || busy} onClick={submit}>{busy ? '…' : 'Place order'}</button>
+          <button className="btn w-full" disabled={!valid || busy} onClick={submit}>{busy ? '…' : editing ? 'Save changes' : 'Place order'}</button>
           <p className="mt-2 text-center text-[11px] text-faint">
             {quoting ? 'Fetching live rates…' : !canQuote ? 'Add products + destination to see shipping.' : 'Charged from your wallet when we ship.'}
           </p>
         </div>
       </div>
+
+      {confirmExported && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 px-4" onClick={(e) => { e.stopPropagation(); setConfirmExported(false); }}>
+          <div className="surface w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-[15px] font-semibold">Order already sent to shipping</h3>
+            <p className="mb-4 text-[13px] text-muted">
+              We've already handed this order to the shipping platform. Saving will update your record here, but <span className="font-medium text-text">the change won't be pushed to the shipping platform</span>. To change the actual shipment, contact support.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button className="btn-ghost" onClick={() => setConfirmExported(false)}>Cancel</button>
+              <button className="btn" disabled={busy} onClick={submit}>{busy ? '…' : 'Save anyway'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
