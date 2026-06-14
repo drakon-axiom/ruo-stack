@@ -2,8 +2,13 @@ import type { RateOption, RateQuoteInput } from '@ruostack/shared';
 import { loadConfig } from '../../config.js';
 import { ComputedRatesAdapter } from './computed.js';
 import { ShipStationRatesAdapter } from './shipstation.js';
+import { ShipStationV2RatesAdapter } from './shipstation-v2.js';
 
-/** ShipStation when credentials are present, else the computed rater. */
+/**
+ * Pick the rate source: ShipStation v1 (key + secret), ShipStation v2 (single
+ * API key, no secret), else the computed rater. The presence of a secret
+ * distinguishes v1 from v2.
+ */
 function primaryAdapter() {
   const cfg = loadConfig();
   if (cfg.SHIPSTATION_API_KEY && cfg.SHIPSTATION_API_SECRET) {
@@ -12,6 +17,9 @@ function primaryAdapter() {
       apiSecret: cfg.SHIPSTATION_API_SECRET,
       carrierCodes: cfg.SHIPSTATION_CARRIER_CODES?.split(',').map((s) => s.trim()).filter(Boolean),
     });
+  }
+  if (cfg.SHIPSTATION_API_KEY) {
+    return new ShipStationV2RatesAdapter(cfg.SHIPSTATION_API_KEY);
   }
   return new ComputedRatesAdapter();
 }
