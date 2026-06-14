@@ -108,6 +108,8 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
           wholesaleTotalCents: wholesaleTotal,
           shippingTotalCents: shipping,
           walletChargeCents: walletCharge,
+          shippingServiceCode: shipQuote.chosen.serviceCode,
+          shippingCarrier: shipQuote.chosen.carrier,
           items: { create: lines },
         },
         include: { items: true },
@@ -240,6 +242,7 @@ type OrderRow = {
   wholesaleTotalCents: number;
   shippingTotalCents: number;
   walletChargeCents: number;
+  shippingServiceCode: string | null;
   trackingNumber: string | null;
   carrier: string | null;
   shippedAt: Date | null;
@@ -267,6 +270,7 @@ function serializeOrder(o: OrderRow) {
     wholesale_total_cents: o.wholesaleTotalCents,
     shipping_total_cents: o.shippingTotalCents,
     wallet_charge_cents: o.walletChargeCents,
+    shipping_service_code: o.shippingServiceCode,
     tracking_number: o.trackingNumber,
     carrier: o.carrier,
     shipped_at: o.shippedAt,

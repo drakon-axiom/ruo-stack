@@ -482,8 +482,12 @@ model Order {
   wholesaleTotalCents Int       @map("wholesale_total_cents")
   shippingTotalCents  Int       @map("shipping_total_cents")
   walletChargeCents   Int       @map("wallet_charge_cents")
+  shippingServiceCode String?   @map("shipping_service_code") // rated service to buy at ship
+  shippingCarrier     String?   @map("shipping_carrier") // rated carrier label
   trackingNumber      String?   @map("tracking_number")
   carrier             String?
+  labelUrl            String?   @map("label_url")
+  labelCostCents      Int?      @map("label_cost_cents") // actual carrier cost (RUOStack's)
   shippedAt           DateTime? @map("shipped_at")
   deliveredAt         DateTime? @map("delivered_at")
   createdAt           DateTime  @default(now()) @map("created_at")

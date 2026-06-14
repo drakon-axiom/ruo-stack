@@ -1,8 +1,9 @@
-import type { RateOption, RateQuoteInput } from '@ruostack/shared';
+import type { LabelsAdapter, RateOption, RateQuoteInput } from '@ruostack/shared';
 import { loadConfig } from '../../config.js';
 import { ComputedRatesAdapter } from './computed.js';
 import { ShipStationRatesAdapter } from './shipstation.js';
 import { ShipStationV2RatesAdapter } from './shipstation-v2.js';
+import { ShipStationV2LabelsAdapter } from './shipstation-v2-labels.js';
 
 /**
  * Pick the rate source: ShipStation v1 (key + secret), ShipStation v2 (single
@@ -42,4 +43,14 @@ export async function quoteRates(
     /* fall through to computed */
   }
   return { source: 'computed', options: await computed.getRates(input) };
+}
+
+/** Label buying is ShipStation-v2 only (single key, no secret). Null otherwise →
+ * the ship flow falls back to manual tracking entry. */
+export function getLabelsAdapter(): LabelsAdapter | null {
+  const cfg = loadConfig();
+  if (cfg.SHIPSTATION_API_KEY && !cfg.SHIPSTATION_API_SECRET) {
+    return new ShipStationV2LabelsAdapter(cfg.SHIPSTATION_API_KEY);
+  }
+  return null;
 }

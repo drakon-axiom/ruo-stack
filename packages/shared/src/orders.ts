@@ -31,8 +31,9 @@ export const OrderQuoteSchema = z.object({
 });
 export type OrderQuote = z.infer<typeof OrderQuoteSchema>;
 
-/** Admin ship action. */
+/** Admin ship action. tracking_number is optional — when a ShipStation label is
+ * bought, tracking comes from the carrier; provide it only for manual fulfillment. */
 export const OrderShipSchema = z.object({
-  tracking_number: z.string().min(1).max(80),
-  carrier: z.string().min(1).max(40).default('USPS'),
+  tracking_number: z.string().max(80).optional(),
+  carrier: z.string().max(40).optional(),
 });

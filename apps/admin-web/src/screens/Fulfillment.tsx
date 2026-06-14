@@ -14,8 +14,11 @@ interface Order {
   recipient: { name: string; city: string; state: string; zip: string };
   item_count: number;
   wallet_charge_cents: number;
+  shipping_service_code: string | null;
+  carrier_rated: boolean;
   tracking_number: string | null;
   carrier: string | null;
+  label_url: string | null;
   created_at: string;
 }
 
@@ -103,7 +106,12 @@ export function Fulfillment() {
                     {writable && o.status === 'shipped' && (
                       <button className="btn-ghost" onClick={() => deliver(o.id)}>Mark delivered</button>
                     )}
-                    {o.status === 'shipped' && <div className="mt-1 font-mono text-[11px] text-teal-bright">{o.tracking_number}</div>}
+                    {o.status === 'shipped' && (
+                      <div className="mt-1 flex items-center justify-end gap-2">
+                        <span className="font-mono text-[11px] text-teal-bright">{o.carrier} {o.tracking_number}</span>
+                        {o.label_url && <a className="text-[11px] text-teal underline" href={o.label_url} target="_blank" rel="noreferrer">label</a>}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -123,11 +131,12 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  async function ship() {
+  async function ship(buyLabel: boolean) {
     setErr('');
     setBusy(true);
     try {
-      await api(`/api/admin/orders/${order.id}/ship`, { method: 'POST', body: { tracking_number: tracking, carrier } });
+      const body = buyLabel ? undefined : { tracking_number: tracking, carrier };
+      await api(`/api/admin/orders/${order.id}/ship`, { method: 'POST', body });
       onShipped();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Ship failed');
@@ -139,20 +148,40 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
       <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
         <h2 className="mb-1 text-[16px] font-semibold text-text">Ship order</h2>
-        <p className="mb-4 text-[12px] text-muted">{order.brand_name} → {order.recipient.name}. This captures {dollars(order.wallet_charge_cents)} from the brand's wallet.</p>
+        <p className="mb-4 text-[12px] text-muted">{order.brand_name} → {order.recipient.name}. Shipping captures {dollars(order.wallet_charge_cents)} from the brand's wallet.</p>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
-        <Field label="Carrier">
-          <select className="input" value={carrier} onChange={(e) => setCarrier(e.target.value)}>
-            <option>USPS</option><option>UPS</option><option>FedEx</option>
-          </select>
-        </Field>
-        <Field label="Tracking number">
-          <input className="input" value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
-        </Field>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn" disabled={!tracking || busy} onClick={ship}>{busy ? '…' : 'Capture & ship'}</button>
-        </div>
+
+        {order.carrier_rated ? (
+          <>
+            <p className="mb-4 rounded-lg border border-line bg-card2 px-3 py-2 text-[12px] text-muted">
+              Buys a <span className="text-text">{order.shipping_service_code?.replace(/_/g, ' ')}</span> label via ShipStation and captures the tracking number automatically.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button className="btn-ghost" onClick={onClose}>Cancel</button>
+              <button className="btn" disabled={busy} onClick={() => ship(true)}>{busy ? '…' : 'Buy label & ship'}</button>
+            </div>
+            <p className="mt-3 text-center text-[11px] text-faint">Or enter a tracking number manually below.</p>
+            <div className="mt-2 flex gap-2">
+              <input className="input flex-1" value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="manual tracking #" />
+              <button className="btn-ghost" disabled={!tracking || busy} onClick={() => ship(false)}>Use manual</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Field label="Carrier">
+              <select className="input" value={carrier} onChange={(e) => setCarrier(e.target.value)}>
+                <option>USPS</option><option>UPS</option><option>FedEx</option>
+              </select>
+            </Field>
+            <Field label="Tracking number">
+              <input className="input" value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
+            </Field>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn-ghost" onClick={onClose}>Cancel</button>
+              <button className="btn" disabled={!tracking || busy} onClick={() => ship(false)}>{busy ? '…' : 'Capture & ship'}</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
