@@ -19,8 +19,17 @@ export const OrderCreateSchema = z.object({
   state: z.string().min(1).max(60),
   zip: z.string().min(1).max(20),
   country: z.string().min(2).max(2).default('US'),
+  service_code: z.string().max(60).optional(), // chosen live-rate service (Pro/Volume)
 });
 export type OrderCreate = z.infer<typeof OrderCreateSchema>;
+
+/** Rate preview for the order drawer (items + destination → shipping options). */
+export const OrderQuoteSchema = z.object({
+  items: z.array(OrderItemInputSchema).min(1).max(50),
+  zip: z.string().min(1).max(20),
+  state: z.string().min(1).max(60),
+});
+export type OrderQuote = z.infer<typeof OrderQuoteSchema>;
 
 /** Admin ship action. */
 export const OrderShipSchema = z.object({

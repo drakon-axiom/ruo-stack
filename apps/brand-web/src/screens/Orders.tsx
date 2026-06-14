@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api.js';
 
-const SHIPPING_CENTS = 1295;
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 interface OrderItem { product_id: string; qty: number; unit_wholesale_cents: number }
@@ -17,6 +16,8 @@ interface Order {
   items: OrderItem[];
 }
 interface CatalogProduct { id: string; name: string; dose?: string | null; unit?: string | null; wholesale_cents: number }
+interface ShipOption { carrier: string; service: string; service_code: string; amount_cents: number; est_days: number | null }
+interface Quote { plan: string; wholesale_cents: number; shipping_source: string; shipping_options: ShipOption[]; recommended_service_code: string }
 
 const STATUS_PILL: Record<string, string> = {
   ready_for_fulfillment: 'border-amber/40 bg-amber/10 text-amber',
@@ -121,14 +122,33 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [lines, setLines] = useState<{ product_id: string; qty: number }[]>([]);
   const [r, setR] = useState({ recipient_name: '', recipient_email: '', address1: '', address2: '', city: '', state: '', zip: '', country: 'US' });
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [service, setService] = useState('');
+  const [quoting, setQuoting] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { api<{ products: CatalogProduct[] }>('/api/brand/catalog').then((x) => setCatalog(x.products)); }, []);
-  const byId = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
 
-  const wholesale = lines.reduce((s, l) => s + (byId.get(l.product_id)?.wholesale_cents ?? 0) * l.qty, 0);
-  const charge = lines.length ? wholesale + SHIPPING_CENTS : 0;
+  // Fetch live shipping rates when items + destination are ready.
+  const canQuote = lines.length > 0 && r.zip.length >= 5 && r.state.length >= 2;
+  const quoteKey = JSON.stringify({ lines, zip: r.zip, state: r.state });
+  useEffect(() => {
+    if (!canQuote) { setQuote(null); return; }
+    let active = true;
+    setQuoting(true);
+    api<Quote>('/api/brand/orders/quote', { method: 'POST', body: { items: lines, zip: r.zip, state: r.state } })
+      .then((q) => { if (active) { setQuote(q); setService(q.recommended_service_code); } })
+      .catch(() => { if (active) setQuote(null); })
+      .finally(() => { if (active) setQuoting(false); });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey]);
+
+  const selected = quote?.shipping_options.find((o) => o.service_code === service) ?? quote?.shipping_options[0];
+  const wholesale = quote?.wholesale_cents ?? 0;
+  const shipping = selected?.amount_cents ?? 0;
+  const charge = quote ? wholesale + shipping : 0;
 
   function addLine() { if (catalog[0]) setLines([...lines, { product_id: catalog[0].id, qty: 1 }]); }
   function setLine(i: number, patch: Partial<{ product_id: string; qty: number }>) {
@@ -139,7 +159,7 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     setErr('');
     setBusy(true);
     try {
-      await api('/api/brand/orders', { method: 'POST', body: { items: lines, ...r, recipient_email: r.recipient_email || undefined } });
+      await api('/api/brand/orders', { method: 'POST', body: { items: lines, ...r, recipient_email: r.recipient_email || undefined, service_code: service || undefined } });
       onSaved();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Could not create order');
@@ -147,7 +167,7 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     }
   }
 
-  const valid = lines.length > 0 && r.recipient_name && r.address1 && r.city && r.state && r.zip;
+  const valid = lines.length > 0 && r.recipient_name && r.address1 && r.city && r.state && r.zip && !!quote;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={onClose}>
@@ -191,13 +211,31 @@ function NewOrder({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         </div>
 
         <div className="border-t border-lline px-5 py-4 dark:border-line">
+          {quote && quote.shipping_options.length > 1 && (
+            <div className="mb-3">
+              <span className="label mb-1 block">Shipping {quote.shipping_source !== 'flat' ? '(live)' : ''}</span>
+              <div className="space-y-1">
+                {quote.shipping_options.map((o) => (
+                  <label key={o.service_code} className="flex cursor-pointer items-center justify-between rounded-lg border border-lline px-2 py-1.5 text-[12px] dark:border-line">
+                    <span className="flex items-center gap-2">
+                      <input type="radio" checked={service === o.service_code} onChange={() => setService(o.service_code)} />
+                      {o.carrier} {o.service}{o.est_days ? ` · ~${o.est_days}d` : ''}
+                    </span>
+                    <span>{dollars(o.amount_cents)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mb-3 space-y-1 text-[13px]">
             <div className="flex justify-between text-muted"><span>Wholesale</span><span>{dollars(wholesale)}</span></div>
-            <div className="flex justify-between text-muted"><span>Shipping</span><span>{dollars(lines.length ? SHIPPING_CENTS : 0)}</span></div>
-            <div className="flex justify-between font-semibold"><span>Wallet charge</span><span>{dollars(charge)}</span></div>
+            <div className="flex justify-between text-muted"><span>Shipping{quote && quote.shipping_source !== 'flat' ? ' (live)' : ''}</span><span>{quote ? dollars(shipping) : '—'}</span></div>
+            <div className="flex justify-between font-semibold"><span>Wallet charge</span><span>{quote ? dollars(charge) : '—'}</span></div>
           </div>
           <button className="btn w-full" disabled={!valid || busy} onClick={submit}>{busy ? '…' : 'Place order'}</button>
-          <p className="mt-2 text-center text-[11px] text-faint">Charged from your wallet when we ship. Insufficient funds → Action Required.</p>
+          <p className="mt-2 text-center text-[11px] text-faint">
+            {quoting ? 'Fetching live rates…' : !canQuote ? 'Add products + destination to see shipping.' : 'Charged from your wallet when we ship.'}
+          </p>
         </div>
       </div>
     </div>

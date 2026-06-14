@@ -3,8 +3,8 @@ import { z } from 'zod';
 import {
   AUDIT_ACTIONS,
   OrderCreateSchema,
+  OrderQuoteSchema,
   PLANS,
-  SHIPPING_FLAT_CENTS,
   wholesaleFieldFor,
 } from '@ruostack/shared';
 import { getClients } from '../clients.js';
@@ -12,6 +12,7 @@ import { writeAudit } from '../audit.js';
 import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { getWalletSummary } from '../services/wallet.js';
+import { computeParcel, priceShipping, type ParcelProduct } from '../services/shipping.js';
 import { BadRequest, Conflict, NotFound } from '../errors.js';
 
 /**
@@ -56,7 +57,16 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     const productIds = body.items.map((i) => i.product_id);
     const products = await prisma.catalogProduct.findMany({
       where: { id: { in: productIds }, isPublished: true },
-      select: { id: true, wholesaleStarter: true, wholesalePro: true, wholesaleVolume: true },
+      select: {
+        id: true,
+        wholesaleStarter: true,
+        wholesalePro: true,
+        wholesaleVolume: true,
+        weight: true,
+        length: true,
+        width: true,
+        height: true,
+      },
     });
     const byId = new Map(products.map((p) => [p.id, p]));
     const lines = body.items.map((i) => {
@@ -64,9 +74,15 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
       if (!p) throw BadRequest('unknown_product', `Product ${i.product_id} is not available`);
       return { productId: i.product_id, qty: i.qty, unitWholesaleCents: p[wf] };
     });
-
     const wholesaleTotal = lines.reduce((s, l) => s + l.unitWholesaleCents * l.qty, 0);
-    const shipping = SHIPPING_FLAT_CENTS;
+
+    // Shipping: flat for Starter, live (re-rated server-side) for Pro/Volume.
+    const parcelItems: ParcelProduct[] = body.items.map((i) => {
+      const p = byId.get(i.product_id)!;
+      return { qty: i.qty, weight: p.weight, length: p.length, width: p.width, height: p.height };
+    });
+    const shipQuote = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state }, body.service_code);
+    const shipping = shipQuote.chosen.amountCents;
     const walletCharge = wholesaleTotal + shipping;
 
     // Funds check against available = balance − held (existing open orders).
@@ -109,6 +125,43 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return reply.code(201).send(serializeOrder(order));
+  });
+
+  // ── Rate preview (items + destination → shipping options) ─────────────────
+  app.post('/api/brand/orders/quote', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    const body = OrderQuoteSchema.parse(req.body);
+    const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } });
+    const plan = effectivePlan(sub);
+    const wf = wholesaleFieldFor(plan);
+    const products = await prisma.catalogProduct.findMany({
+      where: { id: { in: body.items.map((i) => i.product_id) }, isPublished: true },
+      select: { id: true, wholesaleStarter: true, wholesalePro: true, wholesaleVolume: true, weight: true, length: true, width: true, height: true },
+    });
+    const byId = new Map(products.map((p) => [p.id, p]));
+    let wholesale = 0;
+    const parcelItems: ParcelProduct[] = body.items.map((i) => {
+      const p = byId.get(i.product_id);
+      if (!p) throw BadRequest('unknown_product', `Product ${i.product_id} is not available`);
+      wholesale += p[wf] * i.qty;
+      return { qty: i.qty, weight: p.weight, length: p.length, width: p.width, height: p.height };
+    });
+    const q = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state });
+    return {
+      plan,
+      wholesale_cents: wholesale,
+      shipping_source: q.source,
+      shipping_options: q.options.map((o) => ({
+        carrier: o.carrier,
+        service: o.service,
+        service_code: o.serviceCode,
+        amount_cents: o.amountCents,
+        est_days: o.estDays ?? null,
+      })),
+      recommended_service_code: q.chosen.serviceCode,
+      recommended_shipping_cents: q.chosen.amountCents,
+      total_cents: wholesale + q.chosen.amountCents,
+    };
   });
 
   // ── List / detail ──────────────────────────────────────────────────────────

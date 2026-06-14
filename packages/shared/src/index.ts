@@ -7,3 +7,4 @@ export * from './dto.js';
 export * from './money.js';
 export * from './plans.js';
 export * from './orders.js';
+export * from './rates.js';

@@ -45,6 +45,15 @@ export const EnvSchema = z.object({
   STRIPE_PRO_PRICE_ID: z.string().optional(),
   STRIPE_VOLUME_PRICE_ID: z.string().optional(),
 
+  // Shipping / rates. Origin = RUOStack's fulfillment warehouse (ship-from).
+  WAREHOUSE_FROM_ZIP: z.string().default('90001'),
+  WAREHOUSE_FROM_STATE: z.string().default('CA'),
+  // ShipStation classic API (optional — falls back to the computed rater if absent).
+  SHIPSTATION_API_KEY: z.string().optional(),
+  SHIPSTATION_API_SECRET: z.string().optional(),
+  // Carrier codes to rate against (comma-sep); if absent, all configured carriers.
+  SHIPSTATION_CARRIER_CODES: z.string().optional(),
+
   // API.
   API_PORT: z.coerce.number().int().positive().default(3901),
   API_HOST: z.string().default('0.0.0.0'),
