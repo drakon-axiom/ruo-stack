@@ -1,37 +1,27 @@
 {
-  "name": "ruo-stack",
-  "version": "0.1.0",
+  "name": "ruostack",
+  "version": "0.0.0",
   "private": true,
-  "description": "White-label fulfillment SaaS for supplements & consumables (multi-tenant, wallet-funded).",
-  "scripts": {
-    "dev": "next dev -p 3900",
-    "build": "next build",
-    "start": "next start -p 3900",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "db:types": "supabase gen types typescript --linked > src/lib/database.types.ts",
-    "db:push": "supabase db push",
-    "db:reset": "supabase db reset"
+  "description": "RUOStack — two-sided white-label fulfillment platform (Phase 0 foundations)",
+  "engines": {
+    "node": ">=20"
   },
-  "dependencies": {
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.45.4",
-    "next": "^16.2.7",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "stripe": "^16.12.0",
-    "zod": "^3.23.8"
+  "packageManager": "pnpm@11.3.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:api": "pnpm --filter @ruostack/api dev",
+    "dev:admin": "pnpm --filter @ruostack/admin-web dev",
+    "dev:brand": "pnpm --filter @ruostack/brand-web dev",
+    "db:generate": "pnpm --filter @ruostack/db generate",
+    "db:migrate": "pnpm --filter @ruostack/db migrate",
+    "db:deploy": "pnpm --filter @ruostack/db deploy",
+    "seed:superadmin": "pnpm --filter @ruostack/api seed:superadmin",
+    "test": "pnpm -r test",
+    "lint:stripe-guard": "node scripts/check-stripe-imports.mjs",
+    "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
-    "@types/node": "^22.7.4",
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.0",
-    "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^16.2.7",
-    "postcss": "^8.4.47",
-    "supabase": "^2.104.0",
-    "tailwindcss": "^3.4.13",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.3"
   }
 }

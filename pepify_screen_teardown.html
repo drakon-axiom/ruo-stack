@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pepify — Screen Catalog & UX Teardown</title>
+<style>
+  :root{
+    --bg:#080b14; --bg2:#0d1220; --card:#121829; --card2:#161d31;
+    --line:#222a40; --line2:#2c3550;
+    --text:#e8ecf5; --muted:#9aa3bd; --faint:#6b7490;
+    --blue:#4361ee; --blue2:#5b76ff; --green:#28c76f; --amber:#ff9f43; --red:#ea5455;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;}
+  a{color:var(--blue2);text-decoration:none}
+  .wrap{display:grid;grid-template-columns:280px 1fr;max-width:1500px;margin:0 auto}
+  /* sidebar TOC */
+  nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;
+    background:var(--bg2);border-right:1px solid var(--line);padding:24px 18px}
+  nav.toc h1{font-size:20px;margin:0 0 4px}
+  nav.toc .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
+  nav.toc .grp{color:var(--faint);text-transform:uppercase;font-size:10px;letter-spacing:.12em;margin:18px 0 6px}
+  nav.toc a{display:block;color:var(--muted);font-size:13.5px;padding:5px 10px;border-radius:8px}
+  nav.toc a:hover{background:var(--card);color:var(--text)}
+  main{padding:42px 54px;max-width:1100px}
+  h2.section{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue2);
+    margin:54px 0 14px;border-top:1px solid var(--line);padding-top:30px}
+  h2.section:first-of-type{border-top:none;margin-top:0}
+  h3{font-size:23px;margin:34px 0 4px;scroll-margin-top:20px}
+  .route{font-size:12px;color:var(--faint);font-family:ui-monospace,Menlo,Consolas,monospace;margin-bottom:14px}
+  .route .tag{display:inline-block;background:var(--card2);border:1px solid var(--line2);
+    border-radius:6px;padding:1px 8px;margin-left:6px;color:var(--muted)}
+  p{color:#cfd5e6}
+  .lead{font-size:17px;color:var(--muted)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin-bottom:8px}
+  ul.tight{margin:6px 0;padding-left:18px}
+  ul.tight li{margin:3px 0;color:#cfd5e6}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+  .pill{font-size:12px;background:var(--card2);border:1px solid var(--line2);color:var(--muted);
+    border-radius:999px;padding:3px 11px}
+  .pill.blue{border-color:#33459e;color:#9db0ff;background:#16203f}
+  .pill.green{border-color:#1d6b46;color:#7ee2ab;background:#0f2a1d}
+  .pill.amber{border-color:#7a571d;color:#ffd29a;background:#2a2010}
+  /* mock components */
+  .mock{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0;overflow:hidden}
+  .mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .mh .t{font-weight:700}
+  .mh .s{font-size:12px;color:var(--muted)}
+  .btn{background:var(--blue);color:#fff;border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:600;display:inline-block}
+  .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--muted)}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .stat .v{font-size:24px;font-weight:800}
+  .stat .k{font-size:12px;color:var(--muted)}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .tab{font-size:12.5px;border-radius:999px;padding:5px 12px;background:var(--card2);color:var(--muted);border:1px solid var(--line2)}
+  .tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  table.mini{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.mini th{text-align:left;color:var(--faint);font-size:11px;text-transform:uppercase;
+    letter-spacing:.08em;padding:8px 10px;border-bottom:1px solid var(--line)}
+  table.mini td{padding:9px 10px;border-bottom:1px solid var(--line)}
+  table.mini td .g{color:var(--green);font-weight:600}
+  .swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .sw{width:84px}
+  .sw .chip{height:42px;border-radius:8px;border:1px solid var(--line)}
+  .sw .nm{font-size:11px;color:var(--muted);margin-top:5px}
+  .callout{border-left:3px solid var(--blue);background:#0f1731;padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+  .callout.amber{border-color:var(--amber);background:#241a0d}
+  .callout.green{border-color:var(--green);background:#0e2419}
+  .note{font-size:13px;color:var(--muted)}
+  .kicker{color:var(--faint);font-size:13px}
+  code{background:var(--card2);border:1px solid var(--line2);border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .light{background:#eef1f7;color:#1a2238;border-color:#d6dbe8}
+  .light .mh .s{color:#566}
+  hr{border:none;border-top:1px solid var(--line);margin:30px 0}
+  @media(max-width:1000px){.wrap{grid-template-columns:1fr}nav.toc{display:none}main{padding:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="toc">
+  <h1>Pepify Teardown</h1>
+  <div class="sub">Screen catalog &amp; UX breakdown · captured Jun 10, 2026</div>
+  <a href="#overview-doc">📋 How to read this</a>
+  <a href="#model">💡 Product &amp; business model</a>
+  <a href="#ia">🗺️ Information architecture</a>
+  <a href="#design">🎨 Design system</a>
+  <a href="#components">🧩 Component library</a>
+
+  <div class="grp">Public funnel (light)</div>
+  <a href="#landing">Landing page</a>
+  <a href="#signup">Create Account / Onboarding</a>
+  <a href="#login">Login</a>
+
+  <div class="grp">App · Core (dark)</div>
+  <a href="#overview">Overview (dashboard)</a>
+  <a href="#orders">Orders</a>
+  <a href="#tracking">Tracking Hub</a>
+  <a href="#action">Action Required</a>
+  <a href="#customers">Customers</a>
+  <a href="#address">Address Book</a>
+  <a href="#wallet">Wallet (Pepify Balance)</a>
+
+  <div class="grp">App · Store</div>
+  <a href="#store">My Store</a>
+
+  <div class="grp">App · Catalog</div>
+  <a href="#products">Research Peptides</a>
+  <a href="#coas">COAs</a>
+
+  <div class="grp">App · Brand &amp; tools</div>
+  <a href="#branding">Branding</a>
+  <a href="#shipping">Shipping</a>
+  <a href="#calc">Profit Calculator</a>
+
+  <div class="grp">App · Support</div>
+  <a href="#chat">Live Chat</a>
+  <a href="#referrals">Referrals</a>
+  <a href="#account">Account</a>
+
+  <div class="grp">Global</div>
+  <a href="#notifications">Notifications Inbox</a>
+  <a href="#topbar">Top bar &amp; chrome</a>
+</nav>
+
+<main>
+  <h3 id="overview-doc" style="margin-top:0">Pepify — Screen Catalog &amp; UX Teardown</h3>
+  <p class="lead">A walkthrough of every screen in the Pepify platform (pepify.pro), documented from a logged-in
+  brand account ("Ascend BioLab"). Pepify is a <strong>white-label dropshipping / fulfillment platform</strong>:
+  a brand owner signs up, connects a store, funds a prepaid wallet, and Pepify fulfils orders under the brand's
+  own label. This document captures the layout, components, states, and data of each screen so the structure can
+  be rebuilt for a different industry.</p>
+
+  <div class="callout note">
+    <strong>How to read this.</strong> Each screen entry lists its <em>purpose</em>, <em>layout</em>
+    (top-to-bottom regions), <em>components &amp; controls</em>, <em>states</em>, and <em>data shown</em>.
+    Simplified HTML/CSS "mock" blocks recreate the visual layout of the most important screens so you have a
+    reference without raw screenshots. A companion file, <code>pepify_build_spec.md</code>, contains the
+    buildable blueprint (data model, flows, integrations, MVP phases).
+  </div>
+
+  <!-- ===================== MODEL ===================== -->
+  <h2 class="section" id="model">💡 Product &amp; business model</h2>
+  <p>Understanding the model makes every screen self-explanatory — the whole app is built around one money loop.</p>
+  <div class="grid2">
+    <div class="card">
+      <div class="lbl">The core loop</div>
+      <ul class="tight">
+        <li><strong>Brand owner</strong> signs up &amp; subscribes to "Pro" (<strong>$97/mo</strong>).</li>
+        <li>Connects their own storefront (WooCommerce / Wix) or submits orders manually.</li>
+        <li>Pre-funds a <strong>prepaid wallet</strong> by credit card (via Stripe).</li>
+        <li>Customer buys on the brand's store &amp; pays the <em>brand</em> directly.</li>
+        <li>Pepify fulfils: picks, applies the brand's <strong>white-label</strong> vial label, packs, ships.</li>
+        <li>Wholesale cost + flat shipping is <strong>auto-deducted from the wallet</strong>.</li>
+        <li>The spread (retail − wholesale − shipping − membership) is the brand's profit.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="lbl">Revenue &amp; pricing levers</div>
+      <ul class="tight">
+        <li><strong>$97/mo membership</strong> (anchored as "raising to $200 soon").</li>
+        <li>Wholesale margin baked into product "Your Cost" vs "Suggested Retail".</li>
+        <li><strong>$12.95 flat shipping</strong> per order (USPS Ground Advantage).</li>
+        <li>Wallet deposits are <strong>non-refundable</strong> (float / lock-in).</li>
+        <li>Referral program: <strong>$50</strong> to referrer + <strong>$50</strong> to referee on upgrade.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout amber">
+    <strong>Domain note (peptides &amp; "research only").</strong> Pepify operates in the research-chemical /
+    peptide niche and leans heavily on compliance framing ("for laboratory research only", "≥98% purity",
+    third-party COAs). If you adapt this platform to another industry, the <em>structure</em> transfers cleanly
+    — the compliance/trust layer (COAs, disclaimers, "research use") is the part that's domain-specific and
+    would be swapped for your industry's equivalent trust signals (certificates, authenticity, warranties, etc.).
+  </div>
+
+  <!-- ===================== IA ===================== -->
+  <h2 class="section" id="ia">🗺️ Information architecture</h2>
+  <p>The app is a single-page application behind <code>/dashboard</code> with a persistent left sidebar.
+  Navigation is grouped into five labelled sections. Public marketing/auth pages sit outside the app shell.</p>
+  <div class="grid2">
+    <div class="card">
+      <div class="lbl">App sidebar (authenticated)</div>
+      <ul class="tight">
+        <li><strong>CORE</strong> — Overview · Orders · Tracking · Action Required · Customers · Address Book · Wallet</li>
+        <li><strong>STORE</strong> — My Store</li>
+        <li><strong>CATALOG</strong> — Research Peptides · COAs</li>
+        <li><strong>BRAND &amp; TOOLS</strong> — Branding · Shipping · Profit Calculator</li>
+        <li><strong>SUPPORT</strong> — Live Chat · Referrals · Account</li>
+        <li>Footer — Light/Dark toggle · Help &amp; Support · Log out</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="lbl">Public &amp; system</div>
+      <ul class="tight">
+        <li><code>/</code> — Landing (marketing)</li>
+        <li><code>/onboarding</code> — Create account (also referral entry <code>?ref=CODE</code>)</li>
+        <li><code>/login</code> · <code>/forgot-password</code></li>
+        <li>Top bar — Notifications inbox · Profile menu · Theme toggle</li>
+        <li>Persistent — "Tips available" banner, AI agent prompt, Stripe checkout (new tab)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== DESIGN ===================== -->
+  <h2 class="section" id="design">🎨 Design system</h2>
+  <p>Two themes: a <strong>light</strong> theme for public/auth pages and a <strong>dark</strong> theme for the app
+  (default). The aesthetic is a modern fintech/SaaS dashboard — rounded geometric sans, soft cards, generous
+  spacing, a single saturated blue accent, with green/amber/red reserved for status.</p>
+  <div class="card">
+    <div class="lbl">Color (approximated from capture)</div>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#080b14"></div><div class="nm">App bg #080b14</div></div>
+      <div class="sw"><div class="chip" style="background:#121829"></div><div class="nm">Card #121829</div></div>
+      <div class="sw"><div class="chip" style="background:#4361ee"></div><div class="nm">Accent blue</div></div>
+      <div class="sw"><div class="chip" style="background:#28c76f"></div><div class="nm">Success/profit</div></div>
+      <div class="sw"><div class="chip" style="background:#ff9f43"></div><div class="nm">Warning</div></div>
+      <div class="sw"><div class="chip" style="background:#ea5455"></div><div class="nm">Danger/logout</div></div>
+      <div class="sw"><div class="chip" style="background:#eef1f7"></div><div class="nm">Light page bg</div></div>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card"><div class="lbl">Typography</div><p class="note">Rounded geometric sans (Poppins/Quicksand-like)
+      for headings; high-contrast white-on-near-black. Bold weights for stat values &amp; CTAs.</p></div>
+    <div class="card"><div class="lbl">Shape &amp; depth</div><p class="note">~12–16px corner radii on cards,
+      fully-rounded (pill) buttons &amp; filter tabs, 1px hairline borders, subtle elevation — no heavy shadows.</p></div>
+    <div class="card"><div class="lbl">Motion &amp; feedback</div><p class="note">Slide-over drawers from the right,
+      fade-in page transitions, live status dots (green "Online/Live"), toast-style "tips" banner.</p></div>
+  </div>
+
+  <!-- ===================== COMPONENTS ===================== -->
+  <h2 class="section" id="components">🧩 Reusable component library</h2>
+  <p>The entire app is assembled from ~12 repeating components. Build these once and most screens fall out for free.</p>
+  <div class="grid2">
+    <div class="card">
+      <div class="lbl">Recurring components</div>
+      <ul class="tight">
+        <li><strong>Page header</strong> — title + one-line description (every screen)</li>
+        <li><strong>KPI stat card</strong> — icon, big value, label (3–4 across)</li>
+        <li><strong>Filter pill tabs</strong> — with live counts (All / status filters)</li>
+        <li><strong>Search bar</strong> — context-specific placeholder &amp; match hint</li>
+        <li><strong>Data table</strong> — sortable rows, status badges</li>
+        <li><strong>Empty state</strong> — icon + headline + sub + primary CTA</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="lbl">…continued</div>
+      <ul class="tight">
+        <li><strong>Right slide-over drawer</strong> — forms (new order, add customer)</li>
+        <li><strong>Center modal</strong> — Add Funds / confirmations</li>
+        <li><strong>Accordion</strong> — "How it works" explainers</li>
+        <li><strong>Status badge</strong> — In Stock / Soon / Online / Live</li>
+        <li><strong>Tips banner</strong> — dismissible "N tips available · Show"</li>
+        <li><strong>Gamification</strong> — progress bar, streak, badge grid</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== PUBLIC FUNNEL ===================== -->
+  <h2 class="section" id="landing">🌐 Public funnel — Landing page</h2>
+  <div class="route">/ <span class="tag">light theme</span><span class="tag">marketing</span></div>
+  <p>A long single-scroll marketing page. Doubles as both "How it Works" and "Catalog" (those nav links are
+  anchor jumps, not separate pages). This is the conversion engine — it sells the $97/mo plan.</p>
+  <div class="card">
+    <div class="lbl">Sections, top to bottom</div>
+    <ul class="tight">
+      <li><strong>Sticky nav</strong> — logo · How it Works · Catalog · Sign In · Get Started. Urgency strip: "Closing soon — almost full".</li>
+      <li><strong>Hero</strong> — "Launch Your Own Research Peptide Brand In 24 Hours" + dual CTA (Get Started / See Wholesale Pricing) + trust chips (3 US warehouses, 1–2 day fulfilment, Janoshik-verified COAs).</li>
+      <li><strong>How it works</strong> — 4 numbered steps (Create account → Activate Pro $97/mo → Set up dashboard → You sell, we fulfil) + "100% Automated" feature column.</li>
+      <li><strong>Research Catalog carousel</strong> — product cards showing wholesale cost / suggested retail / profit-per-vial / margin %, with "Out of Stock" badges.</li>
+      <li><strong>Wallet &amp; Payments</strong> — 4-card explainer (fund, holds balance, auto-deduct, refunds stay in wallet) + secure-payments note.</li>
+      <li><strong>Interactive Profit Calculator</strong> — pick product, set retail, set monthly volume → live profit/order, margin, net monthly profit, break-even.</li>
+      <li><strong>Pricing</strong> — single "Pepify Pro" plan, $97/mo, long feature checklist, "price raising to $200" anchor.</li>
+      <li><strong>Testimonials</strong> — "4.9/5 from 200+ operators", 6 verified quote cards w/ avatars.</li>
+      <li><strong>FAQ</strong> — accordion grouped into How It Works / Your Store &amp; Selling / What's Included / Product Quality.</li>
+      <li><strong>Footer</strong> — platform/account/legal columns, disclaimers, cookie consent (Accept / Decline).</li>
+    </ul>
+  </div>
+  <div class="callout"><span class="kicker">Build note</span><br>Nearly all marketing copy is reused from in-app
+  explainers (wallet, fulfilment steps, calculator). Treat marketing + app as sharing one content source so they
+  stay consistent.</div>
+
+  <h2 class="section" id="signup">Create Account / Onboarding</h2>
+  <div class="route">/onboarding <span class="tag">light theme</span><span class="tag">accepts ?ref=CODE</span></div>
+  <p>Single-step signup — no multi-screen wizard. Post-signup onboarding is handled <em>inside</em> the dashboard
+  via a "Get Started — 1/3" checklist (connect store · fund wallet · upload label) and the Account
+  "Profile Completeness" meter.</p>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Fields</div><ul class="tight">
+      <li>Full Name</li><li>Email Address</li>
+      <li>Password <span class="note">(min 8 chars, uppercase + number)</span></li>
+      <li>Confirm Password</li><li>Create Account (primary)</li>
+    </ul></div>
+    <div class="card"><div class="lbl">Around the form</div><ul class="tight">
+      <li>"Already have an account? Log in" link</li>
+      <li>Trust badges: ≥98% purity · 1–2 day US fulfilment · white-label branding included</li>
+      <li>Terms/Privacy agreement line</li>
+      <li>No credit card at signup — paywall (Pro) comes after.</li>
+    </ul></div>
+  </div>
+
+  <h2 class="section" id="login">Login</h2>
+  <div class="route">/login <span class="tag">light theme</span></div>
+  <p>Centered card on a light background. "Welcome Back — Log in to access your Pepify dashboard."</p>
+  <div class="mock light">
+    <div class="mh"><div class="t" style="color:#1a2238">Welcome Back</div></div>
+    <div style="max-width:360px">
+      <div class="lbl" style="color:#566">Email Address</div>
+      <div style="background:#fff;border:1px solid #d6dbe8;border-radius:10px;padding:10px;color:#889;margin-bottom:10px">you@example.com</div>
+      <div class="lbl" style="color:#566">Password</div>
+      <div style="background:#fff;border:1px solid #d6dbe8;border-radius:10px;padding:10px;color:#889;margin-bottom:12px">Your password</div>
+      <div class="btn" style="width:100%;text-align:center">Log In</div>
+      <div style="text-align:center;margin-top:10px;font-size:12.5px;color:#566">Forgot password? · Don't have an account? <b style="color:#4361ee">Create one</b></div>
+    </div>
+  </div>
+  <p class="note">Footer chips: ≥98% purity peptides · 1–2 day US fulfilment · White-label branding. A
+  <code>/forgot-password</code> route exists (email reset-link flow).</p>
+
+  <!-- ===================== APP · CORE ===================== -->
+  <h2 class="section" id="overview">📊 App · Overview (dashboard home)</h2>
+  <div class="route">/dashboard <span class="tag">dark theme</span><span class="tag">default landing after login</span></div>
+  <p class="lead">"Your brand's performance at a glance — revenue, orders, and top products."</p>
+  <div class="mock">
+    <div class="mh"><div><div class="t">Overview</div><div class="s">Good afternoon, Scott 👋 — No orders yet today</div></div><div class="s">💡 3 tips available · Show</div></div>
+    <div class="callout amber" style="margin:8px 0">● Attention recommended · checked 05:17 PM — Product sync · Order sync · Storage access</div>
+    <div class="grid4" style="margin:12px 0">
+      <div class="stat"><div class="v">$0.00</div><div class="k">Today · 0 orders</div></div>
+      <div class="stat"><div class="v">$0</div><div class="k">Revenue (June)</div></div>
+      <div class="stat"><div class="v">$0</div><div class="k">Profit</div></div>
+      <div class="stat"><div class="v">0</div><div class="k">Orders · 0 customers</div></div>
+    </div>
+    <div class="grid3">
+      <div class="stat"><div class="k">Daily Goal · $500</div><div class="v" style="font-size:18px">0%</div></div>
+      <div class="stat"><div class="k">Best Day</div><div class="v" style="font-size:18px">$0.00</div></div>
+      <div class="stat"><div class="k">Goal Streak 🔥</div><div class="v" style="font-size:18px">0 days</div></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Modules on this screen</div><ul class="tight">
+      <li><strong>Greeting/agent banner</strong> — time-aware greeting + "Tip of the day".</li>
+      <li><strong>Sync health</strong> — "Attention recommended": Product sync, Order sync, Storage access status w/ Refresh + Run checks.</li>
+      <li><strong>Store sync activity</strong> — last run / items / success rate per sync type.</li>
+      <li><strong>KPI row</strong> — Today, Revenue, Profit, Orders.</li>
+      <li><strong>Gamification row</strong> — Daily Goal (editable target), Best Day, Goal Streak.</li>
+    </ul></div>
+    <div class="card"><div class="lbl">…continued</div><ul class="tight">
+      <li><strong>Personal Pepify Agent</strong> — tap-to-chat onboarding helper.</li>
+      <li><strong>Announcements</strong> — "Restockify!" / inventory-update broadcasts.</li>
+      <li><strong>Get Started — 1/3</strong> checklist (connect store · fund wallet · upload label), dismissible.</li>
+      <li><strong>Charts</strong> — Last 14 days (revenue &amp; profit line), Monthly Revenue (6-month trend).</li>
+      <li><strong>Top Products</strong>, <strong>Quick actions</strong> (View Orders · Add Funds · My Store · Calculator), <strong>Recent Orders</strong>.</li>
+    </ul></div>
+  </div>
+  <div class="meta"><span class="pill">Empty state: zeros + nudges</span><span class="pill blue">Heavy gamification</span><span class="pill green">Charts: Recharts-style</span></div>
+
+  <h2 class="section" id="orders">Orders</h2>
+  <div class="route">/dashboard → Orders <span class="tag">dark</span></div>
+  <p>"Track all synced orders from your store. Statuses update automatically as we fulfil them."</p>
+  <div class="mock">
+    <div class="mh"><div class="t">Orders</div><div class="btn">+ New Order</div></div>
+    <div class="grid4" style="margin:10px 0">
+      <div class="stat"><div class="v">0</div><div class="k">Total Orders</div></div>
+      <div class="stat"><div class="v">0</div><div class="k">Pending Fulfilment</div></div>
+      <div class="stat"><div class="v">0</div><div class="k">Shipped</div></div>
+      <div class="stat"><div class="v">0</div><div class="k">Delivered</div></div>
+    </div>
+    <div class="tabs"><span class="tab on">All 0</span><span class="tab">Ready for Fulfilment 0</span><span class="tab">Processing 0</span><span class="tab">Shipped 0</span><span class="tab">Delivered 0</span></div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;color:var(--faint);font-size:13px">🔍 Search orders, customers, products… <span class="note">— matches order IDs, customer &amp; product names</span></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Layout</div><ul class="tight">
+      <li>KPI row → status filter tabs (w/ counts) → search → table / empty state.</li>
+      <li>Empty: "No orders yet — Submit a manual order or sync from your store" + "Submit Your First Order".</li>
+      <li>Order statuses: <strong>Ready for Fulfilment → Processing → Shipped → Delivered</strong>.</li>
+    </ul></div>
+    <div class="card"><div class="lbl">"New Manual Order" drawer (right slide-over)</div><ul class="tight">
+      <li><strong>Customer info</strong> — Name* , Email.</li>
+      <li><strong>Products</strong> — repeatable line items: product dropdown + Qty (default 1).</li>
+      <li>Submit Order. Used for social/Telegram/custom sellers without a connected store.</li>
+    </ul></div>
+  </div>
+
+  <h2 class="section" id="tracking">Tracking Hub</h2>
+  <div class="route">/dashboard → Tracking <span class="tag">dark</span></div>
+  <p>"Every order with a shipping label in one place. Click Track to view live carrier updates."</p>
+  <div class="card"><div class="lbl">Contents</div><ul class="tight">
+    <li>KPI cards: <strong>Tracked · In Transit · Delivered</strong>.</li>
+    <li>Search by order #, tracking #, customer, or product.</li>
+    <li>Per-row "Track" action → live carrier status. Tracking numbers appear automatically once orders ship (and are pushed back to the connected store).</li>
+    <li>Empty: "No tracking numbers yet."</li>
+  </ul></div>
+
+  <h2 class="section" id="action">Action Required</h2>
+  <div class="route">/dashboard → Action Required <span class="tag">dark</span></div>
+  <p>A filtered variant of Orders — only orders blocked on the brand owner. "Once fixed, they move to your Orders tab."</p>
+  <div class="card"><div class="lbl">Same Orders layout, different filters</div>
+    <div class="tabs"><span class="tab on">All 0</span><span class="tab">Needs Address 0</span><span class="tab">Needs Customer Info 0</span><span class="tab">Awaiting Funds 0</span></div>
+    <p class="note">Three blocker reasons: missing shipping address, missing customer info, or insufficient wallet
+    balance ("Awaiting Funds"). Resolving the blocker releases the order to fulfilment.</p>
+  </div>
+
+  <h2 class="section" id="customers">Customers</h2>
+  <div class="route">/dashboard → Customers <span class="tag">dark</span></div>
+  <p>"View all customers who've placed orders through your connected store."</p>
+  <div class="card"><div class="lbl">Contents</div><ul class="tight">
+    <li>KPI cards: <strong>Total Customers · New This Month · Avg LTV · Retention Rate</strong>.</li>
+    <li>Search customers; table of customers + lifetime value.</li>
+    <li>Empty: "Customers will appear here once you receive your first order."</li>
+  </ul></div>
+
+  <h2 class="section" id="address">Address Book</h2>
+  <div class="route">/dashboard → Address Book <span class="tag">dark</span></div>
+  <p>"Your saved customers. Repeat buyers auto-fill name and address on new orders."</p>
+  <div class="grid2">
+    <div class="card"><div class="lbl">List view</div><ul class="tight">
+      <li>Search by name, email, city, ZIP.</li>
+      <li>"+ Add Customer" → right slide-over drawer.</li>
+      <li>Auto-populated when orders are submitted; powers order auto-fill.</li>
+    </ul></div>
+    <div class="card"><div class="lbl">Add Customer drawer</div><ul class="tight">
+      <li>Customer Name* , Email, + address fields (street/city/state/ZIP) below.</li>
+      <li>Save Customer.</li>
+    </ul></div>
+  </div>
+
+  <h2 class="section" id="wallet">Wallet — "Pepify Balance"</h2>
+  <div class="route">/dashboard → Wallet <span class="tag">dark</span><span class="tag">Stripe</span></div>
+  <p>"Your prepaid wallet funds order fulfilment. Add funds via credit card — deposits are credited automatically."</p>
+  <div class="mock">
+    <div class="mh"><div class="t">Pepify Balance</div><div><span class="btn ghost">? Need help</span> <span class="btn">+ Add Funds</span></div></div>
+    <div class="grid3">
+      <div class="stat"><div class="v">$0.00</div><div class="k">Current Balance</div></div>
+      <div class="stat"><div class="v">$0.00</div><div class="k">Spent This Month</div></div>
+      <div class="stat"><div class="v">0</div><div class="k">Orders Fulfilled This Month</div></div>
+    </div>
+    <div style="margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px">How Your Wallet Works ⌄</div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Screen contents</div><ul class="tight">
+      <li>Balance KPIs · "How Your Wallet Works" accordion · Wallet Activity (transaction ledger).</li>
+      <li>Empty: "No transactions yet. Add funds to get started."</li>
+    </ul></div>
+    <div class="card"><div class="lbl">Add Funds modal (center)</div><ul class="tight">
+      <li>Warning: deposits non-refundable, credit never expires.</li>
+      <li>Preset amounts <strong>$100 / $250 / $500 / $1000</strong> + custom amount.</li>
+      <li>"Add $X to Balance" → <strong>Stripe checkout opens in a new tab</strong>; balance credits automatically on completion.</li>
+      <li>Supports Visa/MC/Amex/Discover/Apple Pay/Google Pay.</li>
+    </ul></div>
+  </div>
+
+  <!-- ===================== APP · STORE ===================== -->
+  <h2 class="section" id="store">🏪 App · My Store</h2>
+  <div class="route">/dashboard → My Store <span class="tag">dark</span><span class="tag">integrations</span></div>
+  <p>"Connect your store and sync orders automatically. We handle fulfilment — you manage your products."</p>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Platform picker</div><ul class="tight">
+      <li><strong>WooCommerce</strong> (WordPress) · <strong>Wix</strong> eCommerce.</li>
+      <li>"Don't have an online store?" → submit orders manually (social / Telegram / custom).</li>
+    </ul></div>
+    <div class="card"><div class="lbl">Connect WooCommerce form</div><ul class="tight">
+      <li>Store URL · Consumer Key (<code>ck_</code>) · Consumer Secret (<code>cs_</code>).</li>
+      <li>Required terms checkbox (Prohibited Uses / "sold strictly as research chemicals").</li>
+      <li>Inline help: how to generate REST API keys; sync runs every 15 min + "Sync Now"; tracking pushed back to store; unmatched products show a "No match" badge.</li>
+    </ul></div>
+  </div>
+
+  <!-- ===================== APP · CATALOG ===================== -->
+  <h2 class="section" id="products">📦 App · Research Peptides (wholesale catalog)</h2>
+  <div class="route">/dashboard → Research Peptides <span class="tag">dark</span><span class="tag">core data screen</span></div>
+  <p>The wholesale price sheet — <strong>36 products</strong>. "Your customers order from your store, not here. Add
+  these to your store at your own retail price; we fulfil and deduct wholesale from your wallet."</p>
+  <div class="mock">
+    <div class="mh"><div class="t">Product Catalog</div><div class="s">🔍 Search products</div></div>
+    <div class="callout green" style="margin:6px 0">● Orders are live — fulfilment is running normally.</div>
+    <table class="mini">
+      <thead><tr><th>Product</th><th>Your Cost</th><th>Suggested Retail</th><th>Est. Margin</th><th>Est. Total Cost</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Bacteriostatic Water · 3mL</td><td>$8.00</td><td>$12.00</td><td class="g">33% · $4</td><td>~$15.00</td><td><span class="pill green">In Stock</span></td></tr>
+        <tr><td>T-5 · 5mg</td><td>$17.00</td><td>$55.00</td><td class="g">69% · $38</td><td>~$24.00</td><td><span class="pill green">In Stock</span></td></tr>
+        <tr><td>Tesamorelin · 20mg</td><td>$130.00</td><td>$315.00</td><td class="g">59% · $185</td><td>~$137.00</td><td><span class="pill green">In Stock</span></td></tr>
+        <tr><td>NAD+ · 500mg</td><td>$20.00</td><td>$55.00</td><td class="g">64% · $35</td><td>~$27.00</td><td><span class="pill amber">Soon</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Columns / data per product</div><ul class="tight">
+      <li>Name + size variant (e.g. 5mg/10mg/20mg).</li>
+      <li>Your Cost (wholesale) · Suggested Retail · Est. Margin (% + $ profit) · Est. Total Cost (incl. shipping) · Status.</li>
+      <li>Status: <strong>In Stock</strong> / <strong>Soon</strong> ("Out of Stock = pending COA verification").</li>
+    </ul></div>
+    <div class="card"><div class="lbl">Framing &amp; footer</div><ul class="tight">
+      <li>"This is your wholesale price sheet" explainer card.</li>
+      <li>Live fulfilment status banner.</li>
+      <li>Footer: free custom labeling included; $12.95 flat USPS Ground Advantage; retail is a guideline — you set prices.</li>
+    </ul></div>
+  </div>
+
+  <h2 class="section" id="coas">COAs (Certificates of Analysis)</h2>
+  <div class="route">/dashboard → COAs <span class="tag">dark</span><span class="tag">trust layer</span></div>
+  <p>"Download and share verified COAs with your customers — third-party tested via HPLC." The product's
+  <strong>trust / authenticity layer</strong>.</p>
+  <div class="card"><div class="lbl">Contents</div><ul class="tight">
+    <li>"Third-Party Verified by Janoshik" banner (HPLC/LC-MS).</li>
+    <li>"How to use COAs in your store" steps + "Verify It Yourself" callout.</li>
+    <li>Searchable list (~14 COAs); each row: product name, lab + method, <strong>Copy Link</strong> + <strong>View</strong> (links to external Janoshik report).</li>
+    <li>Teaser: "independent batch testing program launching shortly."</li>
+  </ul></div>
+  <div class="callout"><span class="kicker">Adaptation</span><br>For another industry this becomes your authenticity
+  artifact — lab report, certificate of authenticity, inspection report, warranty doc — with the same
+  copy-link-into-product-description pattern.</div>
+
+  <!-- ===================== APP · BRAND & TOOLS ===================== -->
+  <h2 class="section" id="branding">🎨 App · Branding</h2>
+  <div class="route">/dashboard → Branding <span class="tag">dark</span></div>
+  <p>"Upload your logo and customize vial labels. Your brand goes on every product we ship."</p>
+  <div class="card"><div class="lbl">Contents</div><ul class="tight">
+    <li>"How it works" (upload logo → printed on every vial → customers see your brand). Custom labeling is FREE.</li>
+    <li>Logo upload zone — PNG/JPG, max 10 MB, B&amp;W recommended; live preview; Update / Remove.</li>
+    <li>"Logo uploaded ✓" status; changes apply to all future orders.</li>
+  </ul></div>
+
+  <h2 class="section" id="shipping">Shipping</h2>
+  <div class="route">/dashboard → Shipping <span class="tag">dark</span></div>
+  <p>"All orders ship via USPS Ground Advantage · $12.95 flat rate · USA only · accepted 24/7, ship Mon–Fri."</p>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Contents</div><ul class="tight">
+      <li>KPI cards: Shipped This Month · Total Delivered · In Progress · Avg Fulfilment Time (&lt; 24h).</li>
+      <li><strong>Return Address form</strong> — Sender/Company* , Street* , Apt/Suite, City* , State* , ZIP* , Phone → Save (shown as sender on labels; blank = Pepify default warehouse).</li>
+      <li>Carrier card: USPS Ground Advantage, 3–5 business days, $12.95, domestic only.</li>
+    </ul></div>
+    <div class="card"><div class="lbl">Explainers</div><ul class="tight">
+      <li>"What's Included" — Free Custom Labeling · COA Catalog · Fast Processing · Discreet Packaging.</li>
+      <li>"How Fulfilment Works" 4 steps: Submit Order → We Pick &amp; Pack → Fast Shipping (1–2 biz days, tracking) → Track Everything.</li>
+    </ul></div>
+  </div>
+
+  <h2 class="section" id="calc">Profit Calculator</h2>
+  <div class="route">/dashboard → Profit Calculator <span class="tag">dark</span><span class="tag">interactive tool</span></div>
+  <p>"Full cost breakdown per order — see exactly what you earn after wholesale, shipping, and membership." Mirrors
+  the marketing-page calculator but for the full catalog.</p>
+  <div class="mock">
+    <div class="grid2">
+      <div>
+        <div class="lbl">Configure</div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px">Product ▾ Bacteriostatic Water — 3mL</div>
+        <div class="note">Your wholesale cost $8.00 · Suggested retail $12</div>
+        <div style="margin-top:8px" class="note">☑ Include shipping in cost ($12.95) · ☑ Charge customer for shipping</div>
+        <div class="note" style="margin-top:6px">Monthly volume slider: 10 · 25 · 50 · 250 · 500</div>
+      </div>
+      <div>
+        <div class="lbl">Per-order breakdown</div>
+        <div class="stat" style="margin-bottom:8px"><div class="k">Total cost / order</div><div class="v" style="font-size:18px">$20.95</div></div>
+        <div class="stat" style="margin-bottom:8px"><div class="k">Total revenue / order</div><div class="v" style="font-size:18px">$24.99</div></div>
+        <div class="stat"><div class="k">Profit / order · margin</div><div class="v" style="font-size:18px;color:var(--green)">$4.04 · 16%</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="card"><div class="lbl">Also on this screen</div><ul class="tight">
+    <li>"How Payments Work" 4-step flow + money-flow explainer ("you never send us your customer revenue").</li>
+    <li><strong>Monthly Wallet Funding Needed</strong> table (product + shipping + $97 membership = total to load).</li>
+    <li><strong>Profit Projections</strong> table across 10/25/50/100/250/500 orders → You Collect / Wallet Load / Net Profit / Annual.</li>
+    <li>Break-even highlighted (≈25 orders/mo at the example price).</li>
+  </ul></div>
+
+  <!-- ===================== APP · SUPPORT ===================== -->
+  <h2 class="section" id="chat">💬 App · Live Chat</h2>
+  <div class="route">/dashboard → Live Chat <span class="tag">dark</span></div>
+  <p>"Instant AI answers on orders, branding, shipping — escalate to a human anytime." Full-screen chat with an
+  Online status dot, message thread (welcome message from "Pepify Support"), and composer ("Type a message…
+  Shift+Enter for new line") + send button.</p>
+
+  <h2 class="section" id="referrals">Referrals</h2>
+  <div class="route">/dashboard → Referrals <span class="tag">dark</span></div>
+  <p>"Refer a brand, earn $50." Referrer gets $50 wallet credit, referee gets $50 welcome bonus on Pro upgrade.</p>
+  <div class="card"><div class="lbl">Contents</div><ul class="tight">
+    <li>Your Referral Code (e.g. <code>JABE7KEC</code>) + copy.</li>
+    <li>Share Link <code>https://pepify.pro/onboarding?ref=CODE</code> + copy.</li>
+    <li>KPI cards: Total Invited · Upgraded · Earned ($).</li>
+    <li>Empty: "No referrals yet — share your link above to start earning."</li>
+  </ul></div>
+
+  <h2 class="section" id="account">Account</h2>
+  <div class="route">/dashboard → Account <span class="tag">dark</span><span class="tag">profile + billing + gamification</span></div>
+  <p>"Manage your profile, email, password, and subscription settings." The most feature-dense settings screen.</p>
+  <div class="grid2">
+    <div class="card"><div class="lbl">Profile &amp; status</div><ul class="tight">
+      <li>Avatar, name, <strong>Pro</strong> badge, email, "Member since".</li>
+      <li>Mini-KPIs: Orders · Spent · Funded · Referrals.</li>
+      <li><strong>Live Order Tracking</strong> widget (real-time).</li>
+      <li><strong>Profile Completeness</strong> meter — 4/6 steps (67%): full name · company name · logo · website · sales channel · first order.</li>
+      <li><strong>Achievements</strong> — 1/10 badge grid (Welcome aboard, First order, 10 orders strong, Power seller, Funded up, Big mover, Connector, Network builder, All set up, Lifetime member).</li>
+      <li><strong>Recent Activity</strong> feed.</li>
+    </ul></div>
+    <div class="card"><div class="lbl">Settings forms</div><ul class="tight">
+      <li><strong>Profile Information</strong> — Full Name (changeable once / 7 days), Research Company Name → Save.</li>
+      <li><strong>Email</strong> — current + change email.</li>
+      <li><strong>Password</strong> — send reset email link.</li>
+      <li><strong>Subscription</strong> — sync status with Stripe ("Sync now"); manage/upgrade/cancel via support.</li>
+    </ul></div>
+  </div>
+
+  <!-- ===================== GLOBAL ===================== -->
+  <h2 class="section" id="notifications">🔔 Global — Notifications Inbox</h2>
+  <div class="route">top bar 🔔 → full page <span class="tag">dark</span></div>
+  <p>"Every order update, announcement, internal note, and reported issue in one feed." Opens as a full screen
+  (not a dropdown).</p>
+  <div class="card"><div class="lbl">Contents</div>
+    <div class="tabs"><span class="tab on">All 2</span><span class="tab">Orders 0</span><span class="tab">Announcements 2</span><span class="tab">Order Notes 0</span><span class="tab">Issues 0</span></div>
+    <ul class="tight">
+      <li>Filter pill tabs by type + Refresh.</li>
+      <li>Feed cards (e.g. "Restockify!", "5/28 Inventory Update" from Pepify Team) with relative timestamps.</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="topbar">Top bar &amp; app chrome</h2>
+  <div class="route">persistent <span class="tag">dark</span></div>
+  <div class="grid3">
+    <div class="card"><div class="lbl">Left sidebar</div><p class="note">Brand identity block (logo + name + user), 5 grouped
+      nav sections, footer (theme toggle · Help &amp; Support · Log out). Independently scrollable.</p></div>
+    <div class="card"><div class="lbl">Top bar</div><p class="note">Page title + description (left); theme toggle ☀,
+      notifications 🔔 (red dot), and profile avatar (right).</p></div>
+    <div class="card"><div class="lbl">Profile menu</div><p class="note">Name + brand, Account Settings, Help &amp;
+      Support, Log out (red). Plus the recurring dismissible "N tips available · Show" banner per screen.</p></div>
+  </div>
+
+  <hr>
+  <p class="note">End of screen catalog. See <code>pepify_build_spec.md</code> for the data model, user flows,
+  integrations, and an MVP build plan. Captured from a live logged-in session on 2026-06-10; product data
+  (prices, 36 SKUs) reflects that moment and will drift.</p>
+
+</main>
+</div>
+</body>
+</html>

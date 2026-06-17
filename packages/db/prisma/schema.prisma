@@ -1,0 +1,518 @@
+// RUOStack — Phase 0 Prisma schema.
+// Prisma manages the `public` schema ONLY — never auth/storage/realtime.
+// All money is integer cents. All tables get created_at; mutable ones updated_at.
+// The brand "person" is a Supabase `auth.users` row (Supabase owns credentials,
+// password hashes, sessions, MFA factors) — never duplicated here.
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // tx pooler 6543 + ?pgbouncer=true (runtime)
+  directUrl = env("DIRECT_URL") // session/direct 5432 (migrations)
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+enum SubscriptionStatus {
+  none
+  pro
+
+  @@map("subscription_status")
+}
+
+enum BrandStatus {
+  active
+  suspended
+
+  @@map("brand_status")
+}
+
+enum BrandMemberRole {
+  owner
+  staff
+
+  @@map("brand_member_role")
+}
+
+enum BrandMemberStatus {
+  active
+  invited
+  suspended
+
+  @@map("brand_member_status")
+}
+
+enum BrandRealm {
+  brand
+
+  @@map("brand_realm")
+}
+
+enum AdminRole {
+  super_admin
+  operations
+  support
+  finance
+
+  @@map("admin_role")
+}
+
+enum AdminStatus {
+  active
+  suspended
+
+  @@map("admin_status")
+}
+
+enum ActorType {
+  admin
+  brand
+  system
+
+  @@map("actor_type")
+}
+
+enum CatalogStatus {
+  in_stock
+  soon
+  out_of_stock
+
+  @@map("catalog_status")
+}
+
+enum WebhookSource {
+  stripe
+
+  @@map("webhook_source")
+}
+
+enum WebhookStatus {
+  received
+  processed
+  failed
+
+  @@map("webhook_status")
+}
+
+enum TaxExemptionStatus {
+  none
+  on_file
+  expired
+
+  @@map("tax_exemption_status")
+}
+
+// ── Brand realm (app data keyed to Supabase auth.users) ──────────────────────
+
+/// realm: brand. id == auth.users.id (FK by convention; auth schema is Supabase-owned).
+/// Does NOT recreate password_hash/MFA — Supabase Auth owns those.
+model UserProfile {
+  id                  String   @id @db.Uuid // == auth.users.id
+  fullName            String   @map("full_name")
+  nameLastChangedAt   DateTime? @map("name_last_changed_at") // enforces "name editable once / 7 days"
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("user_profile")
+}
+
+/// The tenant.
+model Brand {
+  id                 String             @id @default(uuid()) @db.Uuid
+  brandName          String             @map("brand_name")
+  status             BrandStatus        @default(active)
+  logoUrl            String?            @map("logo_url")
+  website            String?
+  salesChannel       String?            @map("sales_channel")
+  subscriptionStatus SubscriptionStatus @default(none) @map("subscription_status") // convenience flag; SubscriptionState is SoT in Phase 1
+  stripeCustomerId   String?            @map("stripe_customer_id")
+  memberSince        DateTime           @default(now()) @map("member_since")
+  referralCode       String             @unique @map("referral_code")
+  referredBy         String?            @map("referred_by") // store only; reward logic is later
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  members           BrandMember[]
+  userRoles         BrandUserRole[]
+  taxExemptions     BrandTaxExemption[]
+  subscriptionState  SubscriptionState?
+  walletLedger       WalletLedger[]
+  brandProductPrices BrandProductPrice[]
+  orders             Order[]
+
+  @@map("brand")
+}
+
+/// Join: which users belong to which brand. MVP creates exactly one `owner`.
+model BrandMember {
+  id        String            @id @default(uuid()) @db.Uuid
+  brandId   String            @map("brand_id") @db.Uuid
+  userId    String            @map("user_id") @db.Uuid // -> auth.users.id
+  role      BrandMemberRole
+  status    BrandMemberStatus @default(active)
+  invitedAt DateTime?         @map("invited_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, userId])
+  @@index([userId])
+  @@map("brand_member")
+}
+
+/// Server-owned source for the custom access token hook (NOT user_metadata).
+/// The hook reads this to inject realm + brand_id claims; written only by the API.
+model BrandUserRole {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @map("user_id") @db.Uuid
+  realm     BrandRealm @default(brand)
+  brandId   String     @map("brand_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, brandId])
+  @@index([userId])
+  @@map("brand_user_role")
+}
+
+// ── Admin realm (option a: separate from the customer pool) ───────────────────
+
+model AdminUser {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  fullName     String      @map("full_name")
+  role         AdminRole
+  status       AdminStatus @default(active)
+  mfaEnabled   Boolean     @default(false) @map("mfa_enabled")
+  mfaSecret    String?     @map("mfa_secret") // encrypted at rest (AES-256-GCM)
+  lastLoginAt  DateTime?   @map("last_login_at")
+  createdBy    String?     @map("created_by") @db.Uuid // AdminUser.id
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  sessions     AdminSession[]
+  resetTokens  AdminPasswordResetToken[]
+
+  @@map("admin_user")
+}
+
+/// Revocable admin refresh tokens (option a only; Supabase Auth manages brand sessions).
+model AdminSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  adminUserId      String    @map("admin_user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  ip               String?
+  userAgent        String?   @map("user_agent")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@map("admin_session")
+}
+
+/// Option a only; brand resets are handled by Supabase Auth.
+model AdminPasswordResetToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  adminUserId String    @map("admin_user_id") @db.Uuid
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@map("admin_password_reset_token")
+}
+
+// ── Audit spine ───────────────────────────────────────────────────────────────
+
+/// APPEND-ONLY. A BEFORE UPDATE OR DELETE trigger raises (robust vs the service
+/// role); an RLS insert/select-only policy is a second layer. No updated_at, no
+/// soft-delete. One row per mutating admin action / sensitive brand action.
+model AuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  actorType  ActorType @map("actor_type")
+  actorId    String?   @map("actor_id")
+  action     String
+  targetType String?   @map("target_type")
+  targetId   String?   @map("target_id")
+  before     Json?
+  after      Json?
+  reason     String?
+  ip         String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([actorType, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+  @@map("audit_log")
+}
+
+// ── Catalog master (operator-owned) ───────────────────────────────────────────
+
+/// Operator-owned master; the brand-facing Product is a READ PROJECTION of this.
+/// `is_published`: while false, canonical_sku is editable and the product does
+/// NOT project to brands; on publish, the SKU LOCKS and it becomes brand-visible.
+model CatalogProduct {
+  id                  String        @id @default(uuid()) @db.Uuid
+  canonicalSku        String        @unique @map("canonical_sku")
+  compound            String
+  dose                String?
+  unit                String?
+  name                String
+  descriptionTemplate String?       @map("description_template")
+  wholesaleStarter    Int           @map("wholesale_starter") // cents — Starter tier rate
+  wholesalePro        Int           @map("wholesale_pro") // cents — Pro tier rate
+  wholesaleVolume     Int           @map("wholesale_volume") // cents — Volume tier rate
+  suggestedRetail     Int           @map("suggested_retail") // cents (operator suggestion; brand can override)
+  status              CatalogStatus @default(soon) // stock state
+  isPublished         Boolean       @default(false) @map("is_published")
+  weight              Float?
+  length              Float?
+  width               Float?
+  height              Float?
+  packagingRule       String?       @map("packaging_rule")
+  coaId               String?       @map("coa_id")
+  images              String[]      @default([])
+  updatedBy           String?       @map("updated_by") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  brandPrices BrandProductPrice[]
+  orderItems  OrderItem[]
+
+  @@index([status])
+  @@index([isPublished])
+  @@map("catalog_product")
+}
+
+// ── Processor seam ────────────────────────────────────────────────────────────
+
+/// Idempotency for the Phase 0 webhook receiver (Phase 1 builds ledger on this).
+model WebhookEvent {
+  id          String        @id @default(uuid()) @db.Uuid
+  source      WebhookSource
+  externalId  String        @map("external_id")
+  type        String
+  payload     Json
+  status      WebhookStatus @default(received)
+  attempts    Int           @default(0)
+  processedAt DateTime?     @map("processed_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@unique([source, externalId])
+  @@map("webhook_event")
+}
+
+// ── SALT footprint (schema only in Phase 0 — no endpoints/UI) ─────────────────
+
+/// Gives the SALT determination somewhere to land later (architecture §5.3).
+model BrandTaxExemption {
+  id             String             @id @default(uuid()) @db.Uuid
+  brandId        String             @map("brand_id") @db.Uuid
+  state          String
+  certificateRef String?            @map("certificate_ref")
+  expiresAt      DateTime?          @map("expires_at")
+  status         TaxExemptionStatus @default(none)
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+  @@map("brand_tax_exemption")
+}
+
+// ── Money layer (Phase 1) ─────────────────────────────────────────────────────
+// Membership and wallet are DIFFERENT money concerns and never commingle
+// (architecture §4.1): a membership charge never touches WalletLedger; a wallet
+// deposit never touches SubscriptionState.
+
+enum SubscriptionStateStatus {
+  none
+  active
+  past_due
+  suspended
+  cancelled
+
+  @@map("subscription_state_status")
+}
+
+enum PlanTier {
+  starter
+  pro
+  volume
+
+  @@map("plan_tier")
+}
+
+enum WalletTxnType {
+  deposit
+  hold
+  hold_release
+  capture
+  refund_credit
+  referral_credit
+  manual_adjustment
+
+  @@map("wallet_txn_type")
+}
+
+enum OrderSource {
+  manual
+  woocommerce
+  wix
+
+  @@map("order_source")
+}
+
+enum OrderStatus {
+  ready_for_fulfillment
+  processing
+  shipped
+  delivered
+  cancelled
+
+  @@map("order_status")
+}
+
+enum OrderBlocker {
+  none
+  needs_address
+  needs_customer_info
+  awaiting_funds
+
+  @@map("order_blocker")
+}
+
+/// One per brand. Driven ONLY by billing webhooks (invoice.paid / payment_failed
+/// / subscription.*). Source of truth for membership; Brand.subscription_status
+/// is a convenience mirror.
+model SubscriptionState {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  brandId              String                  @unique @map("brand_id") @db.Uuid
+  stripeSubscriptionId String?                 @map("stripe_subscription_id")
+  plan                 PlanTier                @default(starter)
+  price                Int                     @default(0) // cents
+  status               SubscriptionStateStatus @default(none)
+  currentPeriodEnd     DateTime?               @map("current_period_end")
+  cancelAtPeriodEnd    Boolean                 @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime                @default(now()) @map("created_at")
+  updatedAt            DateTime                @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@map("subscription_state")
+}
+
+/// Append-only prepaid wallet ledger. `balance_after` is the running available
+/// balance after this entry; current balance = the row with the greatest `seq`.
+/// Non-refundable / non-withdrawable by design (closed-loop; payments §2) — there
+/// is deliberately no withdrawal entry type. Idempotent on external_id (the
+/// processor event id) so a replayed webhook can't double-credit.
+model WalletLedger {
+  id           String        @id @default(uuid()) @db.Uuid
+  seq          BigInt        @default(autoincrement()) @unique
+  brandId      String        @map("brand_id") @db.Uuid
+  type         WalletTxnType
+  amount       Int // signed delta, cents
+  balanceAfter Int           @map("balance_after") // cents
+  externalId   String?       @unique @map("external_id") // processor event id (idempotency)
+  reason       String?
+  createdBy    String?       @map("created_by") @db.Uuid // AdminUser.id for manual_adjustment
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId, seq])
+  @@map("wallet_ledger")
+}
+
+/// A brand's own retail price for a product — overrides CatalogProduct.suggested_retail.
+/// The brand sets this in their portal; defaults to the operator suggestion if absent.
+model BrandProductPrice {
+  id          String   @id @default(uuid()) @db.Uuid
+  brandId     String   @map("brand_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  retailCents Int      @map("retail_cents")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  brand   Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  product CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, productId])
+  @@index([brandId])
+  @@map("brand_product_price")
+}
+
+// ── Orders (Phase 1: manual-first) ────────────────────────────────────────────
+// Funds model: placing an order reserves funds implicitly (held = sum of open
+// orders); shipping CAPTURES the wallet (a capture ledger entry). Insufficient
+// available funds → blocker awaiting_funds.
+
+/// A brand's order. Line items snapshot the brand's tier wholesale at order time.
+model Order {
+  id                 String       @id @default(uuid()) @db.Uuid
+  brandId            String       @map("brand_id") @db.Uuid
+  source             OrderSource  @default(manual)
+  status             OrderStatus  @default(ready_for_fulfillment)
+  blocker            OrderBlocker @default(none)
+  externalOrderId    String?      @map("external_order_id") // store order id (Woo/Wix; Phase 1.5)
+
+  // Shipping recipient (manual entry; Customer/Address Book is a later slice).
+  recipientName  String  @map("recipient_name")
+  recipientEmail String? @map("recipient_email")
+  recipientPhone String? @map("recipient_phone")
+  address1       String  @map("address1")
+  address2       String? @map("address2")
+  city           String
+  state          String
+  zip            String
+  country        String  @default("US")
+
+  wholesaleTotalCents Int       @map("wholesale_total_cents")
+  shippingTotalCents  Int       @map("shipping_total_cents")
+  walletChargeCents   Int       @map("wallet_charge_cents")
+  shippingServiceCode String?   @map("shipping_service_code") // rated service to buy at ship
+  shippingCarrier     String?   @map("shipping_carrier") // rated carrier label
+  trackingNumber      String?   @map("tracking_number")
+  carrier             String?
+  labelUrl            String?   @map("label_url")
+  labelCostCents      Int?      @map("label_cost_cents") // actual carrier cost (RUOStack's)
+  exportedAt          DateTime? @map("exported_at") // first time ShipStation pulled it via the custom-store export
+  shippedAt           DateTime? @map("shipped_at")
+  deliveredAt         DateTime? @map("delivered_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  brand Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  items OrderItem[]
+
+  @@index([brandId, status])
+  @@index([status])
+  @@map("order")
+}
+
+model OrderItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  orderId           String   @map("order_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  qty               Int
+  unitWholesaleCents Int     @map("unit_wholesale_cents") // snapshot at the brand's tier
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product CatalogProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_item")
+}
