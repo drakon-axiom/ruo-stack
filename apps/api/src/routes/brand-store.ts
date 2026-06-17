@@ -1,0 +1,162 @@
+import type { FastifyInstance } from 'fastify';
+import type { BrandStoreConnection } from '@ruostack/db';
+import { z } from 'zod';
+import { AUDIT_ACTIONS, PLANS } from '@ruostack/shared';
+import { getClients } from '../clients.js';
+import { loadConfig } from '../config.js';
+import { writeAudit } from '../audit.js';
+import { requireBrand } from '../middleware/guards.js';
+import { effectivePlan } from '../services/subscription.js';
+import { randomToken } from '../crypto.js';
+import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.js';
+import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.js';
+
+/**
+ * Brand store connection (WooCommerce). Gated on the plan's storeConnections
+ * capability (Pro/Volume). The brand pastes its WC REST keys; we verify them,
+ * store them encrypted, and register order webhooks (when a public URL exists).
+ * Credentials are never returned to the client.
+ */
+const ConnectSchema = z.object({
+  store_url: z.string().url(),
+  consumer_key: z.string().min(10).max(120),
+  consumer_secret: z.string().min(10).max(120),
+});
+
+export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
+  const { prisma } = getClients();
+
+  async function planAllowsStore(brandId: string): Promise<boolean> {
+    const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } });
+    return PLANS[effectivePlan(sub)].capabilities.storeConnections;
+  }
+
+  function webhookUrl(id: string): string | null {
+    const base = loadConfig().PUBLIC_API_BASE_URL;
+    return base ? `${base.replace(/\/+$/, '')}/api/woo/webhook/${id}` : null;
+  }
+
+  function serialize(c: BrandStoreConnection) {
+    return {
+      id: c.id,
+      platform: c.platform,
+      store_url: c.storeUrl,
+      status: c.status,
+      last_error: c.lastError,
+      last_order_at: c.lastOrderAt,
+      auto_webhooks: c.webhookIds.length > 0,
+      webhook_url: webhookUrl(c.id),
+      connected_at: c.createdAt,
+    };
+  }
+
+  // Current connection + whether the plan permits one.
+  app.get('/api/brand/store', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    const [allowed, conn] = await Promise.all([
+      planAllowsStore(brandId),
+      prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } }),
+    ]);
+    return { plan_allows: allowed, connection: conn ? serialize(conn) : null };
+  });
+
+  // Connect a store.
+  app.post('/api/brand/store/connect', { preHandler: requireBrand }, async (req) => {
+    const { brandId, userId } = req.brand!;
+    const body = ConnectSchema.parse(req.body);
+    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    const existing = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
+    if (existing) throw Conflict('already_connected', 'A WooCommerce store is already connected — disconnect it first');
+
+    const creds = { storeUrl: body.store_url, consumerKey: body.consumer_key, consumerSecret: body.consumer_secret };
+    try {
+      await verifyWooCreds(creds);
+    } catch (e) {
+      throw BadRequest('verify_failed', `Couldn't reach the store with those keys: ${e instanceof Error ? e.message.slice(0, 160) : ''}`);
+    }
+
+    const webhookSecret = randomToken(24);
+    const enc = encryptStoreCreds(body.consumer_key, body.consumer_secret);
+    const conn = await prisma.brandStoreConnection.create({
+      data: { brandId, platform: 'woocommerce', storeUrl: body.store_url, ...enc, webhookSecret, status: 'active' },
+    });
+
+    // Register webhooks if we have a public URL; otherwise surface the URL +
+    // secret so the brand can add the webhook in WooCommerce manually.
+    const url = webhookUrl(conn.id);
+    let autoRegistered = false;
+    if (url) {
+      try {
+        const webhookIds = await registerWooWebhooks(creds, url, webhookSecret);
+        await prisma.brandStoreConnection.update({ where: { id: conn.id }, data: { webhookIds } });
+        autoRegistered = webhookIds.length > 0;
+      } catch (e) {
+        await prisma.brandStoreConnection.update({
+          where: { id: conn.id },
+          data: { lastError: `webhook registration failed: ${e instanceof Error ? e.message.slice(0, 160) : ''}` },
+        });
+      }
+    }
+
+    await writeAudit(prisma, {
+      actorType: 'brand',
+      actorId: userId,
+      action: AUDIT_ACTIONS.storeConnected,
+      targetType: 'brand',
+      targetId: brandId,
+      after: { store_url: body.store_url, auto_registered: autoRegistered },
+      ip: req.ip,
+    });
+
+    const fresh = (await prisma.brandStoreConnection.findUnique({ where: { id: conn.id } }))!;
+    // Hand back the secret + URL ONLY when manual setup is needed (no public URL).
+    return {
+      connection: serialize(fresh),
+      manual_setup: !autoRegistered
+        ? { webhook_url: url, webhook_secret: webhookSecret, topics: ['order.created', 'order.updated'] }
+        : null,
+    };
+  });
+
+  // Re-verify the stored keys.
+  app.post('/api/brand/store/test', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
+    if (!conn) throw NotFound('No store connected');
+    try {
+      await verifyWooCreds(decryptStoreCreds(conn));
+      await prisma.brandStoreConnection.update({ where: { id: conn.id }, data: { status: 'active', lastError: null } });
+      return { ok: true };
+    } catch (e) {
+      await prisma.brandStoreConnection.update({
+        where: { id: conn.id },
+        data: { status: 'error', lastError: e instanceof Error ? e.message.slice(0, 200) : 'verify failed' },
+      });
+      throw BadRequest('verify_failed', 'Store keys no longer work — re-connect with fresh keys');
+    }
+  });
+
+  // Disconnect (tears down our webhooks best-effort).
+  app.post('/api/brand/store/disconnect', { preHandler: requireBrand }, async (req) => {
+    const { brandId, userId } = req.brand!;
+    const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
+    if (!conn) throw NotFound('No store connected');
+    if (conn.webhookIds.length) {
+      try {
+        await deleteWooWebhooks(decryptStoreCreds(conn), conn.webhookIds);
+      } catch {
+        /* best-effort */
+      }
+    }
+    await prisma.brandStoreConnection.delete({ where: { id: conn.id } });
+    await writeAudit(prisma, {
+      actorType: 'brand',
+      actorId: userId,
+      action: AUDIT_ACTIONS.storeDisconnected,
+      targetType: 'brand',
+      targetId: brandId,
+      ip: req.ip,
+    });
+    return { ok: true };
+  });
+}

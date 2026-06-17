@@ -1,16 +1,53 @@
 import type { Order } from '@ruostack/db';
+import { AUDIT_ACTIONS } from '@ruostack/shared';
+import { getClients } from '../clients.js';
+import { writeAudit } from '../audit.js';
+import { decryptStoreCreds, pushTracking } from '../services/woo.js';
 
 /**
- * Seam: when an order ships, the tracking number must be written back to the
- * connected store (WooCommerce/Wix) so the brand's customer sees it. Phase 0/1
- * ships the named no-op only — never a fake implementation.
- *
- * TODO(Phase 1.5): push tracking_number/carrier to order.external_order_id on
- * the brand's connected store via the Woo/Wix connector.
+ * On ship, write the tracking number back to the connected store so the brand's
+ * customer sees it (and the store fires its own "shipped" email). WooCommerce:
+ * mark the order completed + attach tracking. Manual orders have no store and
+ * no-op. This NEVER throws into the ship path — the wallet is already captured;
+ * a writeback failure is flagged on the connection + audited for retry/ops.
  */
 export async function onOrderShipped(order: Order): Promise<void> {
-  // eslint-disable-next-line no-console
-  console.log(
-    `[seam] onOrderShipped: order ${order.id} → ${order.carrier} ${order.trackingNumber} (TODO(Phase 1.5): store writeback)`,
-  );
+  if (order.source !== 'woocommerce' || !order.externalOrderId || !order.trackingNumber) return;
+
+  const { prisma } = getClients();
+  const conn = await prisma.brandStoreConnection.findFirst({
+    where: { brandId: order.brandId, platform: 'woocommerce' },
+  });
+  if (!conn) return; // store disconnected since import — nothing to write back to
+
+  try {
+    await pushTracking(decryptStoreCreds(conn), order.externalOrderId, {
+      carrier: order.carrier ?? 'Carrier',
+      number: order.trackingNumber,
+    });
+    await prisma.brandStoreConnection.update({ where: { id: conn.id }, data: { status: 'active', lastError: null } });
+    await writeAudit(prisma, {
+      actorType: 'system',
+      actorId: null,
+      action: AUDIT_ACTIONS.storeTrackingPushed,
+      targetType: 'order',
+      targetId: order.id,
+      after: { external_order_id: order.externalOrderId, carrier: order.carrier, tracking: order.trackingNumber },
+      ip: null,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message.slice(0, 160) : 'writeback failed';
+    await prisma.brandStoreConnection
+      .update({ where: { id: conn.id }, data: { status: 'error', lastError: `tracking writeback failed: ${message}` } })
+      .catch(() => {});
+    await writeAudit(prisma, {
+      actorType: 'system',
+      actorId: null,
+      action: AUDIT_ACTIONS.storeWritebackFailed,
+      targetType: 'order',
+      targetId: order.id,
+      after: { external_order_id: order.externalOrderId, error: message },
+      ip: null,
+    }).catch(() => {});
+  }
 }

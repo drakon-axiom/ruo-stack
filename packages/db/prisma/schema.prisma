@@ -84,8 +84,24 @@ enum CatalogStatus {
 
 enum WebhookSource {
   stripe
+  woocommerce
 
   @@map("webhook_source")
+}
+
+enum StorePlatform {
+  woocommerce
+  wix
+
+  @@map("store_platform")
+}
+
+enum StoreConnectionStatus {
+  active
+  error
+  disabled
+
+  @@map("store_connection_status")
 }
 
 enum WebhookStatus {
@@ -141,6 +157,7 @@ model Brand {
   walletLedger       WalletLedger[]
   brandProductPrices BrandProductPrice[]
   orders             Order[]
+  storeConnections   BrandStoreConnection[]
 
   @@map("brand")
 }
@@ -294,6 +311,34 @@ model CatalogProduct {
   @@map("catalog_product")
 }
 
+// ── Store connections (Phase 2: WooCommerce hub-and-spoke) ────────────────────
+
+/// A brand's connected storefront (WooCommerce first). RUOStack is the hub: it
+/// pulls orders in via webhook and writes tracking back via the store's REST API.
+/// REST credentials are AES-256-GCM encrypted at rest; `webhook_secret` is the
+/// per-connection HMAC key we generate and configure on the store's webhook.
+model BrandStoreConnection {
+  id                String                @id @default(uuid()) @db.Uuid
+  brandId           String                @map("brand_id") @db.Uuid
+  platform          StorePlatform         @default(woocommerce)
+  storeUrl          String                @map("store_url")
+  consumerKeyEnc    String                @map("consumer_key_enc") // encrypted ck_…
+  consumerSecretEnc String                @map("consumer_secret_enc") // encrypted cs_…
+  webhookSecret     String                @map("webhook_secret") // HMAC key for inbound webhooks
+  webhookIds        Int[]                 @default([]) @map("webhook_ids") // registered Woo webhook ids (for cleanup)
+  status            StoreConnectionStatus @default(active)
+  lastError         String?               @map("last_error")
+  lastOrderAt       DateTime?             @map("last_order_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, platform]) // one store per platform per brand (for now)
+  @@index([brandId])
+  @@map("brand_store_connection")
+}
+
 // ── Processor seam ────────────────────────────────────────────────────────────
 
 /// Idempotency for the Phase 0 webhook receiver (Phase 1 builds ledger on this).
@@ -388,6 +433,7 @@ enum OrderBlocker {
   none
   needs_address
   needs_customer_info
+  needs_mapping // a store order line had a SKU we couldn't match to the catalog
   awaiting_funds
 
   @@map("order_blocker")

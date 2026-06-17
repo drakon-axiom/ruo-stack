@@ -31,6 +31,12 @@ export const AUDIT_ACTIONS = {
   orderDelivered: 'order.delivered',
   orderExported: 'order.exported', // ShipStation pulled it via custom-store export
   orderResent: 'order.resent', // admin re-queued it for ShipStation export
+  // Store connections (Phase 2):
+  storeConnected: 'store.connected',
+  storeDisconnected: 'store.disconnected',
+  storeOrderImported: 'store.order_imported',
+  storeTrackingPushed: 'store.tracking_pushed',
+  storeWritebackFailed: 'store.writeback_failed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
