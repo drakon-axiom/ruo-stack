@@ -37,6 +37,8 @@ export const AUDIT_ACTIONS = {
   storeOrderImported: 'store.order_imported',
   storeTrackingPushed: 'store.tracking_pushed',
   storeWritebackFailed: 'store.writeback_failed',
+  storeProductsProvisioned: 'store.products_provisioned',
+  storeStockPushed: 'store.stock_pushed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

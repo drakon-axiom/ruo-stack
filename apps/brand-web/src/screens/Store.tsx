@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, ApiError } from '../lib/api.js';
+import { api, apiDownload, ApiError } from '../lib/api.js';
 
 interface ManualSetup { webhook_url: string | null; webhook_secret: string; topics: string[] }
 interface Connection {
@@ -42,13 +42,94 @@ export function Store() {
       ) : !state.plan_allows ? (
         <Upsell />
       ) : state.connection ? (
-        <Connected conn={state.connection} onChanged={() => { setManual(null); load(); }} />
+        <>
+          <Connected conn={state.connection} onChanged={() => { setManual(null); load(); }} />
+          <Provisioning />
+        </>
       ) : (
         <ConnectForm onConnected={(m) => { setManual(m); load(); }} />
       )}
 
       {manual && <ManualSetupCard setup={manual} onDismiss={() => setManual(null)} />}
     </>
+  );
+}
+
+interface CatalogRow { id: string; canonicalSku: string; name: string; retail_cents: number; status: string }
+interface ProvResult { product_id: string; sku: string; name: string; action: 'created' | 'updated' | 'error'; error?: string }
+const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
+
+function Provisioning() {
+  const [products, setProducts] = useState<CatalogRow[]>([]);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [results, setResults] = useState<ProvResult[] | null>(null);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+
+  useEffect(() => { api<{ products: CatalogRow[] }>('/api/brand/catalog').then((r) => setProducts(r.products)); }, []);
+
+  const allSelected = products.length > 0 && sel.size === products.length;
+  function toggle(id: string) {
+    setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function toggleAll() { setSel(allSelected ? new Set() : new Set(products.map((p) => p.id))); }
+
+  async function push() {
+    setErr(''); setResults(null); setBusy('push');
+    try {
+      const r = await api<{ results: ProvResult[] }>('/api/brand/store/provision', { method: 'POST', body: { product_ids: [...sel] } });
+      setResults(r.results);
+    } catch (e) { setErr(e instanceof ApiError ? e.message : 'Push failed'); }
+    finally { setBusy(''); }
+  }
+  async function csv() {
+    setErr(''); setBusy('csv');
+    try {
+      const ids = [...sel];
+      await apiDownload(`/api/brand/store/provision.csv${ids.length ? `?ids=${ids.join(',')}` : ''}`, 'ruostack-products.csv');
+    } catch (e) { setErr(e instanceof ApiError ? e.message : 'Download failed'); }
+    finally { setBusy(''); }
+  }
+
+  return (
+    <div className="surface mt-4 max-w-xl space-y-3 p-6">
+      <div>
+        <div className="text-[15px] font-semibold">Add products to your store</div>
+        <p className="mt-1 text-[12.5px] text-muted">Pushes products as <span className="text-text">drafts</span> carrying the RUOStack SKU (so orders match automatically). Review &amp; publish them in WooCommerce. Or export a CSV to import yourself.</p>
+      </div>
+      {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+
+      <div className="max-h-72 overflow-y-auto rounded-lg border border-lline dark:border-line">
+        <label className="flex items-center gap-2 border-b border-lline bg-card2/50 px-3 py-2 text-[12px] font-medium dark:border-line">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+          Select all ({products.length})
+        </label>
+        {products.map((p) => (
+          <label key={p.id} className="flex items-center gap-2 border-b border-lline/60 px-3 py-2 text-[13px] last:border-0 dark:border-line/60">
+            <input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} />
+            <span className="flex-1">{p.name}</span>
+            <span className="font-mono text-[11px] text-faint">{p.canonicalSku}</span>
+            <span className="text-muted">{dollars(p.retail_cents)}</span>
+          </label>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <button className="btn" disabled={sel.size === 0 || !!busy} onClick={push}>{busy === 'push' ? 'Pushing…' : `Push ${sel.size || ''} as drafts`}</button>
+        <button className="btn-ghost" disabled={!!busy} onClick={csv}>{busy === 'csv' ? '…' : sel.size ? 'Download CSV (selected)' : 'Download CSV (all)'}</button>
+      </div>
+
+      {results && (
+        <div className="space-y-1 rounded-lg border border-lline px-3 py-2 text-[12px] dark:border-line">
+          {results.map((r) => (
+            <div key={r.sku} className="flex items-center justify-between">
+              <span>{r.name || r.sku}</span>
+              <span className={r.action === 'error' ? 'text-danger' : 'text-success'}>{r.action === 'error' ? `error: ${r.error ?? ''}` : r.action}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

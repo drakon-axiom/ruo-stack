@@ -50,6 +50,25 @@ export async function api<T = unknown>(
   return res.json() as Promise<T>;
 }
 
+/** Authenticated file download → triggers a browser save of the response body. */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (token) headers.authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+  if (!res.ok) throw new ApiError(res.status, 'download_failed', 'Download failed');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Signup: API creates auth.users + Brand atomically, then we sign in. */
 export async function signupBrand(input: {
   full_name: string;
