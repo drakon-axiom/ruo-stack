@@ -6,6 +6,7 @@ import { Account } from './screens/Account.js';
 import { Catalog } from './screens/Catalog.js';
 import { Wallet } from './screens/Wallet.js';
 import { Orders } from './screens/Orders.js';
+import { Store } from './screens/Store.js';
 import { ActionRequired } from './screens/ActionRequired.js';
 import { Tracking } from './screens/Tracking.js';
 
@@ -32,7 +33,6 @@ const COMING = [
   ['overview', 'Overview'],
   ['customers', 'Customers'],
   ['address-book', 'Address Book'],
-  ['store', 'My Store'],
   ['coas', 'COAs'],
   ['branding', 'Branding'],
   ['shipping', 'Shipping'],
@@ -53,6 +53,7 @@ export function App() {
       <Route path="/app/catalog" element={<Protected><Catalog /></Protected>} />
       <Route path="/app/wallet" element={<Protected><Wallet /></Protected>} />
       <Route path="/app/orders" element={<Protected><Orders /></Protected>} />
+      <Route path="/app/store" element={<Protected><Store /></Protected>} />
       <Route path="/app/action-required" element={<Protected><ActionRequired /></Protected>} />
       <Route path="/app/tracking" element={<Protected><Tracking /></Protected>} />
       {COMING.map(([slug, title]) => (

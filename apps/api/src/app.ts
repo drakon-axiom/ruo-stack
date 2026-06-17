@@ -6,6 +6,7 @@ import { HttpError } from './errors.js';
 import { brandRoutes } from './routes/brand.js';
 import { brandBillingRoutes } from './routes/brand-billing.js';
 import { brandOrderRoutes } from './routes/brand-orders.js';
+import { brandStoreRoutes } from './routes/brand-store.js';
 import { adminAuthRoutes } from './routes/admin-auth.js';
 import { adminFulfillmentRoutes } from './routes/admin-fulfillment.js';
 import { adminOverviewRoutes } from './routes/admin-overview.js';
@@ -13,6 +14,7 @@ import { adminBrandRoutes } from './routes/admin-brands.js';
 import { adminCatalogRoutes } from './routes/admin-catalog.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
 import { shipstationCustomStoreRoutes } from './routes/shipstation-custom-store.js';
+import { wooWebhookRoutes } from './routes/woo-webhook.js';
 import { webhookRoutes } from './routes/webhook.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -51,6 +53,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(brandRoutes);
   await app.register(brandBillingRoutes);
   await app.register(brandOrderRoutes);
+  await app.register(brandStoreRoutes);
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
   await app.register(adminUsersRoutes);
@@ -59,6 +62,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminBrandRoutes);
   // ShipStation Custom Store: own scope (raw-body parser for shipnotify XML).
   await app.register(shipstationCustomStoreRoutes);
+  // WooCommerce webhook: own scope (raw-body parser for HMAC verification).
+  await app.register(wooWebhookRoutes);
   // Webhook: own encapsulated scope (raw-body parser) — register last.
   await app.register(webhookRoutes);
 

@@ -68,6 +68,12 @@ export const EnvSchema = z.object({
     .default('true')
     .transform((v) => v !== 'false'),
 
+  // Publicly reachable base URL of this API (no trailing slash), used to build
+  // webhook delivery URLs registered on external services (WooCommerce, etc.).
+  // When unset, webhook auto-registration is skipped and the URL is surfaced for
+  // manual setup — dev (private Tailscale IP) verifies by simulating webhooks.
+  PUBLIC_API_BASE_URL: z.string().url().optional(),
+
   // API.
   API_PORT: z.coerce.number().int().positive().default(3901),
   API_HOST: z.string().default('0.0.0.0'),
