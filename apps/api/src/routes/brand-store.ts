@@ -9,6 +9,7 @@ import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { randomToken } from '../crypto.js';
 import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.js';
+import { buildProductCsv, provisionProducts, type ProvisionProduct } from '../services/store-provision.js';
 import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.js';
 
 /**
@@ -134,6 +135,72 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
       });
       throw BadRequest('verify_failed', 'Store keys no longer work — re-connect with fresh keys');
     }
+  });
+
+  // Load published catalog products (optionally a subset) with the brand's retail.
+  async function loadProvisionProducts(brandId: string, ids?: string[]): Promise<ProvisionProduct[]> {
+    const [products, prices] = await Promise.all([
+      prisma.catalogProduct.findMany({
+        where: { isPublished: true, ...(ids && ids.length ? { id: { in: ids } } : {}) },
+        orderBy: { name: 'asc' },
+        select: { id: true, canonicalSku: true, name: true, descriptionTemplate: true, status: true, images: true, suggestedRetail: true },
+      }),
+      prisma.brandProductPrice.findMany({ where: { brandId }, select: { productId: true, retailCents: true } }),
+    ]);
+    const retail = new Map(prices.map((p) => [p.productId, p.retailCents]));
+    return products.map((p) => ({
+      id: p.id,
+      canonicalSku: p.canonicalSku,
+      name: p.name,
+      descriptionTemplate: p.descriptionTemplate,
+      status: p.status,
+      images: p.images,
+      retailCents: retail.get(p.id) ?? p.suggestedRetail,
+    }));
+  }
+
+  // Provision selected products into the store (API push → drafts/updates).
+  app.post('/api/brand/store/provision', { preHandler: requireBrand }, async (req) => {
+    const { brandId, userId } = req.brand!;
+    const { product_ids } = z.object({ product_ids: z.array(z.string().uuid()).min(1).max(200) }).parse(req.body);
+    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
+    if (!conn) throw BadRequest('not_connected', 'Connect your store before pushing products');
+
+    const products = await loadProvisionProducts(brandId, product_ids);
+    if (products.length === 0) throw BadRequest('no_products', 'None of those products are available');
+
+    let results;
+    try {
+      results = await provisionProducts(prisma, conn, products);
+    } catch (e) {
+      throw BadRequest('provision_failed', `Push to the store failed: ${e instanceof Error ? e.message.slice(0, 160) : ''}`);
+    }
+    const created = results.filter((r) => r.action === 'created').length;
+    const updated = results.filter((r) => r.action === 'updated').length;
+    await writeAudit(prisma, {
+      actorType: 'brand',
+      actorId: userId,
+      action: AUDIT_ACTIONS.storeProductsProvisioned,
+      targetType: 'brand',
+      targetId: brandId,
+      after: { requested: products.length, created, updated, errors: results.filter((r) => r.action === 'error').length },
+      ip: req.ip,
+    });
+    return { results, created, updated };
+  });
+
+  // CSV export (WooCommerce importer format) — brand-controlled, no store write.
+  app.get('/api/brand/store/provision.csv', { preHandler: requireBrand }, async (req, reply) => {
+    const { brandId } = req.brand!;
+    const { ids } = z.object({ ids: z.string().optional() }).parse(req.query);
+    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    const idList = ids ? ids.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    const products = await loadProvisionProducts(brandId, idList);
+    return reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', 'attachment; filename="ruostack-products.csv"')
+      .send(buildProductCsv(products));
   });
 
   // Disconnect (tears down our webhooks best-effort).

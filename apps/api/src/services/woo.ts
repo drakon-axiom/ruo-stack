@@ -86,6 +86,50 @@ export async function deleteWooWebhooks(creds: WooCreds, ids: number[]): Promise
   }
 }
 
+// ── Products (provisioning + stock push) ──────────────────────────────────────
+
+/** Find a Woo product id by exact SKU (provisioned products carry the canonical
+ * SKU). Returns null if no product has that SKU. */
+export async function getProductIdBySku(creds: WooCreds, sku: string): Promise<number | null> {
+  const rows = await wooRequest<{ id: number }[]>(creds, 'GET', `/products?sku=${encodeURIComponent(sku)}`);
+  return rows[0]?.id ?? null;
+}
+
+export interface WooProductInput {
+  id?: number; // present → update
+  sku: string;
+  name: string;
+  type: 'simple';
+  status?: 'draft' | 'publish'; // omit on update to keep the store's publish state
+  regular_price: string; // dollars
+  description?: string;
+  manage_stock: boolean;
+  stock_status: 'instock' | 'outofstock';
+  images?: { src: string }[];
+  meta_data?: { key: string; value: string }[];
+}
+
+export interface WooBatchResult {
+  create?: ({ id?: number; sku?: string; error?: { message?: string } } | null)[];
+  update?: ({ id?: number; sku?: string; error?: { message?: string } } | null)[];
+}
+
+/** Batch create/update products (WooCommerce caps a batch at 100 per array). */
+export async function batchProducts(
+  creds: WooCreds,
+  payload: { create?: WooProductInput[]; update?: WooProductInput[] },
+): Promise<WooBatchResult> {
+  return wooRequest<WooBatchResult>(creds, 'POST', '/products/batch', payload);
+}
+
+/** Stock push: flip a product in/out of stock (prevents selling the unfulfillable). */
+export async function updateProductStock(creds: WooCreds, productId: number, inStock: boolean): Promise<void> {
+  await wooRequest(creds, 'PUT', `/products/${productId}`, {
+    manage_stock: false,
+    stock_status: inStock ? 'instock' : 'outofstock',
+  });
+}
+
 /** Writeback: mark the Woo order completed (fires the brand's shipped email) +
  * attach tracking (Shipment-Tracking meta + a customer-visible note). */
 export async function pushTracking(
