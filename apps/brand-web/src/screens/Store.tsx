@@ -44,6 +44,7 @@ export function Store() {
       ) : state.connection ? (
         <>
           <Connected conn={state.connection} onChanged={() => { setManual(null); load(); }} />
+          <ShippingMarkup />
           <Provisioning />
         </>
       ) : (
@@ -52,6 +53,42 @@ export function Store() {
 
       {manual && <ManualSetupCard setup={manual} onDismiss={() => setManual(null)} />}
     </>
+  );
+}
+
+function ShippingMarkup() {
+  const [cfg, setCfg] = useState<{ markup_cents: number; pickpack_fee_cents: number } | null>(null);
+  const [val, setVal] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api<{ markup_cents: number; pickpack_fee_cents: number }>('/api/brand/store/shipping').then((c) => { setCfg(c); setVal((c.markup_cents / 100).toFixed(2)); });
+  }, []);
+
+  async function save() {
+    setBusy(true); setMsg('');
+    try {
+      const cents = Math.max(0, Math.round(parseFloat(val || '0') * 100));
+      const r = await api<{ markup_cents: number }>('/api/brand/store/shipping', { method: 'PATCH', body: { markup_cents: cents } });
+      setVal((r.markup_cents / 100).toFixed(2));
+      setMsg('Saved.');
+    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Save failed'); }
+    finally { setBusy(false); }
+  }
+
+  if (!cfg) return null;
+  return (
+    <div className="surface mt-4 max-w-xl space-y-3 p-6">
+      <div className="text-[15px] font-semibold">Shipping markup</div>
+      <p className="text-[12.5px] text-muted">Optional profit added to the shipping price your customers see at checkout, on top of the live carrier rate. Your wallet is only charged the carrier rate plus our pick &amp; pack — the markup is yours.</p>
+      <div className="flex items-center gap-2">
+        <span className="text-muted">$</span>
+        <input className="app-input w-28" value={val} inputMode="decimal" onChange={(e) => setVal(e.target.value)} />
+        <button className="btn" disabled={busy} onClick={save}>{busy ? '…' : 'Save'}</button>
+        {msg && <span className="text-[12px] text-muted">{msg}</span>}
+      </div>
+    </div>
   );
 }
 

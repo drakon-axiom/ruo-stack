@@ -158,8 +158,27 @@ model Brand {
   brandProductPrices BrandProductPrice[]
   orders             Order[]
   storeConnections   BrandStoreConnection[]
+  shippingConfig     BrandShippingConfig?
 
   @@map("brand")
+}
+
+/// Per-brand shipping pricing (rate proxy §12). The pick-&-pack fee is RUOStack's
+/// margin (global default + optional per-brand override); the markup is the
+/// brand's shipping profit (default $0). `enabledServices` scopes which carrier
+/// services are offered at checkout (empty = all configured).
+model BrandShippingConfig {
+  id                     String   @id @default(uuid()) @db.Uuid
+  brandId                String   @unique @map("brand_id") @db.Uuid
+  pickpackFeeOverrideCents Int?   @map("pickpack_fee_override_cents") // null → use global default
+  markupCents            Int      @default(0) @map("markup_cents")
+  enabledServices        String[] @default([]) @map("enabled_services")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@map("brand_shipping_config")
 }
 
 /// Join: which users belong to which brand. MVP creates exactly one `owner`.

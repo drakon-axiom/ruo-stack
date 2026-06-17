@@ -1,8 +1,5 @@
 import { z } from 'zod';
 
-/** Flat shipping rate (cents) used until the live-rate engine lands (Phase 2). */
-export const SHIPPING_FLAT_CENTS = 1295;
-
 export const OrderItemInputSchema = z.object({
   product_id: z.string().uuid(),
   qty: z.number().int().min(1).max(999),

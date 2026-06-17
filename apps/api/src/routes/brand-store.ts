@@ -137,6 +137,39 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // ── Shipping config (per-brand markup; pick-&-pack fee is platform-owned) ──
+  app.get('/api/brand/store/shipping', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    const cfg = await prisma.brandShippingConfig.findUnique({ where: { brandId } });
+    return {
+      markup_cents: cfg?.markupCents ?? 0,
+      pickpack_fee_cents: cfg?.pickpackFeeOverrideCents ?? loadConfig().SHIPPING_PICKPACK_FEE_CENTS,
+      enabled_services: cfg?.enabledServices ?? [],
+    };
+  });
+
+  app.patch('/api/brand/store/shipping', { preHandler: requireBrand }, async (req) => {
+    const { brandId, userId } = req.brand!;
+    const { markup_cents } = z.object({ markup_cents: z.number().int().min(0).max(100_000) }).parse(req.body);
+    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    const cfg = await prisma.brandShippingConfig.upsert({
+      where: { brandId },
+      create: { brandId, markupCents: markup_cents },
+      update: { markupCents: markup_cents },
+    });
+    await writeAudit(prisma, {
+      actorType: 'brand',
+      actorId: userId,
+      action: AUDIT_ACTIONS.brandProfileUpdated,
+      targetType: 'brand',
+      targetId: brandId,
+      after: { shipping_markup_cents: markup_cents },
+      ip: req.ip,
+    });
+    return { markup_cents: cfg.markupCents };
+  });
+
   // Load published catalog products (optionally a subset) with the brand's retail.
   async function loadProvisionProducts(brandId: string, ids?: string[]): Promise<ProvisionProduct[]> {
     const [products, prices] = await Promise.all([

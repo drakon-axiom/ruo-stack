@@ -14,7 +14,7 @@ import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { getWalletSummary } from '../services/wallet.js';
 import { applyOrderEdit } from '../services/order-edit.js';
-import { computeParcel, priceShipping, type ParcelProduct } from '../services/shipping.js';
+import { computeParcel, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
 import { BadRequest, Conflict, NotFound } from '../errors.js';
 
 /**
@@ -83,8 +83,9 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
       const p = byId.get(i.product_id)!;
       return { qty: i.qty, weight: p.weight, length: p.length, width: p.width, height: p.height };
     });
-    const shipQuote = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state }, body.service_code);
-    const shipping = shipQuote.chosen.amountCents;
+    const pricing = await resolveShippingPricing(prisma, brandId);
+    const shipQuote = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state }, body.service_code, pricing);
+    const shipping = shipQuote.chosen.amountCents; // brand cost = carrier + pick-&-pack
     const walletCharge = wholesaleTotal + shipping;
 
     // Funds check against available = balance − held (existing open orders).
@@ -150,7 +151,8 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
       wholesale += p[wf] * i.qty;
       return { qty: i.qty, weight: p.weight, length: p.length, width: p.width, height: p.height };
     });
-    const q = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state });
+    const pricing = await resolveShippingPricing(prisma, brandId);
+    const q = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state }, undefined, pricing);
     return {
       plan,
       wholesale_cents: wholesale,
@@ -159,7 +161,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
         carrier: o.carrier,
         service: o.service,
         service_code: o.serviceCode,
-        amount_cents: o.amountCents,
+        amount_cents: o.amountCents, // brand cost (carrier + pick-&-pack) — what the wallet pays
         est_days: o.estDays ?? null,
       })),
       recommended_service_code: q.chosen.serviceCode,
