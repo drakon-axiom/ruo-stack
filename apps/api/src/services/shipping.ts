@@ -1,4 +1,12 @@
-import { PLANS, SHIPPING_FLAT_CENTS, type PlanKey, type RateOption } from '@ruostack/shared';
+import type { PrismaClient } from '@ruostack/db';
+import {
+  FLAT_FALLBACK,
+  PLANS,
+  priceOption,
+  type PlanKey,
+  type PricedRateOption,
+  type ShippingPricing,
+} from '@ruostack/shared';
 import { loadConfig } from '../config.js';
 import { quoteRates } from './rates/index.js';
 
@@ -35,32 +43,45 @@ export function computeParcel(items: ParcelProduct[]): {
 }
 
 export interface ShippingQuote {
-  source: string; // 'flat' | 'computed' | 'shipstation'
-  options: RateOption[];
-  chosen: RateOption;
+  source: string; // 'flat' | 'computed' | 'shipstation' | 'fallback'
+  options: PricedRateOption[];
+  chosen: PricedRateOption;
 }
 
-const FLAT_OPTION: RateOption = {
-  carrier: 'USPS',
-  service: 'Flat Rate',
-  serviceCode: 'flat',
-  amountCents: SHIPPING_FLAT_CENTS,
-};
+/**
+ * Resolve a brand's shipping pricing: pick-&-pack fee (per-brand override ?? global
+ * default) + the brand's markup. Both feed the pricing model in priceShipping.
+ */
+export async function resolveShippingPricing(db: PrismaClient, brandId: string): Promise<ShippingPricing> {
+  const cfg = await db.brandShippingConfig.findUnique({ where: { brandId }, select: { pickpackFeeOverrideCents: true, markupCents: true } });
+  return {
+    pickpackCents: cfg?.pickpackFeeOverrideCents ?? loadConfig().SHIPPING_PICKPACK_FEE_CENTS,
+    markupCents: cfg?.markupCents ?? 0,
+  };
+}
 
 /**
- * Price shipping for a plan + parcel + destination. Starter → flat; Pro/Volume →
- * live rates (the chosen serviceCode if valid, else the cheapest). Always returns
- * a chosen option so an order can be priced even if live rating is unavailable.
+ * Price shipping for a plan + parcel + destination. Starter → flat $12.99; Pro/
+ * Volume → live rates with the pick-&-pack fee applied (the chosen serviceCode if
+ * valid, else the cheapest). Each option carries carrier cost, brand cost (carrier
+ * + pick-&-pack, what the wallet pays), and customer price (+ markup). Always
+ * returns the flat fallback if live rating is unavailable, so an order can always
+ * be priced and checkout never blocks.
  */
 export async function priceShipping(
   plan: PlanKey,
   parcel: { weightOz: number; lengthIn: number; widthIn: number; heightIn: number },
   dest: { toZip: string; toState: string },
   serviceCode?: string,
+  pricing?: ShippingPricing,
 ): Promise<ShippingQuote> {
+  const pp: ShippingPricing = pricing ?? { pickpackCents: loadConfig().SHIPPING_PICKPACK_FEE_CENTS, markupCents: 0 };
+  const flat = priceOption(FLAT_FALLBACK, pp, true);
+
   if (PLANS[plan].capabilities.shipping === 'flat') {
-    return { source: 'flat', options: [FLAT_OPTION], chosen: FLAT_OPTION };
+    return { source: 'flat', options: [flat], chosen: flat };
   }
+
   const cfg = loadConfig();
   const { source, options } = await quoteRates({
     fromZip: cfg.WAREHOUSE_FROM_ZIP,
@@ -72,7 +93,9 @@ export async function priceShipping(
     widthIn: parcel.widthIn || undefined,
     heightIn: parcel.heightIn || undefined,
   });
-  if (options.length === 0) return { source: 'flat', options: [FLAT_OPTION], chosen: FLAT_OPTION };
-  const chosen = (serviceCode && options.find((o) => o.serviceCode === serviceCode)) || options[0]!;
-  return { source, options, chosen };
+  if (options.length === 0) return { source: 'fallback', options: [flat], chosen: flat };
+
+  const priced = options.map((o) => priceOption(o, pp, false));
+  const chosen = (serviceCode && priced.find((o) => o.serviceCode === serviceCode)) || priced[0]!;
+  return { source, options: priced, chosen };
 }

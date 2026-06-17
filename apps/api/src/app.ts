@@ -7,6 +7,7 @@ import { brandRoutes } from './routes/brand.js';
 import { brandBillingRoutes } from './routes/brand-billing.js';
 import { brandOrderRoutes } from './routes/brand-orders.js';
 import { brandStoreRoutes } from './routes/brand-store.js';
+import { shippingRatesRoutes } from './routes/shipping-rates.js';
 import { adminAuthRoutes } from './routes/admin-auth.js';
 import { adminFulfillmentRoutes } from './routes/admin-fulfillment.js';
 import { adminOverviewRoutes } from './routes/admin-overview.js';
@@ -54,6 +55,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(brandBillingRoutes);
   await app.register(brandOrderRoutes);
   await app.register(brandStoreRoutes);
+  await app.register(shippingRatesRoutes);
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
   await app.register(adminUsersRoutes);

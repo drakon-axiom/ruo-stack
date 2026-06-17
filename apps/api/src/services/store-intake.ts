@@ -3,7 +3,7 @@ import { AUDIT_ACTIONS, wholesaleFieldFor } from '@ruostack/shared';
 import { writeAudit } from '../audit.js';
 import { effectivePlan } from './subscription.js';
 import { getWalletSummary } from './wallet.js';
-import { computeParcel, priceShipping, type ParcelProduct } from './shipping.js';
+import { computeParcel, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
 
 interface WooLineItem {
   sku?: string;
@@ -99,8 +99,9 @@ export async function importWooOrder(
   // Shipping cost to the brand: re-rate server-side (flat for Starter; live for Pro/Volume).
   let shipping = 0;
   if (lines.length > 0 && hasAddress) {
-    const q = await priceShipping(plan, computeParcel(parcelItems), { toZip: zip, toState: state });
-    shipping = q.chosen.amountCents;
+    const pricing = await resolveShippingPricing(prisma, brandId);
+    const q = await priceShipping(plan, computeParcel(parcelItems), { toZip: zip, toState: state }, undefined, pricing);
+    shipping = q.chosen.amountCents; // brand cost = carrier + pick-&-pack
   }
   const walletCharge = wholesaleTotal + shipping;
 

@@ -67,6 +67,9 @@ export const EnvSchema = z.object({
     .string()
     .default('true')
     .transform((v) => v !== 'false'),
+  // Pick-&-pack fee (cents) — RUOStack's hidden margin baked into every live rate
+  // (global default; per-brand override lives in BrandShippingConfig). Default $2.50.
+  SHIPPING_PICKPACK_FEE_CENTS: z.coerce.number().int().min(0).default(250),
 
   // Publicly reachable base URL of this API (no trailing slash), used to build
   // webhook delivery URLs registered on external services (WooCommerce, etc.).
