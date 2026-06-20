@@ -116,6 +116,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
           walletChargeCents: walletCharge,
           shippingServiceCode: shipQuote.chosen.serviceCode,
           shippingCarrier: shipQuote.chosen.carrier,
+          rateSource: shipQuote.source,
           ...orderBoxFields(parcel),
           items: { create: lines },
         },

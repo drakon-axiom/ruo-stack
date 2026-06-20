@@ -97,6 +97,7 @@ export async function applyOrderEdit(
         walletChargeCents: walletCharge,
         shippingServiceCode: shipQuote.chosen.serviceCode,
         shippingCarrier: shipQuote.chosen.carrier,
+        rateSource: shipQuote.source,
         ...orderBoxFields(parcel),
         blocker,
         items: { create: lines },
