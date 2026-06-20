@@ -358,6 +358,63 @@ model BrandStoreConnection {
   @@map("brand_store_connection")
 }
 
+// ── Fulfillment rules engine (Phase 2 §6) ─────────────────────────────────────
+// Admin-configurable so ops never hand-picks boxes/services and a threshold
+// change needs no code deploy. Weights in ounces, dims in inches.
+
+enum ServiceTier {
+  economy
+  standard
+  expedited
+
+  @@map("service_tier")
+}
+
+enum ServiceSelectionPolicy {
+  cheapest // least-cost-select within the tier
+  fixed // always offer this exact service
+
+  @@map("service_selection_policy")
+}
+
+/// Box catalog: the engine picks the smallest box that fits by volume + weight,
+/// then derives billable weight = max(actual + tare, dimensional).
+model Box {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  innerLengthIn Float    @map("inner_length_in")
+  innerWidthIn  Float    @map("inner_width_in")
+  innerHeightIn Float    @map("inner_height_in")
+  maxWeightOz   Int      @map("max_weight_oz")
+  tareOz        Int      @default(0) @map("tare_oz")
+  enabled       Boolean  @default(true)
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([enabled])
+  @@map("box")
+}
+
+/// Enabled carrier services per tier, with eligibility + selection policy. Drives
+/// which named services are offered at checkout and how raw rates are relabeled.
+model ServiceMapping {
+  id                String                @id @default(uuid()) @db.Uuid
+  tier              ServiceTier
+  carrierServiceCode String               @unique @map("carrier_service_code") // matches the rater's serviceCode
+  displayLabel      String                @map("display_label")
+  transitEstimate   String                @map("transit_estimate")
+  maxWeightOz       Int                   @map("max_weight_oz") // eligibility ceiling
+  enabled           Boolean               @default(true)
+  selectionPolicy   ServiceSelectionPolicy @default(cheapest) @map("selection_policy")
+  sortOrder         Int                   @default(0) @map("sort_order")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  @@index([tier])
+  @@map("service_mapping")
+}
+
 // ── Processor seam ────────────────────────────────────────────────────────────
 
 /// Idempotency for the Phase 0 webhook receiver (Phase 1 builds ledger on this).

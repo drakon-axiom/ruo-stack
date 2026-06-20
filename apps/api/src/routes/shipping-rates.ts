@@ -3,8 +3,9 @@ import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { FLAT_FALLBACK, priceOption, type PricedRateOption } from '@ruostack/shared';
 import { getClients } from '../clients.js';
+import { loadConfig } from '../config.js';
 import { effectivePlan } from '../services/subscription.js';
-import { computeParcel, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
+import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
 
 /**
  * Checkout rate proxy (fulfillment plan §4). The RUOStack Shipping Method (a
@@ -53,7 +54,9 @@ export async function shippingRatesRoutes(app: FastifyInstance): Promise<void> {
         parcelItems.push({ qty: it.qty, weight: p.weight, length: p.length, width: p.width, height: p.height });
       }
 
-      const q = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.destination.zip, toState: body.destination.state }, undefined, pricing);
+      const rules = await loadShippingRules(prisma);
+      const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
+      const q = await priceShipping(plan, parcel, { toZip: body.destination.zip, toState: body.destination.state }, undefined, pricing, rules.mappings);
       return reply.send({ rates: q.options.map(toRate), source: q.source });
     } catch (err) {
       req.log.error({ err }, 'rate quote failed → flat fallback');

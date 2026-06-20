@@ -3,7 +3,8 @@ import { AUDIT_ACTIONS, type OrderEdit, wholesaleFieldFor } from '@ruostack/shar
 import { writeAudit } from '../audit.js';
 import { effectivePlan } from './subscription.js';
 import { getWalletSummary } from './wallet.js';
-import { computeParcel, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
+import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
+import { loadConfig } from '../config.js';
 import { BadRequest, Conflict } from '../errors.js';
 
 type OrderWithItems = Prisma.OrderGetPayload<{ include: { items: true } }>;
@@ -74,7 +75,9 @@ export async function applyOrderEdit(
   });
   const serviceCode = edit.service_code ?? order.shippingServiceCode ?? undefined;
   const pricing = await resolveShippingPricing(prisma, order.brandId);
-  const shipQuote = await priceShipping(plan, computeParcel(parcelItems), { toZip: recipient.zip, toState: recipient.state }, serviceCode, pricing);
+  const rules = await loadShippingRules(prisma);
+  const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
+  const shipQuote = await priceShipping(plan, parcel, { toZip: recipient.zip, toState: recipient.state }, serviceCode, pricing, rules.mappings);
   const shipping = shipQuote.chosen.amountCents; // brand cost = carrier + pick-&-pack
   const walletCharge = wholesaleTotal + shipping;
 

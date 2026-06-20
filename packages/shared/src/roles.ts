@@ -15,6 +15,7 @@ export const ROLE_GATE: Record<string, Record<AdminRole, Access>> = {
   overview: { super_admin: 'view', operations: 'view', support: 'view', finance: 'view' },
   brands: { super_admin: 'write', operations: 'view', support: 'view', finance: 'view' },
   catalog: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },
+  shipping_rules: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },
   fulfillment: { super_admin: 'write', operations: 'write', support: 'view', finance: 'none' },
   exceptions: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },
   claims: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },
