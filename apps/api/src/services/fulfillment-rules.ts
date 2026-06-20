@@ -74,6 +74,18 @@ export function selectBox(items: ParcelProduct[], boxes: Box[], divisor: number)
   return { box, billableWeightOz: Math.max(1, Math.ceil(Math.max(actualOz, dimOz))) };
 }
 
+/** Map a derived parcel to the Order's locked-package columns (box + billable weight). */
+export function orderBoxFields(p: DerivedParcel): {
+  boxId: string | null;
+  boxName: string | null;
+  boxLengthIn: number;
+  boxWidthIn: number;
+  boxHeightIn: number;
+  billableWeightOz: number;
+} {
+  return { boxId: p.boxId, boxName: p.boxName, boxLengthIn: p.lengthIn, boxWidthIn: p.widthIn, boxHeightIn: p.heightIn, billableWeightOz: p.weightOz };
+}
+
 /** Box-derived parcel; falls back to the rough parcel when no box is configured/fits. */
 export function deriveParcel(items: ParcelProduct[], boxes: Box[], divisor: number): DerivedParcel {
   const sel = selectBox(items, boxes, divisor);

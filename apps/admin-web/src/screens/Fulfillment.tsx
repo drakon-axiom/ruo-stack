@@ -193,6 +193,9 @@ interface OrderDetail {
   id: string;
   recipient: { name: string; email: string | null; phone: string | null; address1: string; address2: string | null; city: string; state: string; zip: string; country: string };
   shipping_service_code: string | null;
+  box_name: string | null;
+  billable_weight_oz: number | null;
+  box_dims: { l: number; w: number; h: number } | null;
   wallet_charge_cents: number;
   exported_at: string | null;
   items: { product_id: string; qty: number; unit_wholesale_cents: number }[];
@@ -268,6 +271,14 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
           {detail.exported_at && (
             <div className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[12px] text-amber">
               Already at ShipStation. Saving updates the record but won't push to the shipping platform — use <span className="font-medium">Re-send</span> afterward to re-queue it.
+            </div>
+          )}
+          {detail.box_name && (
+            <div className="rounded-lg border border-line bg-card2 px-3 py-2 text-[12px] text-muted">
+              Package: <span className="text-text">{detail.box_name}</span>
+              {detail.box_dims && <> · {detail.box_dims.l}×{detail.box_dims.w}×{detail.box_dims.h} in</>}
+              {detail.billable_weight_oz != null && <> · {detail.billable_weight_oz} oz billable</>}
+              <span className="text-faint"> (re-derived on save)</span>
             </div>
           )}
 

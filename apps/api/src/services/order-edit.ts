@@ -3,7 +3,7 @@ import { AUDIT_ACTIONS, type OrderEdit, wholesaleFieldFor } from '@ruostack/shar
 import { writeAudit } from '../audit.js';
 import { effectivePlan } from './subscription.js';
 import { getWalletSummary } from './wallet.js';
-import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
+import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
 import { loadConfig } from '../config.js';
 import { BadRequest, Conflict } from '../errors.js';
 
@@ -97,6 +97,7 @@ export async function applyOrderEdit(
         walletChargeCents: walletCharge,
         shippingServiceCode: shipQuote.chosen.serviceCode,
         shippingCarrier: shipQuote.chosen.carrier,
+        ...orderBoxFields(parcel),
         blocker,
         items: { create: lines },
       },
