@@ -20,19 +20,31 @@ export async function onCatalogStockChanged(product: CatalogProduct): Promise<vo
   const conns = await prisma.brandStoreConnection.findMany({ where: { platform: 'woocommerce', status: 'active' } });
   if (conns.length === 0) return;
 
+  // A brand may carry this product under its canonical SKU AND/or aliased SKUs.
+  const aliases = await prisma.productAlias.findMany({ where: { productId: product.id }, select: { brandId: true, wooSku: true } });
+  const aliasByBrand = new Map<string, string[]>();
+  for (const a of aliases) {
+    const arr = aliasByBrand.get(a.brandId) ?? [];
+    arr.push(a.wooSku);
+    aliasByBrand.set(a.brandId, arr);
+  }
+
   let pushed = 0;
   let missing = 0;
   let failed = 0;
   for (const conn of conns) {
+    const skus = [...new Set([product.canonicalSku, ...(aliasByBrand.get(conn.brandId) ?? [])])];
     try {
       const creds = decryptStoreCreds(conn);
-      const wooId = await getProductIdBySku(creds, product.canonicalSku);
-      if (wooId === null) {
-        missing++;
-        continue;
+      let matchedHere = false;
+      for (const sku of skus) {
+        const wooId = await getProductIdBySku(creds, sku);
+        if (wooId === null) continue;
+        await updateProductStock(creds, wooId, inStock);
+        pushed++;
+        matchedHere = true;
       }
-      await updateProductStock(creds, wooId, inStock);
-      pushed++;
+      if (!matchedHere) missing++;
     } catch (e) {
       failed++;
       await prisma.brandStoreConnection
