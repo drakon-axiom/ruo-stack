@@ -80,6 +80,8 @@ export const EnvSchema = z.object({
   RATE_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   // RateQuote validity (seconds) — covers checkout → order-import; reserve uses it.
   RATE_QUOTE_TTL_SECONDS: z.coerce.number().int().positive().default(1800),
+  // How often the API sweeps expired RateQuote rows. Default hourly.
+  RATE_QUOTE_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(3600),
 
   // Publicly reachable base URL of this API (no trailing slash), used to build
   // webhook delivery URLs registered on external services (WooCommerce, etc.).

@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "seed:superadmin": "tsx src/scripts/seed-superadmin.ts",
+    "cleanup:rate-quotes": "tsx src/scripts/cleanup-rate-quotes.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

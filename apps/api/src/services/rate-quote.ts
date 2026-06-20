@@ -63,6 +63,32 @@ export interface QuotedShipping {
   billableWeightOz: number;
 }
 
+/** Delete RateQuotes past their expiry. Returns how many were removed. */
+export async function deleteExpiredRateQuotes(db: PrismaClient): Promise<number> {
+  const { count } = await db.rateQuote.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+  return count;
+}
+
+/**
+ * Start a periodic expired-RateQuote sweeper (runs once now, then every interval).
+ * Returns a stop function. Unref'd so it never keeps the process alive on its own.
+ */
+export function startRateQuoteSweeper(
+  db: PrismaClient,
+  intervalMs: number,
+  log?: (msg: string) => void,
+): () => void {
+  const sweep = () => {
+    deleteExpiredRateQuotes(db)
+      .then((n) => { if (n > 0) log?.(`swept ${n} expired rate quotes`); })
+      .catch((err) => log?.(`rate-quote sweep failed: ${err instanceof Error ? err.message : err}`));
+  };
+  sweep();
+  const timer = setInterval(sweep, intervalMs);
+  if (typeof timer.unref === 'function') timer.unref();
+  return () => clearInterval(timer);
+}
+
 /** Look up a still-valid quote for this cart + chosen service. Null if none/expired. */
 export async function findRateQuote(
   db: PrismaClient,
