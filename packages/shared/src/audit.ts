@@ -17,6 +17,7 @@ export const AUDIT_ACTIONS = {
   brandSignup: 'brand.signup',
   brandSuspended: 'brand.suspended',
   brandActivated: 'brand.activated',
+  pickpackOverrideSet: 'brand.pickpack_override_set',
   // Money layer (Phase 1):
   walletTopupStarted: 'wallet.topup_started',
   walletDeposit: 'wallet.deposit',

@@ -4,6 +4,7 @@ import { AUDIT_ACTIONS, WalletAdjustSchema } from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
 import { requireAdmin } from '../middleware/guards.js';
+import { loadConfig } from '../config.js';
 import { effectivePlan } from '../services/subscription.js';
 import { appendEntry, getWalletSummary } from '../services/wallet.js';
 import { BadRequest, NotFound } from '../errors.js';
@@ -44,11 +45,13 @@ export async function adminBrandRoutes(app: FastifyInstance): Promise<void> {
     let ownerEmail: string | null = null;
     if (owner) ownerEmail = (await supabaseAdmin.auth.admin.getUserById(owner.userId)).data.user?.email ?? null;
 
-    const [wallet, orders, ledger] = await Promise.all([
+    const [wallet, orders, ledger, shippingCfg] = await Promise.all([
       getWalletSummary(prisma, id),
       prisma.order.findMany({ where: { brandId: id }, orderBy: { createdAt: 'desc' }, take: 10 }),
       prisma.walletLedger.findMany({ where: { brandId: id }, orderBy: { seq: 'desc' }, take: 15 }),
+      prisma.brandShippingConfig.findUnique({ where: { brandId: id } }),
     ]);
+    const globalFee = loadConfig().SHIPPING_PICKPACK_FEE_CENTS;
 
     return {
       id: brand.id,
@@ -64,6 +67,12 @@ export async function adminBrandRoutes(app: FastifyInstance): Promise<void> {
         current_period_end: brand.subscriptionState?.currentPeriodEnd ?? null,
       },
       wallet: { balance_cents: wallet.balance, held_cents: wallet.held, available_cents: wallet.available },
+      shipping: {
+        pickpack_fee_override_cents: shippingCfg?.pickpackFeeOverrideCents ?? null,
+        pickpack_fee_effective_cents: shippingCfg?.pickpackFeeOverrideCents ?? globalFee,
+        global_default_cents: globalFee,
+        markup_cents: shippingCfg?.markupCents ?? 0,
+      },
       orders: orders.map((o) => ({
         id: o.id,
         status: o.status,
@@ -107,6 +116,31 @@ export async function adminBrandRoutes(app: FastifyInstance): Promise<void> {
       });
     });
     return { ok: true, status };
+  });
+
+  // Per-brand pick-&-pack fee override (RUOStack's margin) — super_admin + finance.
+  // null clears the override → the brand uses the global default.
+  app.patch('/api/admin/brands/:id/shipping', { preHandler: requireAdmin('wallet_adjust', 'write') }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const { pickpack_fee_override_cents } = z
+      .object({ pickpack_fee_override_cents: z.number().int().min(0).max(100_000).nullable() })
+      .parse(req.body);
+    if (!(await prisma.brand.findUnique({ where: { id }, select: { id: true } }))) throw NotFound('Brand not found');
+    const cfg = await prisma.brandShippingConfig.upsert({
+      where: { brandId: id },
+      create: { brandId: id, pickpackFeeOverrideCents: pickpack_fee_override_cents },
+      update: { pickpackFeeOverrideCents: pickpack_fee_override_cents },
+    });
+    await writeAudit(prisma, {
+      actorType: 'admin',
+      actorId: req.admin!.adminUserId,
+      action: AUDIT_ACTIONS.pickpackOverrideSet,
+      targetType: 'brand',
+      targetId: id,
+      after: { pickpack_fee_override_cents },
+      ip: req.ip,
+    });
+    return { pickpack_fee_override_cents: cfg.pickpackFeeOverrideCents };
   });
 
   // Manual wallet adjustment — super_admin + finance (refund-to-wallet, §4.3).
