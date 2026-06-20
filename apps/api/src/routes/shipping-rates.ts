@@ -6,6 +6,7 @@ import { getClients } from '../clients.js';
 import { loadConfig } from '../config.js';
 import { effectivePlan } from '../services/subscription.js';
 import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
+import { persistRateQuotes } from '../services/rate-quote.js';
 
 /**
  * Checkout rate proxy (fulfillment plan §4). The RUOStack Shipping Method (a
@@ -57,6 +58,8 @@ export async function shippingRatesRoutes(app: FastifyInstance): Promise<void> {
       const rules = await loadShippingRules(prisma);
       const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
       const q = await priceShipping(plan, parcel, { toZip: body.destination.zip, toState: body.destination.state }, undefined, pricing, rules.mappings);
+      // Persist the offered options so order import reserves the exact quote (§9).
+      await persistRateQuotes(prisma, { brandId: conn.brandId, items: body.items, dest: { zip: body.destination.zip, state: body.destination.state }, parcel, pricing, options: q.options });
       return reply.send({ rates: q.options.map(toRate), source: q.source });
     } catch (err) {
       req.log.error({ err }, 'rate quote failed → flat fallback');

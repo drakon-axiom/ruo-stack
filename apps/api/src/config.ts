@@ -73,6 +73,10 @@ export const EnvSchema = z.object({
   // Dimensional-weight divisor (cubic inches per pound) for billable weight.
   // Carrier standard is 166 for domestic.
   SHIPPING_DIM_DIVISOR: z.coerce.number().int().positive().default(166),
+  // Carrier-rate cache TTL (seconds) — short, so checkout never hammers the rater.
+  RATE_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  // RateQuote validity (seconds) — covers checkout → order-import; reserve uses it.
+  RATE_QUOTE_TTL_SECONDS: z.coerce.number().int().positive().default(1800),
 
   // Publicly reachable base URL of this API (no trailing slash), used to build
   // webhook delivery URLs registered on external services (WooCommerce, etc.).
