@@ -417,6 +417,31 @@ model ServiceMapping {
   @@map("service_mapping")
 }
 
+/// A persisted checkout rate quote (§9 quote-driven reserve). When the order
+/// imports, we reserve the EXACT quoted shipping (brand cost = carrier_cost +
+/// pickpack) and lock the box/weight from here, rather than re-rating. Keyed by a
+/// stable cart_hash (sorted SKU:qty + destination) + service. Short-lived.
+model RateQuote {
+  id                 String   @id @default(uuid()) @db.Uuid
+  brandId            String   @map("brand_id") @db.Uuid
+  cartHash           String   @map("cart_hash")
+  destZip            String   @map("dest_zip")
+  destState          String   @map("dest_state")
+  serviceCode        String   @map("service_code")
+  carrierCostCents   Int      @map("carrier_cost_cents") // pass-through carrier cost
+  pickpackCents      Int      @map("pickpack_cents") // RUOStack margin
+  brandMarkupCents   Int      @map("brand_markup_cents")
+  customerPriceCents Int      @map("customer_price_cents")
+  boxId              String?  @map("box_id") @db.Uuid
+  billableWeightOz   Int      @map("billable_weight_oz")
+  expiresAt          DateTime @map("expires_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([brandId, cartHash, serviceCode])
+  @@index([expiresAt])
+  @@map("rate_quote")
+}
+
 // ── Processor seam ────────────────────────────────────────────────────────────
 
 /// Idempotency for the Phase 0 webhook receiver (Phase 1 builds ledger on this).

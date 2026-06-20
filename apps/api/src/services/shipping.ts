@@ -8,7 +8,7 @@ import {
   type ShippingPricing,
 } from '@ruostack/shared';
 import { loadConfig } from '../config.js';
-import { quoteRates } from './rates/index.js';
+import { cachedQuoteRates } from './rate-cache.js';
 import { computeParcel, curateRates } from './fulfillment-rules.js';
 
 // Parcel + rules-engine helpers live in fulfillment-rules; re-exported so existing
@@ -58,7 +58,7 @@ export async function priceShipping(
   }
 
   const cfg = loadConfig();
-  const { source, options } = await quoteRates({
+  const { source, options } = await cachedQuoteRates({
     fromZip: cfg.WAREHOUSE_FROM_ZIP,
     toZip: dest.toZip,
     toState: dest.toState,

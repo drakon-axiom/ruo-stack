@@ -4,6 +4,7 @@ import { writeAudit } from '../audit.js';
 import { effectivePlan } from './subscription.js';
 import { getWalletSummary } from './wallet.js';
 import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
+import { findRateQuote } from './rate-quote.js';
 import { loadConfig } from '../config.js';
 
 interface WooLineItem {
@@ -27,8 +28,24 @@ export interface WooOrder {
   id: number | string;
   number?: string;
   line_items?: WooLineItem[];
+  shipping_lines?: { method_id?: string; method_title?: string }[];
   shipping?: WooAddress;
   billing?: WooAddress;
+}
+
+interface LockedBox {
+  boxId: string | null;
+  boxName: string | null;
+  boxLengthIn: number | null;
+  boxWidthIn: number | null;
+  boxHeightIn: number | null;
+  billableWeightOz: number | null;
+}
+
+/** The service the customer picked at checkout — our plugin sets method_id `ruostack:<code>`. */
+function chosenServiceFromWoo(woo: WooOrder): string | null {
+  const m = woo.shipping_lines?.[0]?.method_id ?? '';
+  return m.startsWith('ruostack:') ? m.slice('ruostack:'.length) : null;
 }
 
 export interface ImportResult {
@@ -97,16 +114,34 @@ export async function importWooOrder(
   const country = ((ship.country ?? 'US').trim() || 'US').slice(0, 2);
   const hasAddress = !!(address1 && city && state && zip);
 
-  // Shipping cost to the brand: re-rate server-side (flat for Starter; live for Pro/Volume).
+  // Shipping cost to the brand. Prefer the EXACT checkout quote (§9): reserve what
+  // the customer was quoted + lock that box/service. Fall back to re-rating when no
+  // live quote exists (manual import, expired quote, non-RUOStack shipping method).
   let shipping = 0;
-  let boxFields: ReturnType<typeof orderBoxFields> | null = null;
+  let boxFields: LockedBox | null = null;
+  let serviceCode: string | null = null;
+  let carrier: string | null = null;
+  let fromQuote = false;
   if (lines.length > 0 && hasAddress) {
-    const pricing = await resolveShippingPricing(prisma, brandId);
-    const rules = await loadShippingRules(prisma);
-    const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
-    boxFields = orderBoxFields(parcel);
-    const q = await priceShipping(plan, parcel, { toZip: zip, toState: state }, undefined, pricing, rules.mappings);
-    shipping = q.chosen.amountCents; // brand cost = carrier + pick-&-pack
+    const chosen = chosenServiceFromWoo(woo);
+    const cartItems = lineItems.map((li) => ({ sku: (li.sku ?? '').trim(), qty: Math.max(1, li.quantity ?? 1) })).filter((i) => i.sku);
+    const quote = chosen ? await findRateQuote(prisma, brandId, cartItems, { zip, state }, chosen) : null;
+    if (quote) {
+      shipping = quote.brandCostCents;
+      serviceCode = quote.serviceCode;
+      fromQuote = true;
+      const box = quote.boxId ? await prisma.box.findUnique({ where: { id: quote.boxId } }) : null;
+      boxFields = { boxId: quote.boxId, boxName: box?.name ?? null, boxLengthIn: box?.innerLengthIn ?? null, boxWidthIn: box?.innerWidthIn ?? null, boxHeightIn: box?.innerHeightIn ?? null, billableWeightOz: quote.billableWeightOz };
+    } else {
+      const pricing = await resolveShippingPricing(prisma, brandId);
+      const rules = await loadShippingRules(prisma);
+      const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
+      boxFields = orderBoxFields(parcel);
+      const q = await priceShipping(plan, parcel, { toZip: zip, toState: state }, chosen ?? undefined, pricing, rules.mappings);
+      shipping = q.chosen.amountCents; // brand cost = carrier + pick-&-pack
+      serviceCode = q.chosen.serviceCode;
+      carrier = q.chosen.carrier;
+    }
   }
   const walletCharge = wholesaleTotal + shipping;
 
@@ -139,6 +174,8 @@ export async function importWooOrder(
         wholesaleTotalCents: wholesaleTotal,
         shippingTotalCents: shipping,
         walletChargeCents: walletCharge,
+        ...(serviceCode ? { shippingServiceCode: serviceCode } : {}),
+        ...(carrier ? { shippingCarrier: carrier } : {}),
         ...(boxFields ?? {}),
         ...(lines.length ? { items: { create: lines } } : {}),
       },
@@ -149,7 +186,7 @@ export async function importWooOrder(
       action: AUDIT_ACTIONS.storeOrderImported,
       targetType: 'order',
       targetId: o.id,
-      after: { source: 'woocommerce', external_order_id: externalOrderId, blocker, matched: lines.length, unmatched, wallet_charge_cents: walletCharge },
+      after: { source: 'woocommerce', external_order_id: externalOrderId, blocker, matched: lines.length, unmatched, wallet_charge_cents: walletCharge, from_quote: fromQuote },
       ip: null,
     });
     return o;
