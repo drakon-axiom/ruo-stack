@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { getClients } from '../clients.js';
 import { requireAdmin } from '../middleware/guards.js';
+import { buildReport } from '../services/reporting.js';
 
 /**
  * Admin Overview — platform health at a glance (architecture §1.3). Aggregates
@@ -8,6 +10,12 @@ import { requireAdmin } from '../middleware/guards.js';
  */
 export async function adminOverviewRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
+
+  // Reporting dashboard — analytical metrics over a rolling window.
+  app.get('/api/admin/reporting', { preHandler: requireAdmin('overview', 'view') }, async (req) => {
+    const { days } = z.object({ days: z.coerce.number().int().min(1).max(365).default(30) }).parse(req.query);
+    return buildReport(prisma, days);
+  });
 
   app.get('/api/admin/overview', { preHandler: requireAdmin('overview', 'view') }, async () => {
     const startOfToday = new Date();

@@ -661,6 +661,7 @@ model Order {
   walletChargeCents   Int       @map("wallet_charge_cents")
   shippingServiceCode String?   @map("shipping_service_code") // rated service to buy at ship
   shippingCarrier     String?   @map("shipping_carrier") // rated carrier label
+  rateSource          String?   @map("rate_source") // how shipping was priced: flat|fallback|shipstation|computed|quote
   // Locked package (rules engine §6): the box + billable weight chosen at rate-time.
   boxId               String?   @map("box_id") @db.Uuid
   boxName             String?   @map("box_name")

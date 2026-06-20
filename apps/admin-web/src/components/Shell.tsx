@@ -7,6 +7,7 @@ import { logout } from '../lib/api.js';
 // visible without implying it's built.
 const NAV: { to: string; label: string; phase0: boolean }[] = [
   { to: '/overview', label: 'Overview', phase0: true },
+  { to: '/reporting', label: 'Reporting', phase0: true },
   { to: '/fulfillment', label: 'Fulfillment Queue', phase0: true },
   { to: '/brands', label: 'Brand Manager', phase0: true },
   { to: '/catalog', label: 'Catalog Manager', phase0: true },

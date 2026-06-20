@@ -119,6 +119,7 @@ export async function importWooOrder(
   let boxFields: LockedBox | null = null;
   let serviceCode: string | null = null;
   let carrier: string | null = null;
+  let rateSource: string | null = null;
   let fromQuote = false;
   if (lines.length > 0 && hasAddress) {
     const chosen = chosenServiceFromWoo(woo);
@@ -126,6 +127,7 @@ export async function importWooOrder(
     if (quote) {
       shipping = quote.brandCostCents;
       serviceCode = quote.serviceCode;
+      rateSource = 'quote';
       fromQuote = true;
       const box = quote.boxId ? await prisma.box.findUnique({ where: { id: quote.boxId } }) : null;
       boxFields = { boxId: quote.boxId, boxName: box?.name ?? null, boxLengthIn: box?.innerLengthIn ?? null, boxWidthIn: box?.innerWidthIn ?? null, boxHeightIn: box?.innerHeightIn ?? null, billableWeightOz: quote.billableWeightOz };
@@ -138,6 +140,7 @@ export async function importWooOrder(
       shipping = q.chosen.amountCents; // brand cost = carrier + pick-&-pack
       serviceCode = q.chosen.serviceCode;
       carrier = q.chosen.carrier;
+      rateSource = q.source;
     }
   }
   const walletCharge = wholesaleTotal + shipping;
@@ -175,6 +178,7 @@ export async function importWooOrder(
         unmatchedSkus,
         ...(serviceCode ? { shippingServiceCode: serviceCode } : {}),
         ...(carrier ? { shippingCarrier: carrier } : {}),
+        ...(rateSource ? { rateSource } : {}),
         ...(boxFields ?? {}),
         ...(lines.length ? { items: { create: lines } } : {}),
       },

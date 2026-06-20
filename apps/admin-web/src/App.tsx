@@ -10,6 +10,7 @@ import { ShippingRules } from './screens/ShippingRules.js';
 import { StoreMatch } from './screens/StoreMatch.js';
 import { Exceptions } from './screens/Exceptions.js';
 import { Claims } from './screens/Claims.js';
+import { Reporting } from './screens/Reporting.js';
 import { Overview } from './screens/Overview.js';
 import { Brands } from './screens/Brands.js';
 import { EmptyState, PageHeader } from './components/ui.js';
@@ -37,6 +38,7 @@ export function App() {
       <Route path="/admins" element={<Protected><AdminUsers /></Protected>} />
       <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
       <Route path="/overview" element={<Protected><Overview /></Protected>} />
+      <Route path="/reporting" element={<Protected><Reporting /></Protected>} />
       <Route path="/fulfillment" element={<Protected><Fulfillment /></Protected>} />
       <Route path="/shipping-rules" element={<Protected><ShippingRules /></Protected>} />
       <Route path="/store-match" element={<Protected><StoreMatch /></Protected>} />
