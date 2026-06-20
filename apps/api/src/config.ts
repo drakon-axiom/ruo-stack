@@ -73,6 +73,9 @@ export const EnvSchema = z.object({
   // Dimensional-weight divisor (cubic inches per pound) for billable weight.
   // Carrier standard is 166 for domestic.
   SHIPPING_DIM_DIVISOR: z.coerce.number().int().positive().default(166),
+  // Usable fraction of a box's inner volume (packing can't reach 100%). Box-fit
+  // compares item volume against innerVolume × this factor. Default 0.85.
+  SHIPPING_BOX_FILL_FACTOR: z.coerce.number().min(0.1).max(1).default(0.85),
   // Carrier-rate cache TTL (seconds) — short, so checkout never hammers the rater.
   RATE_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   // RateQuote validity (seconds) — covers checkout → order-import; reserve uses it.

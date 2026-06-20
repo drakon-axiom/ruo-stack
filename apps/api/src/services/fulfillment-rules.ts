@@ -1,5 +1,6 @@
 import type { Box, PrismaClient, ServiceMapping } from '@ruostack/db';
 import type { RateOption } from '@ruostack/shared';
+import { loadConfig } from '../config.js';
 
 /**
  * Fulfillment rules engine (§6): box selection, billable weight, and service
@@ -10,7 +11,8 @@ import type { RateOption } from '@ruostack/shared';
 
 // Fallbacks when a product has no weight/dims set (set real values in Catalog Manager).
 export const DEFAULT_ITEM_WEIGHT_OZ = 4;
-const DEFAULT_ITEM_VOLUME_IN3 = 6;
+// A research vial — used for volume + dimensional fit when product dims are unset.
+const DEFAULT_ITEM_DIMS = { l: 2.5, w: 0.8, h: 0.8 };
 const DEFAULT_BOX = { length: 6, width: 4, height: 2 };
 
 export interface ParcelProduct {
@@ -54,20 +56,40 @@ export async function loadShippingRules(db: PrismaClient): Promise<{ boxes: Box[
 }
 
 const boxVolume = (b: Box) => b.innerLengthIn * b.innerWidthIn * b.innerHeightIn;
-const itemVolume = (it: ParcelProduct) =>
-  it.length != null && it.width != null && it.height != null ? it.length * it.width * it.height : DEFAULT_ITEM_VOLUME_IN3;
+const itemDims = (it: ParcelProduct) => ({
+  l: it.length ?? DEFAULT_ITEM_DIMS.l,
+  w: it.width ?? DEFAULT_ITEM_DIMS.w,
+  h: it.height ?? DEFAULT_ITEM_DIMS.h,
+});
+const itemVolume = (it: ParcelProduct) => {
+  const d = itemDims(it);
+  return d.l * d.w * d.h;
+};
+/** A single item physically fits a box when its sorted dimensions all fit the
+ * box's sorted inner dimensions (orientation-independent). Catches the "enough
+ * volume but too short for a long item" case a pure volume check misses. */
+function itemFitsBox(it: ParcelProduct, box: Box): boolean {
+  const d = itemDims(it);
+  const id = [d.l, d.w, d.h].sort((a, b) => a - b);
+  const bd = [box.innerLengthIn, box.innerWidthIn, box.innerHeightIn].sort((a, b) => a - b);
+  return id[0]! <= bd[0]! && id[1]! <= bd[1]! && id[2]! <= bd[2]!;
+}
 
 /**
  * Pick the smallest enabled box that fits by content volume + weight, then derive
  * billable weight = max(actual + tare, dimensional), dimensional = (L×W×H)/divisor.
  * If nothing fits, use the largest box (best-effort, over capacity).
  */
-export function selectBox(items: ParcelProduct[], boxes: Box[], divisor: number): { box: Box | null; billableWeightOz: number } {
+export function selectBox(items: ParcelProduct[], boxes: Box[], divisor: number, fillFactor = 0.85): { box: Box | null; billableWeightOz: number } {
   const contentOz = items.reduce((s, it) => s + it.qty * (it.weight ?? DEFAULT_ITEM_WEIGHT_OZ), 0);
   const itemsVol = items.reduce((s, it) => s + it.qty * itemVolume(it), 0);
   if (boxes.length === 0) return { box: null, billableWeightOz: Math.max(1, Math.ceil(contentOz)) };
 
-  const fits = boxes.filter((b) => contentOz <= b.maxWeightOz && itemsVol <= boxVolume(b)).sort((a, b) => boxVolume(a) - boxVolume(b));
+  // Fit = weight, usable volume (innerVolume × fillFactor), and the largest single
+  // item physically fitting the box.
+  const fits = boxes
+    .filter((b) => contentOz <= b.maxWeightOz && itemsVol <= boxVolume(b) * fillFactor && items.every((it) => it.qty === 0 || itemFitsBox(it, b)))
+    .sort((a, b) => boxVolume(a) - boxVolume(b));
   const box = fits[0] ?? [...boxes].sort((a, b) => boxVolume(b) - boxVolume(a))[0]!; // largest as best-effort
   const actualOz = contentOz + box.tareOz;
   const dimOz = (boxVolume(box) / divisor) * 16; // (L×W×H)/divisor = lb → ×16 = oz
@@ -88,7 +110,7 @@ export function orderBoxFields(p: DerivedParcel): {
 
 /** Box-derived parcel; falls back to the rough parcel when no box is configured/fits. */
 export function deriveParcel(items: ParcelProduct[], boxes: Box[], divisor: number): DerivedParcel {
-  const sel = selectBox(items, boxes, divisor);
+  const sel = selectBox(items, boxes, divisor, loadConfig().SHIPPING_BOX_FILL_FACTOR);
   if (!sel.box) {
     const p = computeParcel(items);
     return { ...p, boxId: null, boxName: null };
