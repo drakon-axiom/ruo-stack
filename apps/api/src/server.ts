@@ -2,6 +2,7 @@ import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { getClients } from './clients.js';
 import { startRateQuoteSweeper } from './services/rate-quote.js';
+import { startReconciliationWorker } from './services/reconciliation.js';
 
 async function main() {
   const cfg = loadConfig();
@@ -17,6 +18,12 @@ async function main() {
   startRateQuoteSweeper(
     getClients().prisma,
     cfg.RATE_QUOTE_CLEANUP_INTERVAL_SECONDS * 1000,
+    (m) => app.log.info(m),
+  );
+  // Background: reconciliation worker — heal stuck webhooks + flag drift.
+  startReconciliationWorker(
+    getClients().prisma,
+    cfg.RECONCILE_INTERVAL_SECONDS * 1000,
     (m) => app.log.info(m),
   );
 }

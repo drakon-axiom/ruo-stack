@@ -45,6 +45,8 @@ export const AUDIT_ACTIONS = {
   storeOrderRemapped: 'store.order_remapped',
   // Fulfillment rules engine (Phase 2):
   shippingRuleUpdated: 'shipping_rule.updated',
+  // Reconciliation (Phase 3):
+  reconciliationRun: 'reconciliation.run',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
