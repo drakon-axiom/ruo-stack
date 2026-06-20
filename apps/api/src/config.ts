@@ -82,6 +82,8 @@ export const EnvSchema = z.object({
   RATE_QUOTE_TTL_SECONDS: z.coerce.number().int().positive().default(1800),
   // How often the API sweeps expired RateQuote rows. Default hourly.
   RATE_QUOTE_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(3600),
+  // How often the reconciliation worker runs (retry stuck webhooks + drift scan).
+  RECONCILE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(900),
 
   // Publicly reachable base URL of this API (no trailing slash), used to build
   // webhook delivery URLs registered on external services (WooCommerce, etc.).

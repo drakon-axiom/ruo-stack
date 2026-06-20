@@ -105,6 +105,10 @@ async function resolveBrandId(
   return null;
 }
 
+export async function dispatchStripeEvent(db: PrismaClient, event: NormalizedEvent, ip: string): Promise<void> {
+  return dispatch(db, event, ip);
+}
+
 async function dispatch(db: PrismaClient, event: NormalizedEvent, ip: string): Promise<void> {
   switch (event.kind) {
     case 'wallet.topup_succeeded': {
