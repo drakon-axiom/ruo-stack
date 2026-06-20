@@ -79,6 +79,7 @@ interface Detail {
   referral_code: string;
   subscription: { plan: string; status: string; cancel_at_period_end: boolean; current_period_end: string | null };
   wallet: { balance_cents: number; held_cents: number; available_cents: number };
+  shipping: { pickpack_fee_override_cents: number | null; pickpack_fee_effective_cents: number; global_default_cents: number; markup_cents: number };
   orders: { id: string; status: string; recipient_name: string; wallet_charge_cents: number }[];
   ledger: { id: string; type: string; amount_cents: number; balance_after_cents: number; reason: string | null; created_at: string }[];
 }
@@ -92,9 +93,22 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
   const [busy, setBusy] = useState(false);
   const [adjAmt, setAdjAmt] = useState('');
   const [adjReason, setAdjReason] = useState('');
+  const [fee, setFee] = useState('');
 
   function load() { api<Detail>(`/api/admin/brands/${id}`).then(setD); }
   useEffect(load, [id]);
+  useEffect(() => {
+    if (d) setFee(d.shipping.pickpack_fee_override_cents != null ? (d.shipping.pickpack_fee_override_cents / 100).toFixed(2) : '');
+  }, [d]);
+
+  async function savePickpack(clear: boolean) {
+    setErr(''); setBusy(true);
+    try {
+      const cents = clear ? null : Math.max(0, Math.round(parseFloat(fee || '0') * 100));
+      await api(`/api/admin/brands/${id}/shipping`, { method: 'PATCH', body: { pickpack_fee_override_cents: cents } });
+      load(); onChanged();
+    } catch (e) { setErr(e instanceof ApiError ? e.message : 'Failed'); } finally { setBusy(false); }
+  }
 
   async function toggleStatus() {
     if (!d) return;
@@ -162,6 +176,21 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
                 <Field label="Reason"><input className="input" value={adjReason} onChange={(e) => setAdjReason(e.target.value)} /></Field>
               </div>
               <button className="btn-ghost w-full" disabled={busy || !adjAmt || !adjReason} onClick={adjust}>Apply adjustment</button>
+            </div>
+          )}
+
+          {canAdjust && (
+            <div className="card p-3">
+              <div className="mb-1 text-[11px] uppercase tracking-[0.1em] text-faint">Pick-&amp;-pack fee override (Finance)</div>
+              <div className="mb-2 text-[12px] text-muted">
+                Effective <span className="text-text">{dollars(d.shipping.pickpack_fee_effective_cents)}</span>/shipment
+                {d.shipping.pickpack_fee_override_cents == null ? ' (global default)' : ' (override)'} · global {dollars(d.shipping.global_default_cents)}
+              </div>
+              <div className="flex items-end gap-2">
+                <Field label="Override $/shipment"><input className="input" value={fee} onChange={(e) => setFee(e.target.value)} placeholder={(d.shipping.global_default_cents / 100).toFixed(2)} /></Field>
+                <button className="btn" disabled={busy || !fee} onClick={() => savePickpack(false)}>Save</button>
+                <button className="btn-ghost" disabled={busy || d.shipping.pickpack_fee_override_cents == null} onClick={() => savePickpack(true)}>Use global</button>
+              </div>
             </div>
           )}
 
