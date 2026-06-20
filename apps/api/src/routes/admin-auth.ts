@@ -12,6 +12,11 @@ const ENROLL_PURPOSE = 'admin_mfa_enroll';
 const ENROLL_TTL = 600; // 10 min to complete first-login enrollment
 const TOTP_ISSUER = 'RUOStack Admin';
 
+// Accept the adjacent 30s steps (±1) so a small clock skew between the server and
+// the authenticator app — or entering the code near a step boundary — doesn't
+// reject an otherwise-valid code. otplib defaults to window 0 (no tolerance).
+authenticator.options = { window: 1 };
+
 interface SessionTokens {
   access_token: string;
   refresh_token: string;
