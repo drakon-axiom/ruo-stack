@@ -3,6 +3,7 @@ import { loadConfig } from './config.js';
 import { getClients } from './clients.js';
 import { startRateQuoteSweeper } from './services/rate-quote.js';
 import { startReconciliationWorker } from './services/reconciliation.js';
+import { startDunningWorker } from './services/dunning.js';
 
 async function main() {
   const cfg = loadConfig();
@@ -24,6 +25,16 @@ async function main() {
   startReconciliationWorker(
     getClients().prisma,
     cfg.RECONCILE_INTERVAL_SECONDS * 1000,
+    (m) => app.log.info(m),
+  );
+  // Background: dunning — notify on past-due, suspend after the grace window.
+  const c = getClients();
+  startDunningWorker(
+    c.prisma,
+    c.email,
+    c.supabaseAdmin,
+    cfg.DUNNING_GRACE_DAYS,
+    cfg.DUNNING_SWEEP_INTERVAL_SECONDS * 1000,
     (m) => app.log.info(m),
   );
 }

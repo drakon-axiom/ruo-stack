@@ -19,6 +19,18 @@ export interface SubscriptionUpdate {
 
 export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionUpdate): Promise<void> {
   await db.$transaction(async (tx) => {
+    const existing = await tx.subscriptionState.findUnique({ where: { brandId: u.brandId }, select: { status: true } });
+    // Dunning timestamps: stamp pastDueSince when ENTERING past_due (keep the
+    // original on repeated failure events); clear both once payment recovers.
+    const dunning: { pastDueSince?: Date | null; dunningNotifiedAt?: Date | null } =
+      u.status === 'past_due'
+        ? existing?.status === 'past_due'
+          ? {}
+          : { pastDueSince: new Date(), dunningNotifiedAt: null }
+        : u.status === 'active'
+          ? { pastDueSince: null, dunningNotifiedAt: null }
+          : {};
+
     const row = await tx.subscriptionState.upsert({
       where: { brandId: u.brandId },
       create: {
@@ -29,6 +41,7 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
         price: u.price ?? 0,
         currentPeriodEnd: u.currentPeriodEnd ?? null,
         cancelAtPeriodEnd: u.cancelAtPeriodEnd ?? false,
+        pastDueSince: u.status === 'past_due' ? new Date() : null,
       },
       update: {
         status: u.status,
@@ -37,6 +50,7 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
         ...(u.price !== undefined ? { price: u.price } : {}),
         ...(u.currentPeriodEnd !== undefined ? { currentPeriodEnd: u.currentPeriodEnd } : {}),
         ...(u.cancelAtPeriodEnd !== undefined ? { cancelAtPeriodEnd: u.cancelAtPeriodEnd } : {}),
+        ...dunning,
       },
     });
     // Coarse mirror: 'pro' while on any active paid tier, else 'none'.
@@ -50,10 +64,12 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
 
 /**
  * The brand's effective entitled tier: their plan while the subscription is
- * active, otherwise 'starter' (the free default — e.g. past_due/cancelled fall
- * back to Starter access until resolved).
+ * active OR past_due (the dunning grace window keeps Pro features so a transient
+ * failure doesn't instantly break checkout); 'starter' once suspended/cancelled/
+ * none. The worker flips past_due → suspended after the grace window.
  */
 export function effectivePlan(state: Pick<SubscriptionState, 'plan' | 'status'> | null): PlanKey {
-  if (!state || state.status !== 'active') return 'starter';
-  return state.plan;
+  if (!state) return 'starter';
+  if (state.status === 'active' || state.status === 'past_due') return state.plan;
+  return 'starter';
 }

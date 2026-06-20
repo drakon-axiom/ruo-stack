@@ -577,6 +577,8 @@ model SubscriptionState {
   status               SubscriptionStateStatus @default(none)
   currentPeriodEnd     DateTime?               @map("current_period_end")
   cancelAtPeriodEnd    Boolean                 @default(false) @map("cancel_at_period_end")
+  pastDueSince         DateTime?               @map("past_due_since") // dunning: when payment first failed
+  dunningNotifiedAt    DateTime?               @map("dunning_notified_at") // when we sent the payment-failed notice
   createdAt            DateTime                @default(now()) @map("created_at")
   updatedAt            DateTime                @updatedAt @map("updated_at")
 
