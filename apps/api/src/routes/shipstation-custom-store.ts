@@ -257,12 +257,20 @@ type ExportOrder = {
   shippingTotalCents: number;
   shippingServiceCode: string | null;
   shippingCarrier: string | null;
+  boxLengthIn: number | null;
+  boxWidthIn: number | null;
+  boxHeightIn: number | null;
   brand: { brandName: string };
   items: { qty: number; unitWholesaleCents: number; product: { canonicalSku: string; name: string; weight: number | null } }[];
 };
 
 function buildOrderXml(o: ExportOrder): string {
   const customerCode = o.recipientEmail || `brand:${o.brand.brandName}`;
+  // Locked package dimensions (rules engine) so ShipStation rates/labels the box we chose.
+  const dimensions =
+    o.boxLengthIn != null && o.boxWidthIn != null && o.boxHeightIn != null
+      ? `\n    <Dimensions>\n      <DimensionUnits>Inch</DimensionUnits>\n      <Length>${esc(o.boxLengthIn)}</Length>\n      <Width>${esc(o.boxWidthIn)}</Width>\n      <Height>${esc(o.boxHeightIn)}</Height>\n    </Dimensions>`
+      : '';
   const items = o.items
     .map(
       (it) => `      <Item>
@@ -284,7 +292,7 @@ function buildOrderXml(o: ExportOrder): string {
     <OrderDate>${fmtDate(o.createdAt)}</OrderDate>
     <OrderStatus>${cdata(shipstationStatus(o))}</OrderStatus>
     <LastModified>${fmtDate(o.updatedAt)}</LastModified>
-    <ShippingMethod>${cdata(o.shippingServiceCode ?? o.shippingCarrier ?? '')}</ShippingMethod>
+    <ShippingMethod>${cdata(o.shippingServiceCode ?? o.shippingCarrier ?? '')}</ShippingMethod>${dimensions}
     <OrderTotal>${money(o.walletChargeCents)}</OrderTotal>
     <TaxAmount>0.00</TaxAmount>
     <ShippingAmount>${money(o.shippingTotalCents)}</ShippingAmount>

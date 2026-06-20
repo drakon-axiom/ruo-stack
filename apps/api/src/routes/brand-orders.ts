@@ -14,7 +14,7 @@ import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { getWalletSummary } from '../services/wallet.js';
 import { applyOrderEdit } from '../services/order-edit.js';
-import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
+import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
 import { loadConfig } from '../config.js';
 import { BadRequest, Conflict, NotFound } from '../errors.js';
 
@@ -116,6 +116,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
           walletChargeCents: walletCharge,
           shippingServiceCode: shipQuote.chosen.serviceCode,
           shippingCarrier: shipQuote.chosen.carrier,
+          ...orderBoxFields(parcel),
           items: { create: lines },
         },
         include: { items: true },
@@ -263,6 +264,8 @@ type OrderRow = {
   shippingTotalCents: number;
   walletChargeCents: number;
   shippingServiceCode: string | null;
+  boxName: string | null;
+  billableWeightOz: number | null;
   trackingNumber: string | null;
   carrier: string | null;
   exportedAt: Date | null;
@@ -292,6 +295,8 @@ function serializeOrder(o: OrderRow) {
     shipping_total_cents: o.shippingTotalCents,
     wallet_charge_cents: o.walletChargeCents,
     shipping_service_code: o.shippingServiceCode,
+    box_name: o.boxName,
+    billable_weight_oz: o.billableWeightOz,
     tracking_number: o.trackingNumber,
     carrier: o.carrier,
     exported_at: o.exportedAt,

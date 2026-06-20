@@ -13,7 +13,7 @@ import { computeParcel, curateRates } from './fulfillment-rules.js';
 
 // Parcel + rules-engine helpers live in fulfillment-rules; re-exported so existing
 // importers keep a stable path.
-export { computeParcel, deriveParcel, loadShippingRules, selectBox, DEFAULT_ITEM_WEIGHT_OZ, type ParcelProduct, type DerivedParcel } from './fulfillment-rules.js';
+export { computeParcel, deriveParcel, loadShippingRules, orderBoxFields, selectBox, DEFAULT_ITEM_WEIGHT_OZ, type ParcelProduct, type DerivedParcel } from './fulfillment-rules.js';
 
 export interface ShippingQuote {
   source: string; // 'flat' | 'computed' | 'shipstation' | 'fallback'

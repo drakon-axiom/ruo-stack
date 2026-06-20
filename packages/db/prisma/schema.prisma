@@ -392,6 +392,8 @@ model Box {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  orders Order[]
+
   @@index([enabled])
   @@map("box")
 }
@@ -606,6 +608,13 @@ model Order {
   walletChargeCents   Int       @map("wallet_charge_cents")
   shippingServiceCode String?   @map("shipping_service_code") // rated service to buy at ship
   shippingCarrier     String?   @map("shipping_carrier") // rated carrier label
+  // Locked package (rules engine §6): the box + billable weight chosen at rate-time.
+  boxId               String?   @map("box_id") @db.Uuid
+  boxName             String?   @map("box_name")
+  boxLengthIn         Float?    @map("box_length_in")
+  boxWidthIn          Float?    @map("box_width_in")
+  boxHeightIn         Float?    @map("box_height_in")
+  billableWeightOz    Int?      @map("billable_weight_oz")
   trackingNumber      String?   @map("tracking_number")
   carrier             String?
   labelUrl            String?   @map("label_url")
@@ -617,6 +626,7 @@ model Order {
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   brand Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  box   Box?        @relation(fields: [boxId], references: [id], onDelete: SetNull)
   items OrderItem[]
 
   @@index([brandId, status])
