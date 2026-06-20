@@ -154,6 +154,9 @@ interface Sub {
   billed_plan: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  past_due_since: string | null;
+  grace_ends_at: string | null;
+  payment_action_needed: boolean;
   plans: PlanCard[];
 }
 
@@ -206,13 +209,17 @@ function SubscriptionSection() {
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
 
       {status === 'past_due' && (
-        <div className="mb-4 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-amber">
-          Payment failed — update your payment method to keep your plan. You're on Starter access until it clears.
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-amber">
+          <span>
+            Payment failed — your plan features stay active{sub?.grace_ends_at ? ` until ${new Date(sub.grace_ends_at).toLocaleDateString()}` : ''}. Update your card to avoid interruption.
+          </span>
+          <button className="btn shrink-0" disabled={busy} onClick={manage}>Update payment method</button>
         </div>
       )}
       {status === 'suspended' && (
-        <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
-          Membership suspended for non-payment — fulfillment features are paused. Update your payment method to restore them.
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+          <span>Membership suspended for non-payment — fulfillment features are paused. Update your payment method to restore them.</span>
+          <button className="btn shrink-0" disabled={busy} onClick={manage}>Update payment method</button>
         </div>
       )}
 

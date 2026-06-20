@@ -92,13 +92,19 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/brand/subscription', { preHandler: requireBrand }, async (req) => {
     const { brandId } = req.brand!;
     const sub = await prisma.subscriptionState.findUnique({ where: { brandId } });
-    const current = effectivePlan(sub); // effective tier (starter unless active)
+    const current = effectivePlan(sub); // effective tier (paid while active/past_due)
+    const graceMs = loadConfig().DUNNING_GRACE_DAYS * 86_400_000;
+    const graceEndsAt = sub?.pastDueSince ? new Date(sub.pastDueSince.getTime() + graceMs) : null;
     return {
       status: sub?.status ?? 'none',
       current_plan: current, // what they're entitled to right now
       billed_plan: sub?.plan ?? 'starter', // what Stripe is billing (may differ if past_due)
       current_period_end: sub?.currentPeriodEnd ?? null,
       cancel_at_period_end: sub?.cancelAtPeriodEnd ?? false,
+      // Dunning surface: a failed payment keeps features during the grace window.
+      past_due_since: sub?.pastDueSince ?? null,
+      grace_ends_at: graceEndsAt,
+      payment_action_needed: sub?.status === 'past_due' || sub?.status === 'suspended',
       capabilities: PLANS[current].capabilities,
       // The catalogue the plan-picker renders.
       plans: PLAN_LIST.map((p) => ({

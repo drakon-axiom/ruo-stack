@@ -84,6 +84,10 @@ export const EnvSchema = z.object({
   RATE_QUOTE_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(3600),
   // How often the reconciliation worker runs (retry stuck webhooks + drift scan).
   RECONCILE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(900),
+  // Dunning: days a membership stays past-due (Pro features retained) before the
+  // worker suspends it; and how often the worker sweeps.
+  DUNNING_GRACE_DAYS: z.coerce.number().int().min(0).default(7),
+  DUNNING_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(3600),
 
   // Publicly reachable base URL of this API (no trailing slash), used to build
   // webhook delivery URLs registered on external services (WooCommerce, etc.).
