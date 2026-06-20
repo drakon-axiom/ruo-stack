@@ -39,6 +39,9 @@ export const AUDIT_ACTIONS = {
   storeWritebackFailed: 'store.writeback_failed',
   storeProductsProvisioned: 'store.products_provisioned',
   storeStockPushed: 'store.stock_pushed',
+  storeAliasCreated: 'store.alias_created',
+  storeAliasDeleted: 'store.alias_deleted',
+  storeOrderRemapped: 'store.order_remapped',
   // Fulfillment rules engine (Phase 2):
   shippingRuleUpdated: 'shipping_rule.updated',
 } as const;

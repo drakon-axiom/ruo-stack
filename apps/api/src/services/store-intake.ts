@@ -5,6 +5,8 @@ import { effectivePlan } from './subscription.js';
 import { getWalletSummary } from './wallet.js';
 import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
 import { findRateQuote } from './rate-quote.js';
+import { resolveSkus } from './sku-resolver.js';
+import { Prisma } from '@ruostack/db';
 import { loadConfig } from '../config.js';
 
 interface WooLineItem {
@@ -81,27 +83,23 @@ export async function importWooOrder(
   const wf = wholesaleFieldFor(plan);
 
   const lineItems = woo.line_items ?? [];
-  const skus = lineItems.map((li) => (li.sku ?? '').trim()).filter(Boolean);
-  const products = await prisma.catalogProduct.findMany({
-    where: { canonicalSku: { in: skus }, isPublished: true },
-    select: { id: true, canonicalSku: true, wholesaleStarter: true, wholesalePro: true, wholesaleVolume: true, weight: true, length: true, width: true, height: true },
-  });
-  const bySku = new Map(products.map((p) => [p.canonicalSku, p]));
+  const sourceItems = lineItems.map((li) => ({ sku: (li.sku ?? '').trim(), qty: Math.max(1, li.quantity ?? 1) })).filter((i) => i.sku);
+  // Resolve by canonical SKU, then per-brand alias; unresolved → No-Match.
+  const resolved = await resolveSkus(prisma, brandId, sourceItems.map((i) => i.sku));
 
   const lines: { productId: string; qty: number; unitWholesaleCents: number }[] = [];
   const parcelItems: ParcelProduct[] = [];
-  let unmatched = 0;
-  for (const li of lineItems) {
-    const sku = (li.sku ?? '').trim();
-    const p = sku ? bySku.get(sku) : undefined;
+  const unmatchedSkus: string[] = [];
+  for (const it of sourceItems) {
+    const p = resolved.get(it.sku) ?? null;
     if (!p) {
-      unmatched++;
+      unmatchedSkus.push(it.sku);
       continue;
     }
-    const qty = Math.max(1, li.quantity ?? 1);
-    lines.push({ productId: p.id, qty, unitWholesaleCents: p[wf] });
-    parcelItems.push({ qty, weight: p.weight, length: p.length, width: p.width, height: p.height });
+    lines.push({ productId: p.id, qty: it.qty, unitWholesaleCents: p[wf] });
+    parcelItems.push({ qty: it.qty, weight: p.weight, length: p.length, width: p.width, height: p.height });
   }
+  const unmatched = unmatchedSkus.length;
   const wholesaleTotal = lines.reduce((s, l) => s + l.unitWholesaleCents * l.qty, 0);
 
   const ship = woo.shipping ?? {};
@@ -124,8 +122,7 @@ export async function importWooOrder(
   let fromQuote = false;
   if (lines.length > 0 && hasAddress) {
     const chosen = chosenServiceFromWoo(woo);
-    const cartItems = lineItems.map((li) => ({ sku: (li.sku ?? '').trim(), qty: Math.max(1, li.quantity ?? 1) })).filter((i) => i.sku);
-    const quote = chosen ? await findRateQuote(prisma, brandId, cartItems, { zip, state }, chosen) : null;
+    const quote = chosen ? await findRateQuote(prisma, brandId, sourceItems, { zip, state }, chosen) : null;
     if (quote) {
       shipping = quote.brandCostCents;
       serviceCode = quote.serviceCode;
@@ -174,6 +171,8 @@ export async function importWooOrder(
         wholesaleTotalCents: wholesaleTotal,
         shippingTotalCents: shipping,
         walletChargeCents: walletCharge,
+        sourceItems: sourceItems as unknown as Prisma.InputJsonValue,
+        unmatchedSkus,
         ...(serviceCode ? { shippingServiceCode: serviceCode } : {}),
         ...(carrier ? { shippingCarrier: carrier } : {}),
         ...(boxFields ?? {}),

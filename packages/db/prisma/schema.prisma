@@ -159,6 +159,7 @@ model Brand {
   orders             Order[]
   storeConnections   BrandStoreConnection[]
   shippingConfig     BrandShippingConfig?
+  productAliases     ProductAlias[]
 
   @@map("brand")
 }
@@ -324,10 +325,32 @@ model CatalogProduct {
 
   brandPrices BrandProductPrice[]
   orderItems  OrderItem[]
+  aliases     ProductAlias[]
 
   @@index([status])
   @@index([isPublished])
   @@map("catalog_product")
+}
+
+/// Maps a brand's store SKU → our canonical product, for store items that don't
+/// match by exact SKU (renamed/own/pre-existing products). Resolves order-time
+/// matching to canonical; set in the admin Store-Match screen (§3 aliases).
+model ProductAlias {
+  id           String   @id @default(uuid()) @db.Uuid
+  brandId      String   @map("brand_id") @db.Uuid
+  wooSku       String   @map("woo_sku") // the brand's store SKU (the join key)
+  wooProductId String?  @map("woo_product_id") // informational
+  productId    String   @map("product_id") @db.Uuid // resolves to our canonical product
+  createdBy    String?  @map("created_by") @db.Uuid // AdminUser.id
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  brand   Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  product CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, wooSku])
+  @@index([brandId])
+  @@map("product_alias")
 }
 
 // ── Store connections (Phase 2: WooCommerce hub-and-spoke) ────────────────────
@@ -616,6 +639,8 @@ model Order {
   status             OrderStatus  @default(ready_for_fulfillment)
   blocker            OrderBlocker @default(none)
   externalOrderId    String?      @map("external_order_id") // store order id (Woo/Wix; Phase 1.5)
+  sourceItems        Json?        @map("source_items") // raw store line items [{sku,qty}] for re-mapping
+  unmatchedSkus      String[]     @default([]) @map("unmatched_skus") // No-Match SKUs awaiting an alias
 
   // Shipping recipient (manual entry; Customer/Address Book is a later slice).
   recipientName  String  @map("recipient_name")
