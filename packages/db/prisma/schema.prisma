@@ -160,6 +160,7 @@ model Brand {
   storeConnections   BrandStoreConnection[]
   shippingConfig     BrandShippingConfig?
   productAliases     ProductAlias[]
+  claims             Claim[]
 
   @@map("brand")
 }
@@ -680,10 +681,70 @@ model Order {
   brand Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
   box   Box?        @relation(fields: [boxId], references: [id], onDelete: SetNull)
   items OrderItem[]
+  claims Claim[]
 
   @@index([brandId, status])
   @@index([status])
   @@map("order")
+}
+
+// ── Claims (Phase 3 §11: no refunds once shipped — post-ship remedy path) ──────
+
+enum ClaimType {
+  lost
+  damaged
+  missing_item
+  item_not_received
+  wrong_item
+
+  @@map("claim_type")
+}
+
+enum ClaimStatus {
+  open
+  investigating
+  carrier_filed
+  resolved
+
+  @@map("claim_status")
+}
+
+enum ClaimResolution {
+  reshipped
+  credited
+  denied
+
+  @@map("claim_resolution")
+}
+
+/// A post-ship problem (lost/damaged/...) against a shipped order. Resolved by an
+/// operator as reship / wallet credit / deny; carrier claim id recorded when filed.
+model Claim {
+  id             String           @id @default(uuid()) @db.Uuid
+  orderId        String           @map("order_id") @db.Uuid
+  brandId        String           @map("brand_id") @db.Uuid
+  type           ClaimType
+  status         ClaimStatus      @default(open)
+  resolution     ClaimResolution?
+  description    String?
+  photos         String[]         @default([])
+  carrierClaimId String?          @map("carrier_claim_id")
+  amountCents    Int?             @map("amount_cents") // credited amount / claim value
+  reshipOrderId  String?          @map("reship_order_id") @db.Uuid
+  openedByType   ActorType        @map("opened_by_type")
+  openedById     String?          @map("opened_by_id")
+  reason         String? // resolution reason
+  slaDueAt       DateTime         @map("sla_due_at")
+  resolvedAt     DateTime?        @map("resolved_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+  @@index([status])
+  @@map("claim")
 }
 
 model OrderItem {

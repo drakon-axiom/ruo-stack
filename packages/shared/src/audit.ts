@@ -47,6 +47,10 @@ export const AUDIT_ACTIONS = {
   shippingRuleUpdated: 'shipping_rule.updated',
   // Reconciliation (Phase 3):
   reconciliationRun: 'reconciliation.run',
+  // Claims (Phase 3):
+  claimOpened: 'claim.opened',
+  claimUpdated: 'claim.updated',
+  claimResolved: 'claim.resolved',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

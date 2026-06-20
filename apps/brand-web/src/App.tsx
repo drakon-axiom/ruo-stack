@@ -9,6 +9,7 @@ import { Orders } from './screens/Orders.js';
 import { Store } from './screens/Store.js';
 import { ActionRequired } from './screens/ActionRequired.js';
 import { Tracking } from './screens/Tracking.js';
+import { Claims } from './screens/Claims.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -56,6 +57,7 @@ export function App() {
       <Route path="/app/store" element={<Protected><Store /></Protected>} />
       <Route path="/app/action-required" element={<Protected><ActionRequired /></Protected>} />
       <Route path="/app/tracking" element={<Protected><Tracking /></Protected>} />
+      <Route path="/app/claims" element={<Protected><Claims /></Protected>} />
       {COMING.map(([slug, title]) => (
         <Route key={slug} path={`/app/${slug}`} element={<Protected><ComingSoon title={title} /></Protected>} />
       ))}

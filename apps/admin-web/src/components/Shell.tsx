@@ -15,7 +15,7 @@ const NAV: { to: string; label: string; phase0: boolean }[] = [
   { to: '/admins', label: 'Admin Users & Roles', phase0: true },
   { to: '/audit', label: 'Audit Log', phase0: true },
   { to: '/exceptions', label: 'Exceptions & Reconciliation', phase0: true },
-  { to: '/claims', label: 'Claims Queue', phase0: false },
+  { to: '/claims', label: 'Claims Queue', phase0: true },
   { to: '/ledger', label: 'Ledger & Reconciliation', phase0: false },
 ];
 
