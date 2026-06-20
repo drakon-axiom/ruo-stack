@@ -14,7 +14,8 @@ import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { getWalletSummary } from '../services/wallet.js';
 import { applyOrderEdit } from '../services/order-edit.js';
-import { computeParcel, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
+import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
+import { loadConfig } from '../config.js';
 import { BadRequest, Conflict, NotFound } from '../errors.js';
 
 /**
@@ -84,7 +85,9 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
       return { qty: i.qty, weight: p.weight, length: p.length, width: p.width, height: p.height };
     });
     const pricing = await resolveShippingPricing(prisma, brandId);
-    const shipQuote = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state }, body.service_code, pricing);
+    const rules = await loadShippingRules(prisma);
+    const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
+    const shipQuote = await priceShipping(plan, parcel, { toZip: body.zip, toState: body.state }, body.service_code, pricing, rules.mappings);
     const shipping = shipQuote.chosen.amountCents; // brand cost = carrier + pick-&-pack
     const walletCharge = wholesaleTotal + shipping;
 
@@ -152,7 +155,9 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
       return { qty: i.qty, weight: p.weight, length: p.length, width: p.width, height: p.height };
     });
     const pricing = await resolveShippingPricing(prisma, brandId);
-    const q = await priceShipping(plan, computeParcel(parcelItems), { toZip: body.zip, toState: body.state }, undefined, pricing);
+    const rules = await loadShippingRules(prisma);
+    const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
+    const q = await priceShipping(plan, parcel, { toZip: body.zip, toState: body.state }, undefined, pricing, rules.mappings);
     return {
       plan,
       wholesale_cents: wholesale,

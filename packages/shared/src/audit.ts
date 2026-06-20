@@ -39,6 +39,8 @@ export const AUDIT_ACTIONS = {
   storeWritebackFailed: 'store.writeback_failed',
   storeProductsProvisioned: 'store.products_provisioned',
   storeStockPushed: 'store.stock_pushed',
+  // Fulfillment rules engine (Phase 2):
+  shippingRuleUpdated: 'shipping_rule.updated',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

@@ -39,6 +39,10 @@ export interface RatesAdapter {
 /** Default pick-&-pack fee (cents) when no global/brand override is configured. */
 export const PICKPACK_FEE_DEFAULT_CENTS = 250;
 
+/** Service tiers offered at checkout (fulfillment plan §12.2). No overnight. */
+export const SERVICE_TIERS = ['economy', 'standard', 'expedited'] as const;
+export type ServiceTier = (typeof SERVICE_TIERS)[number];
+
 /** Single $12.99 flat fallback, fulfilled as USPS Ground Advantage — returned when
  * live rates time out/error or a SKU is unmapped/missing weight. Checkout always
  * returns something. */
