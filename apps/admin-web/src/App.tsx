@@ -9,6 +9,7 @@ import { Fulfillment } from './screens/Fulfillment.js';
 import { ShippingRules } from './screens/ShippingRules.js';
 import { StoreMatch } from './screens/StoreMatch.js';
 import { Exceptions } from './screens/Exceptions.js';
+import { Claims } from './screens/Claims.js';
 import { Overview } from './screens/Overview.js';
 import { Brands } from './screens/Brands.js';
 import { EmptyState, PageHeader } from './components/ui.js';
@@ -40,7 +41,7 @@ export function App() {
       <Route path="/shipping-rules" element={<Protected><ShippingRules /></Protected>} />
       <Route path="/store-match" element={<Protected><StoreMatch /></Protected>} />
       <Route path="/exceptions" element={<Protected><Exceptions /></Protected>} />
-      <Route path="/claims" element={<Protected><ComingSoon title="Claims Queue" /></Protected>} />
+      <Route path="/claims" element={<Protected><Claims /></Protected>} />
       <Route path="/brands" element={<Protected><Brands /></Protected>} />
       <Route path="/ledger" element={<Protected><ComingSoon title="Ledger & Reconciliation" /></Protected>} />
       <Route path="*" element={<Navigate to="/overview" replace />} />

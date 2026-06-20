@@ -1,0 +1,162 @@
+import { useEffect, useState } from 'react';
+import { canWrite, claimTypeLabel, type ClaimType } from '@ruostack/shared';
+import { api, ApiError } from '../lib/api.js';
+import { useAuth } from '../lib/auth.js';
+import { Drawer, EmptyState, Field, PageHeader, Tabs } from '../components/ui.js';
+
+const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
+
+interface ClaimRow {
+  id: string;
+  order_id: string;
+  type: ClaimType;
+  status: string;
+  resolution: string | null;
+  brand_name: string;
+  recipient_name: string;
+  tracking_number: string | null;
+  carrier: string | null;
+  sla_due_at: string;
+  sla_overdue: boolean;
+}
+interface ClaimDetail extends ClaimRow {
+  description: string | null;
+  photos: string[];
+  carrier_claim_id: string | null;
+  amount_cents: number | null;
+  reship_order_id: string | null;
+  reason: string | null;
+  order: { recipientName: string; city: string; state: string; trackingNumber: string | null; carrier: string | null; walletChargeCents: number };
+}
+
+type Filter = 'open' | 'investigating' | 'carrier_filed' | 'resolved' | 'all';
+const STATUS_TONE: Record<string, string> = {
+  open: 'border-amber/40 bg-amber/10 text-amber',
+  investigating: 'border-teal/40 bg-teal/10 text-teal',
+  carrier_filed: 'border-teal/40 bg-teal/10 text-teal-bright',
+  resolved: 'border-success/40 bg-success/10 text-success',
+};
+
+export function Claims() {
+  const { claims: authClaims } = useAuth();
+  const writable = authClaims ? canWrite(authClaims.role, 'claims') : false;
+  const [filter, setFilter] = useState<Filter>('open');
+  const [rows, setRows] = useState<ClaimRow[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  function load() {
+    const q = filter === 'all' ? '' : `?status=${filter}`;
+    api<{ claims: ClaimRow[] }>(`/api/admin/claims${q}`).then((r) => setRows(r.claims));
+  }
+  useEffect(load, [filter]);
+
+  return (
+    <>
+      <PageHeader title="Claims Queue" subtitle="Lost / damaged / not-received claims. Triage and resolve as reship, wallet credit, or deny." />
+      <div className="mb-3">
+        <Tabs<Filter> active={filter} onChange={setFilter} tabs={[
+          { key: 'open', label: 'Open' }, { key: 'investigating', label: 'Investigating' }, { key: 'carrier_filed', label: 'Carrier filed' }, { key: 'resolved', label: 'Resolved' }, { key: 'all', label: 'All' },
+        ]} />
+      </div>
+
+      {rows.length === 0 ? <EmptyState title="Nothing here" hint="No claims in this state." /> : (
+        <div className="card overflow-hidden">
+          <table className="w-full text-[13px]">
+            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <th className="px-4 py-3">Brand</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Recipient</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">SLA</th>
+            </tr></thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.id} onClick={() => setOpenId(c.id)} className="cursor-pointer border-b border-line/60 hover:bg-card2">
+                  <td className="px-4 py-3 text-text">{c.brand_name}</td>
+                  <td className="px-4 py-3">{claimTypeLabel(c.type)}</td>
+                  <td className="px-4 py-3 text-muted">{c.recipient_name}</td>
+                  <td className="px-4 py-3"><span className={`pill ${STATUS_TONE[c.status] ?? ''}`}>{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</span></td>
+                  <td className="px-4 py-3">{c.status !== 'resolved' && (c.sla_overdue ? <span className="pill border-danger/40 bg-danger/10 text-danger">overdue</span> : <span className="text-muted">{new Date(c.sla_due_at).toLocaleDateString()}</span>)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {openId && <ClaimDrawer id={openId} writable={writable} onClose={() => setOpenId(null)} onChanged={() => { load(); }} />}
+    </>
+  );
+}
+
+function ClaimDrawer({ id, writable, onClose, onChanged }: { id: string; writable: boolean; onClose: () => void; onChanged: () => void }) {
+  const [c, setC] = useState<ClaimDetail | null>(null);
+  const [carrierId, setCarrierId] = useState('');
+  const [res, setRes] = useState<'reshipped' | 'credited' | 'denied'>('reshipped');
+  const [reason, setReason] = useState('');
+  const [amount, setAmount] = useState('');
+  const [comp, setComp] = useState(true);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function load() { api<ClaimDetail>(`/api/admin/claims/${id}`).then(setC); }
+  useEffect(load, [id]);
+
+  async function patch(body: Record<string, unknown>) {
+    setErr(''); setBusy(true);
+    try { await api(`/api/admin/claims/${id}`, { method: 'PATCH', body }); load(); onChanged(); }
+    catch (e) { setErr(e instanceof ApiError ? e.message : 'Failed'); }
+    finally { setBusy(false); }
+  }
+  async function resolve() {
+    setErr(''); setBusy(true);
+    try {
+      const body: Record<string, unknown> = { resolution: res, reason };
+      if (res === 'credited') body.amount_cents = Math.round(parseFloat(amount || '0') * 100);
+      if (res === 'reshipped') body.comp = comp;
+      await api(`/api/admin/claims/${id}/resolve`, { method: 'POST', body });
+      load(); onChanged();
+    } catch (e) { setErr(e instanceof ApiError ? e.message : 'Resolve failed'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Drawer open title={c ? `${claimTypeLabel(c.type)} — ${c.brand_name}` : 'Claim'} onClose={onClose}>
+      {!c ? <div className="text-muted">Loading…</div> : (
+        <div className="space-y-4 text-[13px]">
+          {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">{err}</div>}
+          <div className="flex items-center gap-2">
+            <span className={`pill ${STATUS_TONE[c.status] ?? ''}`}>{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</span>
+            {c.order.trackingNumber && <span className="font-mono text-[11px] text-muted">{c.order.carrier} {c.order.trackingNumber}</span>}
+          </div>
+          <div className="text-muted">{c.order.recipientName} · {c.order.city}, {c.order.state} · order value {dollars(c.order.walletChargeCents)}</div>
+          {c.description && <div className="rounded-lg border border-line bg-card2 px-3 py-2">{c.description}</div>}
+          {c.photos.length > 0 && <div className="flex flex-wrap gap-2">{c.photos.map((p, i) => <a key={i} className="text-[11px] text-teal underline" href={p} target="_blank" rel="noreferrer">photo {i + 1}</a>)}</div>}
+          {c.carrier_claim_id && <div className="text-muted">Carrier claim: <span className="font-mono">{c.carrier_claim_id}</span></div>}
+          {c.resolution && <div className="rounded-lg border border-line bg-card2 px-3 py-2">Resolved <span className="text-text">{c.resolution}</span>{c.amount_cents ? ` · ${dollars(c.amount_cents)}` : ''}{c.reason ? ` — ${c.reason}` : ''}{c.reship_order_id ? ` · reship ${c.reship_order_id.slice(0, 8)}` : ''}</div>}
+
+          {writable && c.status !== 'resolved' && (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {c.status === 'open' && <button className="btn-ghost" disabled={busy} onClick={() => patch({ status: 'investigating' })}>Start investigating</button>}
+                <span className="flex items-center gap-1">
+                  <input className="input w-40" placeholder="carrier claim id" value={carrierId} onChange={(e) => setCarrierId(e.target.value)} />
+                  <button className="btn-ghost" disabled={busy || !carrierId} onClick={() => patch({ status: 'carrier_filed', carrier_claim_id: carrierId })}>File carrier claim</button>
+                </span>
+              </div>
+
+              <div className="card space-y-2 p-3">
+                <div className="text-[11px] uppercase tracking-[0.1em] text-faint">Resolve</div>
+                <Field label="Resolution">
+                  <select className="input" value={res} onChange={(e) => setRes(e.target.value as typeof res)}>
+                    <option value="reshipped">Reship</option><option value="credited">Wallet credit</option><option value="denied">Deny</option>
+                  </select>
+                </Field>
+                {res === 'credited' && <Field label="Credit amount ($)"><input className="input" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={(c.order.walletChargeCents / 100).toFixed(2)} /></Field>}
+                {res === 'reshipped' && <label className="flex items-center gap-2 text-[12px]"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Platform-comped ($0) — uncheck to charge the brand's wallet</label>}
+                <Field label="Reason"><input className="input" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+                <button className="btn w-full" disabled={busy || !reason || (res === 'credited' && !amount)} onClick={resolve}>Resolve claim</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </Drawer>
+  );
+}
