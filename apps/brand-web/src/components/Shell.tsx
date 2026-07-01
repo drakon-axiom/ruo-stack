@@ -8,7 +8,7 @@ const GROUPS: { group: string; items: { to: string; label: string; phase0?: bool
   {
     group: 'Core',
     items: [
-      { to: '/app/overview', label: 'Overview' },
+      { to: '/app/overview', label: 'Overview', phase0: true },
       { to: '/app/orders', label: 'Orders', phase0: true },
       { to: '/app/tracking', label: 'Tracking', phase0: true },
       { to: '/app/claims', label: 'Claims', phase0: true },
@@ -23,22 +23,22 @@ const GROUPS: { group: string; items: { to: string; label: string; phase0?: bool
     group: 'Catalog',
     items: [
       { to: '/app/catalog', label: 'Research Peptides', phase0: true },
-      { to: '/app/coas', label: 'COAs' },
+      { to: '/app/coas', label: 'COAs', phase0: true },
     ],
   },
   {
     group: 'Brand & Tools',
     items: [
       { to: '/app/branding', label: 'Branding' },
-      { to: '/app/shipping', label: 'Shipping' },
-      { to: '/app/profit', label: 'Profit Calculator' },
+      { to: '/app/shipping', label: 'Shipping', phase0: true },
+      { to: '/app/profit', label: 'Profit Calculator', phase0: true },
     ],
   },
   {
     group: 'Support',
     items: [
       { to: '/app/chat', label: 'Live Chat' },
-      { to: '/app/referrals', label: 'Referrals' },
+      { to: '/app/referrals', label: 'Referrals', phase0: true },
       { to: '/app/account', label: 'Account', phase0: true },
     ],
   },
