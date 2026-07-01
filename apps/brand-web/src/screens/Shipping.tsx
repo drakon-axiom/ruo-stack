@@ -1,0 +1,128 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { FLAT_FALLBACK } from '@ruostack/shared';
+import { api, ApiError } from '../lib/api.js';
+
+const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
+const SHIP = FLAT_FALLBACK.amountCents;
+
+interface Order {
+  id: string;
+  status: string;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+}
+// 'set' = markup loaded; 'locked' = Starter plan (403); 'loading' = pending.
+type Markup = { state: 'loading' } | { state: 'locked' } | { state: 'set'; cents: number };
+
+export function Shipping() {
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [markup, setMarkup] = useState<Markup>({ state: 'loading' });
+
+  useEffect(() => {
+    api<{ orders: Order[] }>('/api/brand/orders').then((r) => setOrders(r.orders));
+    api<{ markup_cents: number }>('/api/brand/store/shipping')
+      .then((r) => setMarkup({ state: 'set', cents: r.markup_cents }))
+      .catch((e) => setMarkup(e instanceof ApiError && e.status === 403 ? { state: 'locked' } : { state: 'set', cents: 0 }));
+  }, []);
+
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1);
+  startOfMonth.setUTCHours(0, 0, 0, 0);
+
+  const all = orders ?? [];
+  const shippedThisMonth = all.filter((o) => o.shipped_at && new Date(o.shipped_at) >= startOfMonth).length;
+  const delivered = all.filter((o) => o.status === 'delivered').length;
+  const inProgress = all.filter((o) => o.status === 'ready_for_fulfillment' || o.status === 'processing').length;
+
+  return (
+    <>
+      <h1 className="mb-1 text-[23px] font-bold">Shipping</h1>
+      <p className="mb-5 text-[13px] text-muted">
+        We fulfill every order under your label. Here's your carrier, what's included, and how it works.
+      </p>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="surface p-4">
+          <div className="text-[26px] font-extrabold">{orders ? shippedThisMonth : '—'}</div>
+          <div className="text-[12px] text-muted">Shipped this month</div>
+        </div>
+        <div className="surface p-4">
+          <div className="text-[26px] font-extrabold text-success">{orders ? delivered : '—'}</div>
+          <div className="text-[12px] text-muted">Delivered (all time)</div>
+        </div>
+        <div className="surface p-4">
+          <div className="text-[26px] font-extrabold text-teal">{orders ? inProgress : '—'}</div>
+          <div className="text-[12px] text-muted">In progress</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Carrier */}
+        <div className="surface mt-5 p-5">
+          <h2 className="mb-1 text-[15px] font-semibold">Default carrier</h2>
+          <div className="mb-3 flex items-baseline justify-between">
+            <span className="text-[18px] font-bold">{FLAT_FALLBACK.carrier} Ground Advantage</span>
+            <span className="text-[18px] font-extrabold text-teal">{dollars(SHIP)}</span>
+          </div>
+          <ul className="space-y-1 text-[13px] text-muted">
+            <li>· Flat-rate domestic (US) shipping</li>
+            <li>· 2–5 business day delivery</li>
+            <li>· Tracking on every shipment</li>
+          </ul>
+        </div>
+
+        {/* Markup */}
+        <div className="surface mt-5 p-5">
+          <h2 className="mb-1 text-[15px] font-semibold">Your shipping markup</h2>
+          {markup.state === 'loading' ? (
+            <div className="text-[13px] text-muted">Loading…</div>
+          ) : markup.state === 'locked' ? (
+            <>
+              <p className="mb-3 text-[13px] text-muted">
+                Add a per-order shipping markup as profit on every store order. Available on Pro & Volume.
+              </p>
+              <Link to="/app/account" className="btn">Upgrade plan</Link>
+            </>
+          ) : (
+            <>
+              <div className="mb-2 text-[26px] font-extrabold">{dollars(markup.cents)}</div>
+              <p className="text-[13px] text-muted">
+                Added to each store order's shipping as your profit. Edit this in <Link to="/app/store" className="text-teal">My Store</Link>.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="surface mt-4 p-5 text-[13px] text-muted">
+          <h2 className="mb-2 text-[15px] font-semibold text-text">What's included</h2>
+          <ul className="space-y-1">
+            <li>· Pick &amp; pack under your brand</li>
+            <li>· Carrier label &amp; postage</li>
+            <li>· Tracking written back to your store</li>
+            <li>· Claims support for lost/damaged shipments</li>
+          </ul>
+        </div>
+        <div className="surface mt-4 p-5 text-[13px] text-muted">
+          <h2 className="mb-2 text-[15px] font-semibold text-text">How fulfillment works</h2>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>An order arrives (manually or from your store).</li>
+            <li>We reserve funds from your wallet and pick the order.</li>
+            <li>We ship it under your label and write tracking back.</li>
+            <li>Your wallet is charged only when it ships.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div className="surface mt-4 p-5">
+        <h2 className="mb-1 text-[15px] font-semibold">Custom return address</h2>
+        <p className="text-[13px] text-muted">
+          Branded return addresses on the shipping label are coming soon. For now, shipments use the RUOStack fulfillment return address.
+        </p>
+      </div>
+    </>
+  );
+}

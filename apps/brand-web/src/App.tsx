@@ -10,6 +10,11 @@ import { Store } from './screens/Store.js';
 import { ActionRequired } from './screens/ActionRequired.js';
 import { Tracking } from './screens/Tracking.js';
 import { Claims } from './screens/Claims.js';
+import { Overview } from './screens/Overview.js';
+import { Profit } from './screens/Profit.js';
+import { Referrals } from './screens/Referrals.js';
+import { Coas } from './screens/Coas.js';
+import { Shipping } from './screens/Shipping.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -31,15 +36,10 @@ function ComingSoon({ title }: { title: string }) {
 }
 
 const COMING = [
-  ['overview', 'Overview'],
   ['customers', 'Customers'],
   ['address-book', 'Address Book'],
-  ['coas', 'COAs'],
   ['branding', 'Branding'],
-  ['shipping', 'Shipping'],
-  ['profit', 'Profit Calculator'],
   ['chat', 'Live Chat'],
-  ['referrals', 'Referrals'],
 ] as const;
 
 export function App() {
@@ -50,8 +50,13 @@ export function App() {
       <Route path="/forgot" element={<Forgot />} />
       <Route path="/reset" element={<Reset />} />
 
+      <Route path="/app/overview" element={<Protected><Overview /></Protected>} />
       <Route path="/app/account" element={<Protected><Account /></Protected>} />
       <Route path="/app/catalog" element={<Protected><Catalog /></Protected>} />
+      <Route path="/app/coas" element={<Protected><Coas /></Protected>} />
+      <Route path="/app/profit" element={<Protected><Profit /></Protected>} />
+      <Route path="/app/shipping" element={<Protected><Shipping /></Protected>} />
+      <Route path="/app/referrals" element={<Protected><Referrals /></Protected>} />
       <Route path="/app/wallet" element={<Protected><Wallet /></Protected>} />
       <Route path="/app/orders" element={<Protected><Orders /></Protected>} />
       <Route path="/app/store" element={<Protected><Store /></Protected>} />
@@ -62,7 +67,7 @@ export function App() {
         <Route key={slug} path={`/app/${slug}`} element={<Protected><ComingSoon title={title} /></Protected>} />
       ))}
 
-      <Route path="*" element={<Navigate to="/app/account" replace />} />
+      <Route path="*" element={<Navigate to="/app/overview" replace />} />
     </Routes>
   );
 }
