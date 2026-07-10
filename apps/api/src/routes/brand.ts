@@ -110,6 +110,8 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
         website: brand.website,
         sales_channel: brand.salesChannel,
         logo_url: brand.logoUrl,
+        primary_color: brand.primaryColor,
+        accent_color: brand.accentColor,
         subscription_status: brand.subscriptionStatus,
         member_since: brand.memberSince,
         referral_code: brand.referralCode,

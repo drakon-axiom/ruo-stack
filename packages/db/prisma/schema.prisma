@@ -140,6 +140,8 @@ model Brand {
   brandName          String             @map("brand_name")
   status             BrandStatus        @default(active)
   logoUrl            String?            @map("logo_url")
+  primaryColor       String?            @map("primary_color") // brand theme, hex (#RRGGBB)
+  accentColor        String?            @map("accent_color") // brand accent, hex (#RRGGBB)
   website            String?
   salesChannel       String?            @map("sales_channel")
   subscriptionStatus SubscriptionStatus @default(none) @map("subscription_status") // convenience flag; SubscriptionState is SoT in Phase 1
