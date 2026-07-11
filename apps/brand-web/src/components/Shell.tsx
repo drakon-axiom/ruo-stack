@@ -29,7 +29,7 @@ const GROUPS: { group: string; items: { to: string; label: string; phase0?: bool
   {
     group: 'Brand & Tools',
     items: [
-      { to: '/app/branding', label: 'Branding' },
+      { to: '/app/branding', label: 'Branding', phase0: true },
       { to: '/app/shipping', label: 'Shipping', phase0: true },
       { to: '/app/profit', label: 'Profit Calculator', phase0: true },
     ],
