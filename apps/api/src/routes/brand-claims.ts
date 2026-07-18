@@ -14,7 +14,7 @@ import { BadRequest, NotFound } from '../errors.js';
 export async function brandClaimRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
 
-  app.post('/api/brand/orders/:id/claims', { preHandler: requireBrand }, async (req, reply) => {
+  app.post('/api/brand/orders/:id/claims', { preHandler: requireBrand, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { brandId, userId } = req.brand!;
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = ClaimOpenSchema.parse(req.body);

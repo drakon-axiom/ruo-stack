@@ -14,6 +14,7 @@ export const AUDIT_ACTIONS = {
   adminSuspended: 'admin.suspended',
   adminActivated: 'admin.activated',
   brandProfileUpdated: 'brand.profile_updated',
+  brandEmailChanged: 'brand.email_changed',
   brandBrandingUpdated: 'brand.branding_updated',
   brandSignup: 'brand.signup',
   brandSuspended: 'brand.suspended',

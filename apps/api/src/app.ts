@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { ZodError } from 'zod';
 import { loadConfig } from './config.js';
 import { HttpError } from './errors.js';
@@ -40,6 +41,16 @@ export async function buildApp(): Promise<FastifyInstance> {
     origin: cfg.corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // Per-IP rate limiting. A generous global default (keyed on req.ip, correct via
+  // trustProxy) protects against blanket abuse; sensitive routes (auth, wallet,
+  // order/claim writes) tighten this with a per-route `config.rateLimit` override.
+  // Disabled under tests so route tests aren't throttled.
+  await app.register(rateLimit, {
+    global: cfg.NODE_ENV !== 'test',
+    max: 300,
+    timeWindow: '1 minute',
   });
 
   // Uniform error shape; never leak internals.

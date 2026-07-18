@@ -18,7 +18,7 @@ export function encryptStoreCreds(consumerKey: string, consumerSecret: string): 
   consumerKeyEnc: string;
   consumerSecretEnc: string;
 } {
-  const key = loadConfig().MFA_ENCRYPTION_KEY;
+  const key = loadConfig().STORE_CREDS_KEY;
   return {
     consumerKeyEnc: encryptSecret(consumerKey, key),
     consumerSecretEnc: encryptSecret(consumerSecret, key),
@@ -28,7 +28,7 @@ export function encryptStoreCreds(consumerKey: string, consumerSecret: string): 
 export function decryptStoreCreds(
   c: Pick<BrandStoreConnection, 'storeUrl' | 'consumerKeyEnc' | 'consumerSecretEnc'>,
 ): WooCreds {
-  const key = loadConfig().MFA_ENCRYPTION_KEY;
+  const key = loadConfig().STORE_CREDS_KEY;
   return {
     storeUrl: c.storeUrl,
     consumerKey: decryptSecret(c.consumerKeyEnc, key),

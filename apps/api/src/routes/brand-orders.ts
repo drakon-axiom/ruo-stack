@@ -33,7 +33,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
   }
 
   // ── Create a manual order ──────────────────────────────────────────────────
-  app.post('/api/brand/orders', { preHandler: requireBrand }, async (req, reply) => {
+  app.post('/api/brand/orders', { preHandler: requireBrand, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { brandId, userId } = req.brand!;
     const body = OrderCreateSchema.parse(req.body);
 
@@ -138,7 +138,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Rate preview (items + destination → shipping options) ─────────────────
-  app.post('/api/brand/orders/quote', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/orders/quote', { preHandler: requireBrand, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
     const { brandId } = req.brand!;
     const body = OrderQuoteSchema.parse(req.body);
     const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } });

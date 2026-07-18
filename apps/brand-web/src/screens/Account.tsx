@@ -69,9 +69,16 @@ export function Account() {
   async function changeEmail() {
     const next = prompt('New email address');
     if (!next) return;
-    const { error } = await supabase.auth.updateUser({ email: next });
-    setMsg(error ? '' : 'Confirmation sent to the new address.');
-    setErr(error?.message ?? '');
+    try {
+      // Server-side + audited (see PATCH /api/brand/account/email).
+      await api('/api/brand/account/email', { method: 'PATCH', body: { email: next } });
+      setErr('');
+      setMsg('Login email updated.');
+      void load();
+    } catch (e) {
+      setMsg('');
+      setErr(e instanceof ApiError ? e.message : 'Could not change email');
+    }
   }
 
   async function resetPassword() {
