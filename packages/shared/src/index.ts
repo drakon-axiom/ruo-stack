@@ -7,5 +7,6 @@ export * from './dto.js';
 export * from './money.js';
 export * from './plans.js';
 export * from './orders.js';
+export * from './addresses.js';
 export * from './rates.js';
 export * from './claims.js';

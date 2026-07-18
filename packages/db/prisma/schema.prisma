@@ -163,8 +163,35 @@ model Brand {
   shippingConfig     BrandShippingConfig?
   productAliases     ProductAlias[]
   claims             Claim[]
+  addresses          Address[]
 
   @@map("brand")
+}
+
+/// Saved ship-to (recipient) addresses for a brand's Address Book. Manually
+/// curated; auto-fills the manual order form. Distinct from the brand's own
+/// return address (a separate, later slice). No link to Order — a saved address
+/// is a template, snapshotted onto the order at placement time.
+model Address {
+  id             String   @id @default(uuid()) @db.Uuid
+  brandId        String   @map("brand_id") @db.Uuid
+  label          String? // optional nickname, e.g. "John — home"
+  recipientName  String   @map("recipient_name")
+  recipientEmail String?  @map("recipient_email")
+  recipientPhone String?  @map("recipient_phone")
+  address1       String   @map("address1")
+  address2       String?  @map("address2")
+  city           String
+  state          String
+  zip            String
+  country        String   @default("US")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+  @@map("brand_address")
 }
 
 /// Per-brand shipping pricing (rate proxy §12). The pick-&-pack fee is RUOStack's

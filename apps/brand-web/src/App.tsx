@@ -17,6 +17,7 @@ import { Coas } from './screens/Coas.js';
 import { Shipping } from './screens/Shipping.js';
 import { Branding } from './screens/Branding.js';
 import { Customers } from './screens/Customers.js';
+import { AddressBook } from './screens/AddressBook.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -38,7 +39,6 @@ function ComingSoon({ title }: { title: string }) {
 }
 
 const COMING = [
-  ['address-book', 'Address Book'],
   ['chat', 'Live Chat'],
 ] as const;
 
@@ -58,6 +58,7 @@ export function App() {
       <Route path="/app/shipping" element={<Protected><Shipping /></Protected>} />
       <Route path="/app/branding" element={<Protected><Branding /></Protected>} />
       <Route path="/app/customers" element={<Protected><Customers /></Protected>} />
+      <Route path="/app/address-book" element={<Protected><AddressBook /></Protected>} />
       <Route path="/app/referrals" element={<Protected><Referrals /></Protected>} />
       <Route path="/app/wallet" element={<Protected><Wallet /></Protected>} />
       <Route path="/app/orders" element={<Protected><Orders /></Protected>} />
