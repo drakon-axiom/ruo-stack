@@ -13,7 +13,7 @@ const GROUPS: { group: string; items: { to: string; label: string; phase0?: bool
       { to: '/app/tracking', label: 'Tracking', phase0: true },
       { to: '/app/claims', label: 'Claims', phase0: true },
       { to: '/app/action-required', label: 'Action Required', phase0: true },
-      { to: '/app/customers', label: 'Customers' },
+      { to: '/app/customers', label: 'Customers', phase0: true },
       { to: '/app/address-book', label: 'Address Book' },
       { to: '/app/wallet', label: 'Wallet', phase0: true },
     ],
