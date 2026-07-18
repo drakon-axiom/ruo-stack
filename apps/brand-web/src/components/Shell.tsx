@@ -14,7 +14,7 @@ const GROUPS: { group: string; items: { to: string; label: string; phase0?: bool
       { to: '/app/claims', label: 'Claims', phase0: true },
       { to: '/app/action-required', label: 'Action Required', phase0: true },
       { to: '/app/customers', label: 'Customers', phase0: true },
-      { to: '/app/address-book', label: 'Address Book' },
+      { to: '/app/address-book', label: 'Address Book', phase0: true },
       { to: '/app/wallet', label: 'Wallet', phase0: true },
     ],
   },

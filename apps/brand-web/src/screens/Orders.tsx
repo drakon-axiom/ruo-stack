@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
+import type { Address } from './AddressBook.js';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -157,8 +158,31 @@ function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmExported, setConfirmExported] = useState(false);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [saveAddress, setSaveAddress] = useState(false);
 
   useEffect(() => { api<{ products: CatalogProduct[] }>('/api/brand/catalog').then((x) => setCatalog(x.products)); }, []);
+  // Address Book: only on new orders (editing keeps the order's captured address).
+  useEffect(() => {
+    if (editing) return;
+    api<{ addresses: Address[] }>('/api/brand/addresses').then((x) => setAddresses(x.addresses)).catch(() => undefined);
+  }, [editing]);
+
+  function fillFromAddress(id: string) {
+    const a = addresses.find((x) => x.id === id);
+    if (!a) return;
+    setR({
+      recipient_name: a.recipient_name,
+      recipient_email: a.recipient_email ?? '',
+      address1: a.address1,
+      address2: a.address2 ?? '',
+      city: a.city,
+      state: a.state,
+      zip: a.zip,
+      country: a.country,
+    });
+    setSaveAddress(false); // already saved
+  }
 
   const canQuote = lines.length > 0 && r.zip.length >= 5 && r.state.length >= 2;
   const quoteKey = JSON.stringify({ lines, zip: r.zip, state: r.state });
@@ -193,6 +217,23 @@ function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: 
       const body = { items: lines, ...r, recipient_email: r.recipient_email || undefined, service_code: service || undefined };
       if (editing) await api(`/api/brand/orders/${editing.id}`, { method: 'PATCH', body });
       else await api('/api/brand/orders', { method: 'POST', body });
+      // Best-effort: persist the recipient to the address book if requested. A
+      // failure here must not fail the placed order.
+      if (!editing && saveAddress) {
+        await api('/api/brand/addresses', {
+          method: 'POST',
+          body: {
+            recipient_name: r.recipient_name,
+            recipient_email: r.recipient_email || undefined,
+            address1: r.address1,
+            address2: r.address2 || undefined,
+            city: r.city,
+            state: r.state,
+            zip: r.zip,
+            country: r.country || 'US',
+          },
+        }).catch(() => undefined);
+      }
       onSaved();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Could not save order');
@@ -237,6 +278,14 @@ function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: 
 
           <div className="space-y-2">
             <span className="label">Ship to</span>
+            {!editing && addresses.length > 0 && (
+              <select className="app-input text-muted" defaultValue="" onChange={(e) => { if (e.target.value) fillFromAddress(e.target.value); e.target.value = ''; }}>
+                <option value="">📖 Choose from address book…</option>
+                {addresses.map((a) => (
+                  <option key={a.id} value={a.id}>{a.label ? `${a.label} — ` : ''}{a.recipient_name}, {a.city} {a.state}</option>
+                ))}
+              </select>
+            )}
             <input className="app-input" placeholder="Recipient name" value={r.recipient_name} onChange={(e) => setR({ ...r, recipient_name: e.target.value })} />
             <input className="app-input" placeholder="Email (optional)" value={r.recipient_email} onChange={(e) => setR({ ...r, recipient_email: e.target.value })} />
             <input className="app-input" placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
@@ -246,6 +295,12 @@ function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: 
               <input className="app-input w-full" placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
               <input className="app-input w-full" placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />
             </div>
+            {!editing && (
+              <label className="flex cursor-pointer items-center gap-2 pt-1 text-[12px] text-muted">
+                <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} />
+                Save this address to my address book
+              </label>
+            )}
           </div>
         </div>
 
