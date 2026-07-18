@@ -1,17 +1,19 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { AUDIT_ACTIONS, CLAIM_SLA_DAYS, ClaimOpenSchema, ClaimResolveSchema } from '@ruostack/shared';
+import { AUDIT_ACTIONS, CLAIM_SLA_DAYS, ClaimOpenSchema, ClaimResolveSchema, canResolveClaim } from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
 import { requireAdmin } from '../middleware/guards.js';
 import { resolveClaim } from '../services/claims.js';
 import { serializeClaim } from './brand-claims.js';
-import { BadRequest, Conflict, NotFound } from '../errors.js';
+import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.js';
 
 /**
  * Claims queue (§11): operator triage + resolution. States open → investigating →
  * carrier_filed → resolved (reshipped | credited | denied), each reason-coded and
- * audit-logged. Role-gated on 'claims' (super_admin / operations write; support view).
+ * audit-logged. Role-gated on 'claims': super_admin / operations write (open +
+ * triage); support view. RESOLUTION is a financial action gated more tightly than
+ * the surface — only super_admin may resolve, and finance may resolve credits.
  */
 export async function adminClaimRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
@@ -77,10 +79,15 @@ export async function adminClaimRoutes(app: FastifyInstance): Promise<void> {
     return serializeClaim(updated);
   });
 
-  // Resolve: reship / credit / deny.
-  app.post('/api/admin/claims/:id/resolve', { preHandler: requireAdmin('claims', 'write') }, async (req) => {
+  // Resolve: reship / credit / deny. Gated per-ACTION (not just the surface):
+  // resolution credits wallets and clones charged orders, so operations (open +
+  // triage only) and support are refused here. `requireAdmin('claims','view')`
+  // authenticates + supplies the live role; the explicit check does the rest.
+  app.post('/api/admin/claims/:id/resolve', { preHandler: requireAdmin('claims', 'view') }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = ClaimResolveSchema.parse(req.body);
+    const role = req.admin!.role;
+    if (!canResolveClaim(role, body.resolution)) throw Forbidden(`Role '${role}' cannot resolve a claim to '${body.resolution}'`);
     const resolved = await resolveClaim(prisma, id, { resolution: body.resolution, reason: body.reason, amountCents: body.amount_cents, comp: body.comp }, req.admin!.adminUserId, req.ip);
     return serializeClaim(resolved);
   });

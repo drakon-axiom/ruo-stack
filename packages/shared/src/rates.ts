@@ -58,6 +58,12 @@ export interface ShippingPricing {
   pickpackCents: number;
   /** Per-brand markup in cents (brand's shipping profit; default 0). */
   markupCents: number;
+  /**
+   * Carrier service codes the brand allows customers to pick from. Empty (the
+   * default) means "no restriction — offer all curated services". When non-empty,
+   * priced options are filtered to this set.
+   */
+  enabledServices?: string[];
 }
 
 export interface PricedRateOption {

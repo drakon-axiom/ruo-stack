@@ -26,10 +26,11 @@ export interface ShippingQuote {
  * default) + the brand's markup. Both feed the pricing model in priceShipping.
  */
 export async function resolveShippingPricing(db: PrismaClient, brandId: string): Promise<ShippingPricing> {
-  const cfg = await db.brandShippingConfig.findUnique({ where: { brandId }, select: { pickpackFeeOverrideCents: true, markupCents: true } });
+  const cfg = await db.brandShippingConfig.findUnique({ where: { brandId }, select: { pickpackFeeOverrideCents: true, markupCents: true, enabledServices: true } });
   return {
     pickpackCents: cfg?.pickpackFeeOverrideCents ?? loadConfig().SHIPPING_PICKPACK_FEE_CENTS,
     markupCents: cfg?.markupCents ?? 0,
+    enabledServices: cfg?.enabledServices ?? [],
   };
 }
 
@@ -69,7 +70,10 @@ export async function priceShipping(
     heightIn: parcel.heightIn || undefined,
   });
   // Curate through the service rules (when configured); empty → flat fallback.
-  const curated = mappings ? curateRates(options, mappings, parcel.weightOz) : options;
+  const rulesCurated = mappings ? curateRates(options, mappings, parcel.weightOz) : options;
+  // Scope to the brand's allowed services when configured (empty = no restriction).
+  const allowed = pp.enabledServices;
+  const curated = allowed && allowed.length > 0 ? rulesCurated.filter((o) => allowed.includes(o.serviceCode)) : rulesCurated;
   if (curated.length === 0) return { source: 'fallback', options: [flat], chosen: flat };
 
   const priced = curated.map((o) => priceOption(o, pp, false));

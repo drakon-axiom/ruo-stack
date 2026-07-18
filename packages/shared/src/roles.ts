@@ -39,3 +39,20 @@ export function canView(role: AdminRole, surface: Surface): boolean {
 export function canWrite(role: AdminRole, surface: Surface): boolean {
   return ROLE_GATE[surface]?.[role] === 'write';
 }
+
+export type ClaimResolutionOutcome = 'reshipped' | 'credited' | 'denied';
+
+/**
+ * Resolving a claim is a FINANCIAL action gated tighter than the `claims` surface:
+ * `operations` (open + triage) and `support` cannot resolve. Only `super_admin`
+ * may resolve any outcome; `finance` may only issue wallet credits. Enforced
+ * server-side on the resolve route and mirrored in the admin UI.
+ *
+ * NOTE — this is an INTENTIONAL deviation from the architecture doc's role matrix
+ * (§1.2, "Claims resolve"), which grants `operations` resolve rights and makes
+ * `finance` view-only. We tightened financial resolution to super_admin (+finance
+ * credits) on purpose; the matrix in that doc predates this decision.
+ */
+export function canResolveClaim(role: AdminRole, resolution: ClaimResolutionOutcome): boolean {
+  return role === 'super_admin' || (role === 'finance' && resolution === 'credited');
+}
