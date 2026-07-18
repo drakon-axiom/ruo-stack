@@ -10,6 +10,12 @@ import { requireBrand } from '../middleware/guards.js';
  * of wallet charges) — the retail a customer actually paid is not stored per
  * order. Every query is scoped to req.brand!.brandId. No new data model.
  */
+// Cap the order scan so a very high-volume brand can't OOM the process by
+// materialising + grouping every order in memory. We take the most-recent slice;
+// when it's hit, the response flags `truncated` so the omission isn't silent.
+// (A future SQL GROUP-BY rollup would remove the cap entirely — see POLISH_TODO.)
+const MAX_ORDER_SCAN = 5000;
+
 export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
 
@@ -21,6 +27,7 @@ export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
     const orders = await prisma.order.findMany({
       where: { brandId, status: { not: 'cancelled' } },
       orderBy: { createdAt: 'desc' }, // newest first → first-seen row per key is the latest
+      take: MAX_ORDER_SCAN + 1, // +1 sentinel to detect truncation
       select: {
         id: true,
         recipientName: true,
@@ -38,6 +45,10 @@ export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
         createdAt: true,
       },
     });
+
+    // Drop the sentinel row; if it was present the scan was capped.
+    const truncated = orders.length > MAX_ORDER_SCAN;
+    if (truncated) orders.length = MAX_ORDER_SCAN;
 
     type Customer = {
       key: string;
@@ -117,6 +128,9 @@ export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
         customers: customers.length,
         orders: orders.length,
         spend_cents: customers.reduce((s, c) => s + c.spend_cents, 0),
+        // True when older orders were omitted by the scan cap (rollup is over the
+        // most-recent MAX_ORDER_SCAN orders only).
+        truncated,
       },
     };
   });
