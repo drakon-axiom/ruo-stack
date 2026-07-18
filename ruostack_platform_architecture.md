@@ -217,6 +217,12 @@ WalletLedger        (existing) deposit | hold | hold_release | capture |
                     ← driven only by wallet/payment webhooks + fulfillment capture
 ```
 
+> **Phase 0 note — the reserve is _implicit_.** There is no `WalletHold` table and
+> no `hold` / `hold_release` rows are written. Held funds are _derived_:
+> `available = balance − held`, where `held` sums a brand's open (placed-but-not-
+> shipped) orders (`apps/api/src/services/wallet.ts` `getHeld`). The `hold` /
+> `hold_release` ledger types are reserved for a future explicit-hold model.
+
 A membership charge **never** touches `WalletLedger`; a wallet deposit **never** touches `SubscriptionState`. The Stripe webhook router (fulfillment plan §9) dispatches by event type to the correct ledger. This prevents a class of bug where a failed membership renewal corrupts available wallet balance.
 
 ## 4.2 Reconciliation as an actionable surface `[DECIDED]`

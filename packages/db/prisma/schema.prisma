@@ -514,6 +514,8 @@ model WebhookEvent {
 }
 
 // ── SALT footprint (schema only in Phase 0 — no endpoints/UI) ─────────────────
+// Orphaned by design: tracked in POLISH_TODO.md ("Tax exemptions UI/endpoints").
+// The upload endpoint + admin review land in a later phase behind the SALT pass.
 
 /// Gives the SALT determination somewhere to land later (architecture §5.3).
 model BrandTaxExemption {
@@ -555,10 +557,15 @@ enum PlanTier {
   @@map("plan_tier")
 }
 
+/// Wallet ledger transaction types. NOTE: `hold` / `hold_release` are RESERVED
+/// but currently UNUSED — the wallet reserve is IMPLICIT (getHeld() derives held
+/// funds by summing open orders; see apps/api/src/services/wallet.ts), so no hold
+/// rows are written. They are kept for a future explicit-hold model; removing an
+/// enum value in Postgres requires a type rebuild, so leave them until then.
 enum WalletTxnType {
   deposit
-  hold
-  hold_release
+  hold // reserved — implicit holds today (see note above)
+  hold_release // reserved — see note above
   capture
   refund_credit
   referral_credit
