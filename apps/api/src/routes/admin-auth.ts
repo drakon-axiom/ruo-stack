@@ -74,7 +74,7 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
   // Password → TOTP required → access + refresh. Login CANNOT complete without a
   // verified TOTP factor (critical invariant #8). A seeded super_admin with MFA
   // not yet enabled is forced into enrollment before any access token is issued.
-  app.post('/auth/admin/login', async (req, reply) => {
+  app.post('/auth/admin/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = AdminLoginSchema.parse(req.body);
     const admin = await prisma.adminUser.findUnique({ where: { email: body.email } });
 
@@ -120,7 +120,7 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── MFA verify (confirms enrollment, completes login) ─────────────────────
-  app.post('/auth/admin/mfa/verify', async (req, reply) => {
+  app.post('/auth/admin/mfa/verify', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const adminId = verifyEnrollmentToken(enrollmentBearer(req));
     const { totp } = AdminMfaVerifySchema.parse(req.body);
     const admin = await prisma.adminUser.findUnique({ where: { id: adminId } });

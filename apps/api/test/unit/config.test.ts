@@ -19,6 +19,12 @@ describe('env validation', () => {
     expect(EnvSchema.safeParse(env).success).toBe(false);
   });
 
+  it('rejects a store-creds key that is not 32 bytes', () => {
+    const env = fullEnv();
+    env.STORE_CREDS_KEY = Buffer.alloc(16).toString('base64');
+    expect(EnvSchema.safeParse(env).success).toBe(false);
+  });
+
   it('accepts a complete environment', () => {
     expect(EnvSchema.safeParse(fullEnv()).success).toBe(true);
   });
@@ -33,6 +39,7 @@ function fullEnv(): Record<string, string> {
     SUPABASE_ANON_KEY: 'k',
     JWT_ADMIN_SECRET: 'a'.repeat(40),
     MFA_ENCRYPTION_KEY: Buffer.alloc(32).toString('base64'),
+    STORE_CREDS_KEY: Buffer.alloc(32, 1).toString('base64'),
     STRIPE_SECRET_KEY: 'sk_test_x',
     STRIPE_WEBHOOK_SECRET: 'whsec_x',
   };

@@ -38,6 +38,12 @@ export const EnvSchema = z.object({
   MFA_ENCRYPTION_KEY: z
     .string()
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'MFA_ENCRYPTION_KEY must be base64 of 32 bytes'),
+  // Separate AES-256-GCM key for store REST credentials (BrandStoreConnection
+  // consumer_key/secret) at rest. Kept distinct from MFA_ENCRYPTION_KEY so a
+  // compromise of one secret category can't decrypt the other.
+  STORE_CREDS_KEY: z
+    .string()
+    .refine((v) => Buffer.from(v, 'base64').length === 32, 'STORE_CREDS_KEY must be base64 of 32 bytes'),
 
   // Stripe (behind PaymentsAdapter only).
   STRIPE_SECRET_KEY: z.string().min(1),

@@ -9,6 +9,7 @@ const defaults: Record<string, string> = {
   SUPABASE_ANON_KEY: 'test-anon',
   JWT_ADMIN_SECRET: 'test-admin-secret-at-least-32-characters-long-xx',
   MFA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  STORE_CREDS_KEY: Buffer.alloc(32, 11).toString('base64'),
   STRIPE_SECRET_KEY: 'sk_test_dummy',
   STRIPE_WEBHOOK_SECRET: 'whsec_test_dummy',
   CORS_ORIGINS: 'http://localhost:3902,http://localhost:3903',

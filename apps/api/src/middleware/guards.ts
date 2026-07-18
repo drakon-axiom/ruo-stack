@@ -17,11 +17,19 @@ function bearer(req: FastifyRequest): string {
  */
 export const requireBrand: preHandlerHookHandler = async (req: FastifyRequest, _reply: FastifyReply) => {
   const principal = await verifyBrandToken(bearer(req));
-  // A suspended brand is locked out of all brand routes (operator action).
   const { prisma } = getClients();
+  // A suspended brand is locked out of all brand routes (operator action).
   const brand = await prisma.brand.findUnique({ where: { id: principal.brandId }, select: { status: true } });
   if (!brand) throw Unauthorized('Brand not found');
   if (brand.status === 'suspended') throw Forbidden('This account is suspended — contact support');
+  // A suspended MEMBER keeps a valid JWT until it expires (~1h) even though the
+  // token hook stops minting fresh claims — enforce membership status per request
+  // so revocation takes effect immediately.
+  const member = await prisma.brandMember.findUnique({
+    where: { brandId_userId: { brandId: principal.brandId, userId: principal.userId } },
+    select: { status: true },
+  });
+  if (!member || member.status !== 'active') throw Forbidden('Your access to this brand has been revoked');
   req.brand = principal;
 };
 

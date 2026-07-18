@@ -32,7 +32,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
   // ── Signup: atomic Brand + owner BrandMember + BrandUserRole + auth.users ──
   // Critical invariant: a forced failure leaves NO orphan rows (compensating
   // delete of the auth user if the DB transaction fails).
-  app.post('/api/brand/signup', async (req, reply) => {
+  app.post('/api/brand/signup', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = BrandSignupSchema.parse(req.body);
 
     // 1. Create the Supabase auth.users row (service role). We auto-confirm the
@@ -180,6 +180,42 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
 
     return { ok: true };
   });
+
+  // ── Change login email (audited) ──────────────────────────────────────────
+  // Done server-side (not client → supabase.auth.updateUser) so the change lands
+  // in the append-only AuditLog. Mirrors signup's posture: the email is updated
+  // immediately via the admin API (no transactional SMTP is configured for a
+  // confirmation round-trip). Switch to email_confirm:false once SMTP is wired.
+  app.patch(
+    '/api/brand/account/email',
+    { preHandler: requireBrand, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (req) => {
+      const { userId, brandId } = req.brand!;
+      const { email } = z.object({ email: z.string().email() }).parse(req.body);
+
+      const current = await supabaseAdmin.auth.admin.getUserById(userId);
+      const before = current.data.user?.email ?? null;
+      if (before && before.toLowerCase() === email.toLowerCase()) {
+        throw BadRequest('same_email', 'That is already your login email');
+      }
+
+      const updated = await supabaseAdmin.auth.admin.updateUserById(userId, { email, email_confirm: true });
+      if (updated.error) throw Conflict('email_taken', updated.error.message);
+
+      await writeAudit(prisma, {
+        actorType: 'brand',
+        actorId: userId,
+        action: AUDIT_ACTIONS.brandEmailChanged,
+        targetType: 'brand',
+        targetId: brandId,
+        before: { email: before },
+        after: { email },
+        ip: req.ip,
+      });
+
+      return { email };
+    },
+  );
 
   // ── Read-only catalog projection (published products only) ────────────────
   // The brand catalog is a READ PROJECTION of CatalogProduct, never independently

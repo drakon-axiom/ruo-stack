@@ -118,7 +118,7 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Wallet top-up (hosted Checkout, payment mode) ──────────────────────────
-  app.post('/api/brand/wallet/topup', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/wallet/topup', { preHandler: requireBrand, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
     const { brandId, userId } = req.brand!;
     const body = WalletTopupSchema.parse(req.body); // enforces non-refundable acknowledgment
     const customerId = await ensureCustomer(brandId);
