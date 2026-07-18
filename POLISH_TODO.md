@@ -23,3 +23,4 @@ Shipping) are built. This file tracks everything intentionally deferred so it is
 - **Auto-suggested aliases on connect** (fuzzy SKU match) + Drifted / Conflict / Adopt provisioning cases.
 - **Tax exemptions UI/endpoints** — `BrandTaxExemption` model exists but is unused (SALT).
 - **Wix store connections** — only WooCommerce is built; the connection layer is generic enough to extend.
+- **Webhook-secret rotate-in-place** — a store connection's `webhookSecret` rotates today only via disconnect → reconnect (a fresh token on each connect). Add a lightweight "rotate secret" action so a brand can cycle it without tearing down the connection.

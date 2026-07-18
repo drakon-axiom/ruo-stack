@@ -74,6 +74,11 @@ export async function brandBrandingRoutes(app: FastifyInstance): Promise<void> {
     const up = await storage.from(LOGO_BUCKET).upload(path, buffer, { contentType: mime, upsert: true });
     if (up.error) throw new Error(`Logo upload failed: ${up.error.message}`);
 
+    // Overwrite only replaces the same extension — a format change (png → webp)
+    // would otherwise orphan the old file. Best-effort sweep of the other exts.
+    const stale = Object.values(MIME_EXT).filter((e) => e !== ext).map((e) => `${brandId}/logo.${e}`);
+    await storage.from(LOGO_BUCKET).remove(stale).catch(() => undefined);
+
     const { data: pub } = storage.from(LOGO_BUCKET).getPublicUrl(path);
     // Cache-bust so a replaced logo (same path) refreshes in the browser.
     const logoUrl = `${pub.publicUrl}?v=${Date.now()}`;
