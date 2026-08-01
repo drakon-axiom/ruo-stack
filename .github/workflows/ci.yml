@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 22, not the `engines: node >=20` floor: pnpm 11.3.0 (the packageManager pin)
+  # needs Node >= 22.13 — it requires node:sqlite. Matches the dev box (22.x).
+  NODE_VERSION: '22'
+
+jobs:
+  # What `pnpm -r test` covers today: the payments-isolation guard, typecheck
+  # across all packages, and the offline unit suites.
+  checks:
+    name: Guard · typecheck · unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Stripe may only be imported inside packages/payments (critical invariant).
+      - name: Payments-isolation guard
+        run: pnpm lint:stripe-guard
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - run: pnpm typecheck
+
+      - run: pnpm -r test
+
+  # The integration suites self-skip without RUN_DB_TESTS=1. Run them against a
+  # throwaway Postgres so migrations, the audit trigger and the RLS/hook spine
+  # are verified on every PR instead of only by hand against Supabase.
+  db-tests:
+    name: Migrations · DB integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ruostack_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # CI runs migrations and the app on one connection; no pooler, no role split.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ruostack_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ruostack_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The generated client is never committed; the API tests can't import
+      # @prisma/client without this.
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      # Stock Postgres has no Supabase roles and no auth.uid(); create stand-ins
+      # so the migrations apply unchanged.
+      - name: Apply Supabase CI shim
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/ci_shim.sql
+
+      - name: Apply migrations
+        run: pnpm db:deploy
+
+      - name: Verify no schema drift vs. the Prisma schema
+        run: pnpm --filter @ruostack/db exec prisma migrate status
+
+      # test/setup.ts supplies every other required var (shape-valid dummies) and
+      # honours DATABASE_URL/DIRECT_URL from the environment. Nothing in these
+      # suites dials out to Supabase or Stripe.
+      - name: DB integration tests
+        env:
+          RUN_DB_TESTS: '1'
+        run: pnpm --filter @ruostack/api test

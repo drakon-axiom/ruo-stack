@@ -128,7 +128,13 @@ function CreateAdmin({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     setErr('');
     setBusy(true);
     try {
-      await api('/api/admin/admins', { method: 'POST', body: { email, full_name: fullName, role } });
+      const created = await api<{ email_sent?: boolean }>('/api/admin/admins', { method: 'POST', body: { email, full_name: fullName, role } });
+      // The account exists either way; only the invite email may have failed.
+      if (created?.email_sent === false) {
+        setErr('Admin created, but the invite email could not be sent — send the temporary password another way (see API logs).');
+        setBusy(false);
+        return;
+      }
       onSaved();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Create failed');

@@ -2,9 +2,12 @@ packages:
   - "apps/*"
   - "packages/*"
 
-# Allow these dependencies to run install/build scripts (pnpm 11 blocks by default).
-onlyBuiltDependencies:
-  - "@prisma/client"
-  - "@prisma/engines"
-  - prisma
-  - esbuild
+# Allow these dependencies to run install/build scripts (pnpm blocks by default).
+# `allowBuilds` — pnpm 11 replaced the legacy `onlyBuiltDependencies` key with
+# this map and ignores the old one, which silently let these builds be skipped
+# (harmless locally with a warm node_modules; a hard install failure in CI).
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  prisma: true
+  esbuild: true
