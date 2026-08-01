@@ -165,6 +165,7 @@ model Brand {
   claims             Claim[]
   addresses          Address[]
   announcements      Announcement[]
+  provisionings      ProductProvisioning[]
 
   @@map("brand")
 }
@@ -354,9 +355,10 @@ model CatalogProduct {
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
-  brandPrices BrandProductPrice[]
-  orderItems  OrderItem[]
-  aliases     ProductAlias[]
+  brandPrices   BrandProductPrice[]
+  orderItems    OrderItem[]
+  aliases       ProductAlias[]
+  provisionings ProductProvisioning[]
 
   @@index([status])
   @@index([isPublished])
@@ -405,7 +407,8 @@ model BrandStoreConnection {
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
 
-  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand         Brand                 @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  provisionings ProductProvisioning[]
 
   @@unique([brandId, platform]) // one store per platform per brand (for now)
   @@index([brandId])
@@ -874,4 +877,42 @@ model AnnouncementRead {
   @@unique([announcementId, userId])
   @@index([userId])
   @@map("announcement_read")
+}
+
+/// Provisioning identity (fulfillment plan §3): the record of what RUOStack
+/// actually created in a brand's store. Stable identity is the Woo
+/// `product_id` recorded at creation — NOT the SKU — so re-pushes are idempotent
+/// and survive a brand renaming a SKU.
+///
+/// Without this row the pre-flight cannot tell **Managed** (ours, safe to touch)
+/// from **Conflict** (the brand's own product that happens to carry our SKU), and
+/// cannot detect **Drift** at all. It is the difference between "update" and
+/// "overwrite someone else's work".
+model ProductProvisioning {
+  id               String   @id @default(uuid()) @db.Uuid
+  brandId          String   @map("brand_id") @db.Uuid
+  connectionId     String   @map("connection_id") @db.Uuid
+  catalogProductId String   @map("catalog_product_id") @db.Uuid
+  /// The store's product id — the stable join.
+  wooProductId     Int      @map("woo_product_id")
+  /// The SKU as it stands in the store for this product. Normally the canonical
+  /// SKU; after a re-alias it is the brand's own SKU, and the ProductAlias row
+  /// carries the mapping back to canonical.
+  provisionedSku   String   @map("provisioned_sku")
+  /// True when the brand claimed a pre-existing product (Conflict → Adopt)
+  /// rather than RUOStack creating it. Kept so "did we make this?" stays
+  /// answerable after the fact.
+  adopted          Boolean  @default(false)
+  lastPushedAt     DateTime @default(now()) @map("last_pushed_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  brand      Brand                @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  connection BrandStoreConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  product    CatalogProduct       @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, catalogProductId])
+  @@unique([connectionId, wooProductId])
+  @@index([brandId])
+  @@map("product_provisioning")
 }
