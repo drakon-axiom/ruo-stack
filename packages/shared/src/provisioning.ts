@@ -31,8 +31,8 @@ const STATE_LABEL: Record<ProvisioningState, string> = {
 export const provisioningStateLabel = (s: ProvisioningState): string => STATE_LABEL[s];
 
 const STATE_EXPLAIN: Record<ProvisioningState, string> = {
-  new: 'Will be created as a draft for you to review and publish.',
-  managed: 'Already in your store. Stock status is refreshed — your price and copy are untouched.',
+  new: 'Will be created as a draft for you to review, price and publish.',
+  managed: 'Already in your store. Only the RUOStack SKU is re-synced — your price, title, copy and images are untouched.',
   drifted: 'The SKU changed in your store. Orders will stop matching until this is resolved.',
   conflict: 'That SKU is already on a product RUOStack did not create. Nothing will be overwritten.',
 };

@@ -213,15 +213,17 @@ describe.skipIf(!RUN)('provisioning pre-flight + commit (DB integration)', () =>
     expect((store.updatedPayloads[0] as { sku: string }).sku).toBe('BRAND-OWN-SKU');
   });
 
-  it('a Managed push sends identity + stock only — never price, copy or images', async () => {
+  it('a Managed push sends the SKU and nothing else', async () => {
     await doCommit('create');
     store.updatedPayloads = [];
     await doCommit('update');
 
     const payload = store.updatedPayloads[0] as Record<string, unknown>;
-    expect(Object.keys(payload).sort()).toEqual(['id', 'manage_stock', 'meta_data', 'name', 'sku', 'stock_status']);
+    expect(Object.keys(payload).sort()).toEqual(['id', 'sku']);
     expect(payload).not.toHaveProperty('regular_price');
     expect(payload).not.toHaveProperty('description');
+    expect(payload).not.toHaveProperty('name');
+    expect(payload).not.toHaveProperty('stock_status');
   });
 
   it('flags a Conflict for a foreign product and NEVER writes to it by default', async () => {

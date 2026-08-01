@@ -38,42 +38,33 @@ const dollars = (cents: number) => (cents / 100).toFixed(2);
 const SKU_META_KEY = '_ruostack_canonical_sku';
 
 /**
- * Update payload for a product that already exists in the store — FIELD-SCOPED.
+ * Update payload for a product that already exists in the store.
  *
- * Fulfillment plan §3: "Updates are field-scoped: RUOStack only rewrites
- * platform-owned fields, **never** the brand's price/copy once set."
+ * **The SKU, and nothing else.** It is the one field that ties the brand's
+ * product to ours — it's what inbound order matching runs on — so it is the only
+ * thing a push has any business writing. Everything else in that product is the
+ * brand's: price, name, copy, images, publish state, stock display.
  *
- * A push carries ONLY the product's IDENTITY plus the stock signal:
- *   • sku  — the identifier order matching runs on.
- *   • name — the product's identity in the catalog; kept in sync so a catalog
- *            rename reaches every store.
- *   • stock_status — the platform-driven signal (same one the stock push uses);
- *     prevents the brand selling something we can't fulfil.
- *   • the canonical-SKU marker meta — our own bookkeeping, self-healing if lost.
+ * Explicitly NOT written, and not to be re-added:
+ *   • regular_price — retail is the brand's.
+ *   • name — a catalog rename does NOT propagate; the brand may have retitled it.
+ *   • description — the brand's copy. This does mean a change to the
+ *     research-use-only disclaimer text will NOT reach already-provisioned
+ *     stores; that is the accepted trade, because propagating it would overwrite
+ *     whatever the brand has written. Seeded at creation only.
+ *   • images, publish state — same reasoning.
+ *   • stock_status — NOT because it's the brand's, but because it has its own
+ *     dedicated path: `hooks/catalog-stock.ts` fans availability out to every
+ *     connected store (by canonical SKU and by alias) whenever a catalog product's
+ *     stock changes. Duplicating it here would just be a second, staler writer.
  *
- * Deliberately ABSENT, and NOT to be added later:
- *   • regular_price — retail is the brand's, explicitly.
- *   • description — the brand's copy. Note this means a change to the
- *     research-use-only disclaimer text does NOT propagate to stores that were
- *     already provisioned; that is the accepted trade, because propagating it
- *     would overwrite whatever the brand has written. Seeded at creation only.
- *   • images — same reasoning as copy.
- *
- * `skuToWrite` is the SKU we LAST RECORDED for this product, not necessarily the
- * canonical one. They are the same for a normally-provisioned product, but after
- * a deliberate re-alias the store keeps the brand's own SKU (with a ProductAlias
- * carrying order matching back to canonical) — writing canonical here would
- * silently undo that choice.
+ * `skuToWrite` is the SKU we LAST RECORDED, not necessarily the canonical one.
+ * They match for a normally-provisioned product, but after a deliberate re-alias
+ * the store keeps the brand's own SKU (with a ProductAlias carrying order
+ * matching back to canonical) — writing canonical here would undo that choice.
  */
-export function platformOwnedUpdate(p: ProvisionProduct, wooId: number, skuToWrite: string): WooProductUpdate {
-  return {
-    id: wooId,
-    sku: skuToWrite,
-    name: p.name,
-    manage_stock: false,
-    stock_status: p.status === 'in_stock' ? 'instock' : 'outofstock',
-    meta_data: [{ key: SKU_META_KEY, value: p.canonicalSku }],
-  };
+export function platformOwnedUpdate(_p: ProvisionProduct, wooId: number, skuToWrite: string): WooProductUpdate {
+  return { id: wooId, sku: skuToWrite };
 }
 
 /** New product → created as a draft (the brand reviews + publishes). */

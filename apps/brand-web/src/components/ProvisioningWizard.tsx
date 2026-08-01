@@ -50,7 +50,7 @@ const STATE_STYLE: Record<ProvisioningState, string> = {
 
 const ACTION_LABEL: Record<ProvisioningAction, string> = {
   create: 'Create draft',
-  update: 'Refresh stock',
+  update: 'Re-sync SKU',
   skip: 'Skip',
   adopt: 'Adopt',
   restore_sku: 'Restore SKU',
@@ -157,8 +157,9 @@ export function ProvisioningWizard() {
       <div>
         <div className="text-[15px] font-semibold">Add products to your store</div>
         <p className="mt-1 text-[12.5px] text-muted">
-          Products are seeded carrying the RUOStack SKU so orders match automatically. We check your store first —
-          nothing is written until you confirm.
+          Products are seeded carrying the RUOStack SKU so orders match automatically. The SKU is the only field we ever
+          write back — everything else in your store stays yours. We check your store first; nothing is written until you
+          confirm.
         </p>
       </div>
 
@@ -264,7 +265,8 @@ export function ProvisioningWizard() {
           </div>
           <p className="text-[12px] text-muted">
             New products arrive in WooCommerce as <span className="text-text">drafts</span> for you to review and publish.
-            Your prices and product copy are never overwritten.
+            For products already in your store we only re-sync the RUOStack SKU — your prices, titles, copy and images are
+            never overwritten.
           </p>
           <div className="flex gap-2">
             <button className="btn-ghost" onClick={() => setStep(2)} disabled={!!busy}>Back</button>

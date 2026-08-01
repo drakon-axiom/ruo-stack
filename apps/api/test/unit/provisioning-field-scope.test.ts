@@ -5,10 +5,10 @@ import { buildProductCsv, platformOwnedUpdate, type ProvisionProduct } from '../
  * Fulfillment plan §3: "Updates are field-scoped: RUOStack only rewrites
  * platform-owned fields, never the brand's price/copy once set."
  *
- * Policy: a push writes the product's IDENTITY (sku, name) plus the stock
- * signal — nothing else. Price, copy and images are the brand's once the product
- * exists. These tests pin that both ways: the identity fields must be sent, and
- * the brand-owned ones must never be.
+ * Policy: a push writes the SKU and NOTHING else. The SKU is the one field that
+ * ties the brand's product to ours (order matching runs on it); everything else
+ * in that product belongs to the brand. These tests pin it as a whitelist, so
+ * adding any field has to be a deliberate act that updates this test.
  */
 const product: ProvisionProduct = {
   id: 'cat-1',
@@ -35,44 +35,40 @@ describe('platformOwnedUpdate — brand-owned fields are never rewritten', () =>
     expect(payload).not.toHaveProperty('images');
   });
 
+  it('never sends the name — the brand may have retitled the product', () => {
+    expect(payload).not.toHaveProperty('name');
+  });
+
   it('never touches publish state — the brand owns the publish decision', () => {
     expect(payload).not.toHaveProperty('status');
   });
 
-  it('sends the identity fields — sku and name are kept in sync', () => {
+  it('never sends stock — that has its own dedicated push path', () => {
+    // hooks/catalog-stock.ts fans availability out to every connected store on a
+    // catalog stock change. Writing it here too would just be a staler writer.
+    expect(payload).not.toHaveProperty('stock_status');
+    expect(payload).not.toHaveProperty('manage_stock');
+  });
+
+  it('sends the SKU — the one field that ties their product to ours', () => {
     expect(payload.sku).toBe('RUO-TIRZ-10MG');
-    expect(payload.name).toBe('Tirzepatide 10mg');
   });
 
   it('writes the SKU it is GIVEN, not canonical — a re-alias must survive a push', () => {
     // After a deliberate re-alias the store keeps the brand's own SKU, with a
     // ProductAlias carrying order matching back to canonical. Writing canonical
     // here would silently undo that choice.
-    const realiased = platformOwnedUpdate(product, 4242, 'BRAND-OWN-SKU');
-    expect(realiased.sku).toBe('BRAND-OWN-SKU');
-    // The marker meta still records what it maps to.
-    expect(realiased.meta_data).toEqual([{ key: '_ruostack_canonical_sku', value: 'RUO-TIRZ-10MG' }]);
+    expect(platformOwnedUpdate(product, 4242, 'BRAND-OWN-SKU').sku).toBe('BRAND-OWN-SKU');
   });
 
-  it('does send the platform-driven stock signal, keyed to the right product', () => {
+  it('is keyed to the right store product', () => {
     expect(payload.id).toBe(4242);
-    expect(payload.stock_status).toBe('instock');
-    expect(payload.manage_stock).toBe(false);
   });
 
-  it('maps every non-in_stock catalog state to outofstock', () => {
-    expect(platformOwnedUpdate({ ...product, status: 'out_of_stock' }, 1, 'S').stock_status).toBe('outofstock');
-    expect(platformOwnedUpdate({ ...product, status: 'soon' }, 1, 'S').stock_status).toBe('outofstock');
-  });
-
-  it('keeps the canonical-SKU marker so our bookkeeping self-heals', () => {
-    expect(payload.meta_data).toEqual([{ key: '_ruostack_canonical_sku', value: 'RUO-TIRZ-10MG' }]);
-  });
-
-  it('sends nothing beyond the identity + stock keys', () => {
-    // A whitelist assertion, so adding a field to the payload has to be a
-    // deliberate act that updates this test.
-    expect(Object.keys(payload).sort()).toEqual(['id', 'manage_stock', 'meta_data', 'name', 'sku', 'stock_status']);
+  it('sends the SKU and NOTHING else', () => {
+    // The whitelist. Adding any field to a push has to be a deliberate act that
+    // updates this test — which is the point.
+    expect(Object.keys(payload).sort()).toEqual(['id', 'sku']);
   });
 });
 
