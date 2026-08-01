@@ -330,7 +330,7 @@ function Steps({ step }: { step: Step }) {
 /** The persistent "managed products" table — what we look after, and any drift. */
 export function ManagedProducts() {
   const [rows, setRows] = useState<
-    { product_id: string; name: string; canonical_sku: string; provisioned_sku: string; woo_product_id: number; adopted: boolean; drifted: boolean; last_pushed_at: string }[]
+    { product_id: string; name: string; canonical_sku: string; provisioned_sku: string; woo_product_id: number; adopted: boolean; aliased: boolean; last_pushed_at: string }[]
   >([]);
 
   useEffect(() => {
@@ -359,8 +359,13 @@ export function ManagedProducts() {
                 <td className="py-2 pr-3">{r.name}</td>
                 <td className="py-2 pr-3 font-mono text-[11px]">{r.provisioned_sku}</td>
                 <td className="py-2 pr-3">
-                  {r.drifted ? (
-                    <span className="pill border-amber/40 bg-amber/10 text-amber">drifted</span>
+                  {r.aliased ? (
+                    <span
+                      className="pill border-white/15 bg-white/5 text-muted"
+                      title={`Kept under your SKU; orders still match ${r.canonical_sku}.`}
+                    >
+                      your SKU
+                    </span>
                   ) : r.adopted ? (
                     <span className="pill border-white/15 bg-white/5 text-muted">adopted</span>
                   ) : (

@@ -3,13 +3,12 @@ import { buildProductCsv, platformOwnedUpdate, type ProvisionProduct } from '../
 
 /**
  * Fulfillment plan §3: "Updates are field-scoped: RUOStack only rewrites
- * platform-owned fields, never the brand's price/copy once set; SKU is treated
- * as immutable and any drift is flagged."
+ * platform-owned fields, never the brand's price/copy once set."
  *
- * These pin that contract. Before this fix the update payload carried name,
- * regular_price, description and images — so any brand that imported via the CSV
- * fallback, edited their retail price and copy, then hit "push to store" had
- * those edits overwritten.
+ * Policy: a push writes the product's IDENTITY (sku, name) plus the stock
+ * signal — nothing else. Price, copy and images are the brand's once the product
+ * exists. These tests pin that both ways: the identity fields must be sent, and
+ * the brand-owned ones must never be.
  */
 const product: ProvisionProduct = {
   id: 'cat-1',
@@ -22,24 +21,37 @@ const product: ProvisionProduct = {
 };
 
 describe('platformOwnedUpdate — brand-owned fields are never rewritten', () => {
-  const payload = platformOwnedUpdate(product, 4242);
+  const payload = platformOwnedUpdate(product, 4242, product.canonicalSku);
 
   it('never sends the retail price — retail is the brand’s', () => {
     expect(payload).not.toHaveProperty('regular_price');
   });
 
-  it('never sends copy or images — seeded at creation, brand-editable after', () => {
-    expect(payload).not.toHaveProperty('name');
+  it('never sends copy or images — the brand’s once the product exists', () => {
+    // Consequence accepted deliberately: a change to the research-use-only
+    // disclaimer does NOT reach already-provisioned stores, because propagating
+    // it would overwrite whatever the brand has written.
     expect(payload).not.toHaveProperty('description');
     expect(payload).not.toHaveProperty('images');
   });
 
-  it('never rewrites the SKU — drift is flagged, not silently corrected', () => {
-    expect(payload).not.toHaveProperty('sku');
-  });
-
   it('never touches publish state — the brand owns the publish decision', () => {
     expect(payload).not.toHaveProperty('status');
+  });
+
+  it('sends the identity fields — sku and name are kept in sync', () => {
+    expect(payload.sku).toBe('RUO-TIRZ-10MG');
+    expect(payload.name).toBe('Tirzepatide 10mg');
+  });
+
+  it('writes the SKU it is GIVEN, not canonical — a re-alias must survive a push', () => {
+    // After a deliberate re-alias the store keeps the brand's own SKU, with a
+    // ProductAlias carrying order matching back to canonical. Writing canonical
+    // here would silently undo that choice.
+    const realiased = platformOwnedUpdate(product, 4242, 'BRAND-OWN-SKU');
+    expect(realiased.sku).toBe('BRAND-OWN-SKU');
+    // The marker meta still records what it maps to.
+    expect(realiased.meta_data).toEqual([{ key: '_ruostack_canonical_sku', value: 'RUO-TIRZ-10MG' }]);
   });
 
   it('does send the platform-driven stock signal, keyed to the right product', () => {
@@ -49,18 +61,18 @@ describe('platformOwnedUpdate — brand-owned fields are never rewritten', () =>
   });
 
   it('maps every non-in_stock catalog state to outofstock', () => {
-    expect(platformOwnedUpdate({ ...product, status: 'out_of_stock' }, 1).stock_status).toBe('outofstock');
-    expect(platformOwnedUpdate({ ...product, status: 'soon' }, 1).stock_status).toBe('outofstock');
+    expect(platformOwnedUpdate({ ...product, status: 'out_of_stock' }, 1, 'S').stock_status).toBe('outofstock');
+    expect(platformOwnedUpdate({ ...product, status: 'soon' }, 1, 'S').stock_status).toBe('outofstock');
   });
 
   it('keeps the canonical-SKU marker so our bookkeeping self-heals', () => {
     expect(payload.meta_data).toEqual([{ key: '_ruostack_canonical_sku', value: 'RUO-TIRZ-10MG' }]);
   });
 
-  it('sends nothing beyond the four platform-owned keys', () => {
+  it('sends nothing beyond the identity + stock keys', () => {
     // A whitelist assertion, so adding a field to the payload has to be a
     // deliberate act that updates this test.
-    expect(Object.keys(payload).sort()).toEqual(['id', 'manage_stock', 'meta_data', 'stock_status']);
+    expect(Object.keys(payload).sort()).toEqual(['id', 'manage_stock', 'meta_data', 'name', 'sku', 'stock_status']);
   });
 });
 

@@ -33,6 +33,8 @@ export interface PreflightRow {
 interface ClassifiedProduct {
   product: ProvisionProduct;
   classification: Classification;
+  /** What we last recorded in the store for this product, if anything. */
+  provisionedSku: string | null;
 }
 
 /**
@@ -63,6 +65,7 @@ async function classifyAll(
 
     out.push({
       product,
+      provisionedSku: record?.provisionedSku ?? null,
       classification: classifyProduct({
         canonicalSku: product.canonicalSku,
         record: record ? { wooProductId: record.wooProductId, provisionedSku: record.provisionedSku } : null,
@@ -130,12 +133,12 @@ export async function commit(
 
   // Bucket the writes so creates and updates each go out as one batch call.
   const toCreate: { product: ProvisionProduct; state: ProvisioningState }[] = [];
-  const toUpdateStock: { product: ProvisionProduct; wooProductId: number; state: ProvisioningState }[] = [];
+  const toUpdateStock: { product: ProvisionProduct; wooProductId: number; state: ProvisioningState; skuToWrite: string }[] = [];
   const toRestoreSku: { product: ProvisionProduct; wooProductId: number }[] = [];
   const adopts: { product: ProvisionProduct; wooProductId: number; storeSku: string }[] = [];
   const realiases: { product: ProvisionProduct; wooProductId: number; storeSku: string }[] = [];
 
-  for (const { product, classification } of classified) {
+  for (const { product, classification, provisionedSku } of classified) {
     const asked = input.decisions.get(product.id) ?? 'skip';
 
     // Re-validate against the FRESH classification, not the one the browser saw.
@@ -161,7 +164,14 @@ export async function commit(
         toCreate.push({ product, state: classification.state });
         break;
       case 'update':
-        toUpdateStock.push({ product, wooProductId: classification.wooProductId!, state: classification.state });
+        toUpdateStock.push({
+          product,
+          wooProductId: classification.wooProductId!,
+          state: classification.state,
+          // Write back the SKU we recorded — canonical normally, the brand's own
+          // after a deliberate re-alias. Never silently re-canonicalise.
+          skuToWrite: provisionedSku ?? product.canonicalSku,
+        });
         break;
       case 'restore_sku':
         toRestoreSku.push({ product, wooProductId: classification.wooProductId! });
@@ -209,7 +219,9 @@ export async function commit(
 
   // ── Field-scoped updates (stock signal only — see platformOwnedUpdate) ─────
   if (toUpdateStock.length) {
-    const results = await store.updateProducts(toUpdateStock.map(({ product, wooProductId }) => platformOwnedUpdate(product, wooProductId)));
+    const results = await store.updateProducts(
+      toUpdateStock.map(({ product, wooProductId, skuToWrite }) => platformOwnedUpdate(product, wooProductId, skuToWrite)),
+    );
     const byId = new Map(toUpdateStock.map((u) => [u.wooProductId, u]));
     for (const r of results) {
       const hit = r.id !== undefined ? byId.get(r.id) : undefined;

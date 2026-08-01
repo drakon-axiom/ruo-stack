@@ -104,13 +104,21 @@ export function classifyProduct(input: ClassifyInput): Classification {
       };
     }
 
-    if (recordedProduct.sku === canonicalSku) {
+    // Drift is measured against what we LAST RECORDED, not against canonical.
+    // After a deliberate re-alias the recorded SKU *is* the brand's own SKU (an
+    // alias carries order matching back to canonical), and that is a settled
+    // state — comparing to canonical here would re-flag it as drifted on every
+    // pre-flight and nag the brand forever about a decision they already made.
+    if (recordedProduct.sku === record.provisionedSku) {
       return {
         state: 'managed',
         wooProductId: recordedProduct.wooProductId,
         storeSku: recordedProduct.sku,
         allowedActions: ['update', 'skip'],
         defaultAction: 'update',
+        ...(recordedProduct.sku !== canonicalSku
+          ? { note: `Kept under your own SKU ${recordedProduct.sku}; orders still match ${canonicalSku}.` }
+          : {}),
       };
     }
 

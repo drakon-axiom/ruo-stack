@@ -40,6 +40,30 @@ describe('classifyProduct — MANAGED', () => {
     expect(c.defaultAction).toBe('update');
     expect(c.wooProductId).toBe(7);
   });
+
+  it('stays Managed after a deliberate re-alias — drift is measured against what we RECORDED', () => {
+    // The brand chose to keep their own SKU and we wrote a ProductAlias for it.
+    // Comparing against canonical here would re-flag it as drifted on every
+    // pre-flight and nag them forever about a decision they already made.
+    const c = classifyProduct(
+      input({
+        record: { wooProductId: 7, provisionedSku: 'BRAND-OWN-SKU' },
+        recordedProduct: { wooProductId: 7, sku: 'BRAND-OWN-SKU' },
+      }),
+    );
+    expect(c.state).toBe('managed');
+    expect(c.note).toMatch(/orders still match/i);
+  });
+
+  it('flags drift again if a re-aliased product is renamed AGAIN', () => {
+    const c = classifyProduct(
+      input({
+        record: { wooProductId: 7, provisionedSku: 'BRAND-OWN-SKU' },
+        recordedProduct: { wooProductId: 7, sku: 'CHANGED-AGAIN' },
+      }),
+    );
+    expect(c.state).toBe('drifted');
+  });
 });
 
 describe('classifyProduct — DRIFTED', () => {
