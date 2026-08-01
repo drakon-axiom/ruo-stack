@@ -109,6 +109,25 @@ export interface WooProductInput {
   meta_data?: { key: string; value: string }[];
 }
 
+/**
+ * Update payload — every field optional but `id`, because provisioning updates
+ * are FIELD-SCOPED (fulfillment plan §3: "RUOStack only rewrites platform-owned
+ * fields, never the brand's price/copy once set"). Sending a whole
+ * `WooProductInput` on update would clobber brand-owned columns; this type makes
+ * that impossible to do by accident.
+ */
+export interface WooProductUpdate {
+  id: number;
+  sku?: string;
+  name?: string;
+  regular_price?: string;
+  description?: string;
+  manage_stock?: boolean;
+  stock_status?: 'instock' | 'outofstock';
+  images?: { src: string }[];
+  meta_data?: { key: string; value: string }[];
+}
+
 export interface WooBatchResult {
   create?: ({ id?: number; sku?: string; error?: { message?: string } } | null)[];
   update?: ({ id?: number; sku?: string; error?: { message?: string } } | null)[];
@@ -117,7 +136,7 @@ export interface WooBatchResult {
 /** Batch create/update products (WooCommerce caps a batch at 100 per array). */
 export async function batchProducts(
   creds: WooCreds,
-  payload: { create?: WooProductInput[]; update?: WooProductInput[] },
+  payload: { create?: WooProductInput[]; update?: WooProductUpdate[] },
 ): Promise<WooBatchResult> {
   return wooRequest<WooBatchResult>(creds, 'POST', '/products/batch', payload);
 }
