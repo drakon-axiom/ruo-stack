@@ -283,8 +283,11 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
         provisioned_sku: r.provisionedSku,
         woo_product_id: r.wooProductId,
         adopted: r.adopted,
-        // Drift as we last recorded it; pre-flight re-checks against the store.
-        drifted: r.provisionedSku !== r.product.canonicalSku,
+        // NOT drift: this is a deliberate re-alias (or adoption) where the store
+        // keeps the brand's own SKU and a ProductAlias carries order matching
+        // back to canonical. Real drift is only detectable by reading the store,
+        // which pre-flight does.
+        aliased: r.provisionedSku !== r.product.canonicalSku,
         last_pushed_at: r.lastPushedAt,
       })),
     };

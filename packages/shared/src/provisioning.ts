@@ -31,8 +31,8 @@ const STATE_LABEL: Record<ProvisioningState, string> = {
 export const provisioningStateLabel = (s: ProvisioningState): string => STATE_LABEL[s];
 
 const STATE_EXPLAIN: Record<ProvisioningState, string> = {
-  new: 'Will be created as a draft for you to review and publish.',
-  managed: 'Already in your store. Stock status is refreshed — your price and copy are untouched.',
+  new: 'Will be created as a draft for you to review, price and publish.',
+  managed: 'Already in your store. Only the RUOStack SKU is re-synced — your price, title, copy and images are untouched.',
   drifted: 'The SKU changed in your store. Orders will stop matching until this is resolved.',
   conflict: 'That SKU is already on a product RUOStack did not create. Nothing will be overwritten.',
 };
@@ -104,13 +104,21 @@ export function classifyProduct(input: ClassifyInput): Classification {
       };
     }
 
-    if (recordedProduct.sku === canonicalSku) {
+    // Drift is measured against what we LAST RECORDED, not against canonical.
+    // After a deliberate re-alias the recorded SKU *is* the brand's own SKU (an
+    // alias carries order matching back to canonical), and that is a settled
+    // state — comparing to canonical here would re-flag it as drifted on every
+    // pre-flight and nag the brand forever about a decision they already made.
+    if (recordedProduct.sku === record.provisionedSku) {
       return {
         state: 'managed',
         wooProductId: recordedProduct.wooProductId,
         storeSku: recordedProduct.sku,
         allowedActions: ['update', 'skip'],
         defaultAction: 'update',
+        ...(recordedProduct.sku !== canonicalSku
+          ? { note: `Kept under your own SKU ${recordedProduct.sku}; orders still match ${canonicalSku}.` }
+          : {}),
       };
     }
 

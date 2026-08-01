@@ -50,7 +50,7 @@ const STATE_STYLE: Record<ProvisioningState, string> = {
 
 const ACTION_LABEL: Record<ProvisioningAction, string> = {
   create: 'Create draft',
-  update: 'Refresh stock',
+  update: 'Re-sync SKU',
   skip: 'Skip',
   adopt: 'Adopt',
   restore_sku: 'Restore SKU',
@@ -157,8 +157,9 @@ export function ProvisioningWizard() {
       <div>
         <div className="text-[15px] font-semibold">Add products to your store</div>
         <p className="mt-1 text-[12.5px] text-muted">
-          Products are seeded carrying the RUOStack SKU so orders match automatically. We check your store first —
-          nothing is written until you confirm.
+          Products are seeded carrying the RUOStack SKU so orders match automatically. The SKU is the only field we ever
+          write back — everything else in your store stays yours. We check your store first; nothing is written until you
+          confirm.
         </p>
       </div>
 
@@ -264,7 +265,8 @@ export function ProvisioningWizard() {
           </div>
           <p className="text-[12px] text-muted">
             New products arrive in WooCommerce as <span className="text-text">drafts</span> for you to review and publish.
-            Your prices and product copy are never overwritten.
+            For products already in your store we only re-sync the RUOStack SKU — your prices, titles, copy and images are
+            never overwritten.
           </p>
           <div className="flex gap-2">
             <button className="btn-ghost" onClick={() => setStep(2)} disabled={!!busy}>Back</button>
@@ -330,7 +332,7 @@ function Steps({ step }: { step: Step }) {
 /** The persistent "managed products" table — what we look after, and any drift. */
 export function ManagedProducts() {
   const [rows, setRows] = useState<
-    { product_id: string; name: string; canonical_sku: string; provisioned_sku: string; woo_product_id: number; adopted: boolean; drifted: boolean; last_pushed_at: string }[]
+    { product_id: string; name: string; canonical_sku: string; provisioned_sku: string; woo_product_id: number; adopted: boolean; aliased: boolean; last_pushed_at: string }[]
   >([]);
 
   useEffect(() => {
@@ -359,8 +361,13 @@ export function ManagedProducts() {
                 <td className="py-2 pr-3">{r.name}</td>
                 <td className="py-2 pr-3 font-mono text-[11px]">{r.provisioned_sku}</td>
                 <td className="py-2 pr-3">
-                  {r.drifted ? (
-                    <span className="pill border-amber/40 bg-amber/10 text-amber">drifted</span>
+                  {r.aliased ? (
+                    <span
+                      className="pill border-white/15 bg-white/5 text-muted"
+                      title={`Kept under your SKU; orders still match ${r.canonical_sku}.`}
+                    >
+                      your SKU
+                    </span>
                   ) : r.adopted ? (
                     <span className="pill border-white/15 bg-white/5 text-muted">adopted</span>
                   ) : (

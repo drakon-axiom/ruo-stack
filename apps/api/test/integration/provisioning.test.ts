@@ -152,15 +152,6 @@ describe.skipIf(!RUN)('provisioning pre-flight + commit (DB integration)', () =>
     expect(store.products.size).toBe(1); // no second product created
   });
 
-  it('a Managed update writes ONLY the stock signal — never price, copy or SKU', async () => {
-    await doCommit('create');
-    store.updatedPayloads = [];
-    await doCommit('update');
-
-    expect(store.updatedPayloads).toHaveLength(1);
-    expect(Object.keys(store.updatedPayloads[0] as object).sort()).toEqual(['id', 'manage_stock', 'meta_data', 'stock_status']);
-  });
-
   it('detects Drift when the brand renames the SKU in their store', async () => {
     const [created] = await doCommit('create');
     store.products.get(created!.woo_product_id!)!.sku = 'BRAND-RENAMED';
@@ -200,6 +191,39 @@ describe.skipIf(!RUN)('provisioning pre-flight + commit (DB integration)', () =>
 
     const rec = await prisma.productProvisioning.findFirstOrThrow({ where: { connectionId, catalogProductId: productId } });
     expect(rec.provisionedSku).toBe('BRAND-RENAMED');
+  });
+
+  it('a re-aliased product stays Managed and a later push does NOT re-canonicalise it', async () => {
+    // The regression guard for "a push writes sku + name": if the push wrote the
+    // canonical SKU it would silently undo the brand's re-alias decision, and
+    // orders would then match through a stale alias.
+    const [created] = await doCommit('create');
+    const wooId = created!.woo_product_id!;
+    store.products.get(wooId)!.sku = 'BRAND-OWN-SKU';
+    await doCommit('realias');
+
+    // Settled, not drifted — the brand already resolved this.
+    const rows = await preflight(prisma, store, connectionId, [product]);
+    expect(rows[0]?.state).toBe('managed');
+
+    store.updatedPayloads = [];
+    const [outcome] = await doCommit('update');
+    expect(outcome?.result).toBe('updated');
+    expect(store.products.get(wooId)?.sku).toBe('BRAND-OWN-SKU');
+    expect((store.updatedPayloads[0] as { sku: string }).sku).toBe('BRAND-OWN-SKU');
+  });
+
+  it('a Managed push sends the SKU and nothing else', async () => {
+    await doCommit('create');
+    store.updatedPayloads = [];
+    await doCommit('update');
+
+    const payload = store.updatedPayloads[0] as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual(['id', 'sku']);
+    expect(payload).not.toHaveProperty('regular_price');
+    expect(payload).not.toHaveProperty('description');
+    expect(payload).not.toHaveProperty('name');
+    expect(payload).not.toHaveProperty('stock_status');
   });
 
   it('flags a Conflict for a foreign product and NEVER writes to it by default', async () => {
