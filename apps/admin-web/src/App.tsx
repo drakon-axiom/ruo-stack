@@ -13,6 +13,7 @@ import { Claims } from './screens/Claims.js';
 import { Reporting } from './screens/Reporting.js';
 import { Overview } from './screens/Overview.js';
 import { Brands } from './screens/Brands.js';
+import { Announcements } from './screens/Announcements.js';
 import { EmptyState, PageHeader } from './components/ui.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,7 @@ export function App() {
       <Route path="/exceptions" element={<Protected><Exceptions /></Protected>} />
       <Route path="/claims" element={<Protected><Claims /></Protected>} />
       <Route path="/brands" element={<Protected><Brands /></Protected>} />
+      <Route path="/announcements" element={<Protected><Announcements /></Protected>} />
       <Route path="/ledger" element={<Protected><ComingSoon title="Ledger & Reconciliation" /></Protected>} />
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>

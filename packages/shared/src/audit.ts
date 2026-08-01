@@ -53,6 +53,12 @@ export const AUDIT_ACTIONS = {
   claimOpened: 'claim.opened',
   claimUpdated: 'claim.updated',
   claimResolved: 'claim.resolved',
+  // Announcements (architecture §1.3):
+  announcementCreated: 'announcement.created',
+  announcementUpdated: 'announcement.updated',
+  announcementPublished: 'announcement.published',
+  announcementArchived: 'announcement.archived',
+  announcementDeleted: 'announcement.deleted',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

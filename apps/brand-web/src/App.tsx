@@ -18,6 +18,7 @@ import { Shipping } from './screens/Shipping.js';
 import { Branding } from './screens/Branding.js';
 import { Customers } from './screens/Customers.js';
 import { AddressBook } from './screens/AddressBook.js';
+import { Notifications } from './screens/Notifications.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -51,6 +52,7 @@ export function App() {
       <Route path="/reset" element={<Reset />} />
 
       <Route path="/app/overview" element={<Protected><Overview /></Protected>} />
+      <Route path="/app/notifications" element={<Protected><Notifications /></Protected>} />
       <Route path="/app/account" element={<Protected><Account /></Protected>} />
       <Route path="/app/catalog" element={<Protected><Catalog /></Protected>} />
       <Route path="/app/coas" element={<Protected><Coas /></Protected>} />

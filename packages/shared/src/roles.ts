@@ -22,6 +22,8 @@ export const ROLE_GATE: Record<string, Record<AdminRole, Access>> = {
   brand_suspend: { super_admin: 'write', operations: 'none', support: 'none', finance: 'none' },
   wallet_adjust: { super_admin: 'write', operations: 'none', support: 'none', finance: 'write' },
   role_grants: { super_admin: 'write', operations: 'none', support: 'none', finance: 'none' },
+  // Authoring broadcasts is an ops function — same shape as `catalog`.
+  announcements: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },
   ledger: { super_admin: 'write', operations: 'view', support: 'none', finance: 'write' },
   admin_users: { super_admin: 'write', operations: 'none', support: 'none', finance: 'none' },
   audit_log: { super_admin: 'view', operations: 'view', support: 'view', finance: 'view' },
