@@ -123,3 +123,28 @@ export function logout(): void {
   }
   clearTokens();
 }
+
+/**
+ * Download an authenticated file (CSV exports). Mirrors `api()`'s auth handling
+ * but keeps the response as a blob, and retries once through the refresh flow so
+ * an export doesn't fail on a token that expired while the operator was reading.
+ */
+export async function apiDownload(path: string, filename: string, retry = true): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getAccess();
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+  if (res.status === 401 && retry && (await refresh())) return apiDownload(path, filename, false);
+  if (!res.ok) throw new ApiError(res.status, 'download_failed', 'Download failed');
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
