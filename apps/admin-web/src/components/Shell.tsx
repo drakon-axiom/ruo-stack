@@ -18,7 +18,7 @@ const NAV: { to: string; label: string; phase0: boolean }[] = [
   { to: '/exceptions', label: 'Exceptions & Reconciliation', phase0: true },
   { to: '/claims', label: 'Claims Queue', phase0: true },
   { to: '/announcements', label: 'Announcements', phase0: true },
-  { to: '/ledger', label: 'Ledger & Reconciliation', phase0: false },
+  { to: '/ledger', label: 'Ledger & Reconciliation', phase0: true },
 ];
 
 const ROLE_LABEL: Record<string, string> = {

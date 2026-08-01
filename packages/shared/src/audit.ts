@@ -53,6 +53,8 @@ export const AUDIT_ACTIONS = {
   claimOpened: 'claim.opened',
   claimUpdated: 'claim.updated',
   claimResolved: 'claim.resolved',
+  // Ledger / reconciliation (architecture §1.3, Gap 4.2):
+  driftCaptureHealed: 'reconciliation.capture_healed',
   // Announcements (architecture §1.3):
   announcementCreated: 'announcement.created',
   announcementUpdated: 'announcement.updated',

@@ -25,6 +25,7 @@ import { adminReconciliationRoutes } from './routes/admin-reconciliation.js';
 import { brandClaimRoutes } from './routes/brand-claims.js';
 import { adminClaimRoutes } from './routes/admin-claims.js';
 import { adminAnnouncementRoutes } from './routes/admin-announcements.js';
+import { adminLedgerRoutes } from './routes/admin-ledger.js';
 import { brandNotificationRoutes } from './routes/brand-notifications.js';
 import { shipstationCustomStoreRoutes } from './routes/shipstation-custom-store.js';
 import { wooWebhookRoutes } from './routes/woo-webhook.js';
@@ -94,6 +95,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(brandClaimRoutes);
   await app.register(adminClaimRoutes);
   await app.register(adminAnnouncementRoutes);
+  await app.register(adminLedgerRoutes);
   await app.register(brandNotificationRoutes);
   // ShipStation Custom Store: own scope (raw-body parser for shipnotify XML).
   await app.register(shipstationCustomStoreRoutes);
