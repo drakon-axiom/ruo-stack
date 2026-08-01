@@ -95,6 +95,13 @@ export const EnvSchema = z.object({
   DUNNING_GRACE_DAYS: z.coerce.number().int().min(0).default(7),
   DUNNING_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(3600),
 
+  // Email (EmailAdapter). Covers admin invites/resets + dunning notices; brand
+  // auth mail (confirm/reset) is sent by Supabase Auth, not this seam. When
+  // RESEND_API_KEY is unset the API falls back to the console adapter — fine in
+  // dev, loudly warned about in production (see clients.ts).
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('RUOStack <no-reply@ruostack.io>'),
+
   // Publicly reachable base URL of this API (no trailing slash), used to build
   // webhook delivery URLs registered on external services (WooCommerce, etc.).
   // When unset, webhook auto-registration is skipped and the URL is surfaced for

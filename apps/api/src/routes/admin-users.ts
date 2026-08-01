@@ -80,19 +80,28 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
       return a;
     });
 
-    await email.send({
-      to: body.email,
-      subject: 'Your RUOStack admin account',
-      text: [
-        `An admin account has been created for you (role: ${body.role}).`,
-        '',
-        `Temporary password: ${initialPassword}`,
-        '',
-        'Log in and you will be required to set up TOTP MFA on first login.',
-      ].join('\n'),
-    });
+    // The admin row is already committed, so a send failure must not 500 the
+    // request — a retry would just hit `email_taken`. Report delivery status
+    // instead, so the operator knows to convey the temp password another way.
+    let emailSent = true;
+    try {
+      await email.send({
+        to: body.email,
+        subject: 'Your RUOStack admin account',
+        text: [
+          `An admin account has been created for you (role: ${body.role}).`,
+          '',
+          `Temporary password: ${initialPassword}`,
+          '',
+          'Log in and you will be required to set up TOTP MFA on first login.',
+        ].join('\n'),
+      });
+    } catch (err) {
+      emailSent = false;
+      req.log.error({ err, adminUserId: created.id }, 'admin invite email failed to send');
+    }
 
-    return reply.code(201).send(publicAdmin(created));
+    return reply.code(201).send({ ...publicAdmin(created), email_sent: emailSent });
   });
 
   // Grant/revoke role — super_admin only (role_grants surface).
