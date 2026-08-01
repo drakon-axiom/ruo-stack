@@ -10,7 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  # 22, not the `engines: node >=20` floor: pnpm 11.3.0 (the packageManager pin)
+  # needs Node >= 22.13 — it requires node:sqlite. Matches the dev box (22.x).
+  NODE_VERSION: '22'
 
 jobs:
   # What `pnpm -r test` covers today: the payments-isolation guard, typecheck
