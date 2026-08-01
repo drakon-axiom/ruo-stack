@@ -1,12 +1,15 @@
 import type { BrandStoreConnection, PrismaClient } from '@ruostack/db';
-import { batchProducts, decryptStoreCreds, getProductIdBySku, type WooProductInput } from './woo.js';
+import { batchProducts, decryptStoreCreds, getProductIdBySku, type WooProductInput, type WooProductUpdate } from './woo.js';
 
 /**
  * Product provisioning: seed the brand's WooCommerce store with products that
  * already carry the canonical RUOStack SKU, so inbound order matching is a
- * deterministic exact-SKU lookup (fulfillment plan §3). New products are created
- * as drafts (the brand reviews + publishes); existing ones (matched by SKU) are
- * updated in place. Price = the brand's retail (override or operator suggestion).
+ * deterministic exact-SKU lookup (fulfillment plan §3).
+ *
+ * New products are created as drafts (the brand reviews + publishes), with
+ * suggested retail pre-filled as an editable default. Products already in the
+ * store are updated FIELD-SCOPED — see `platformOwnedUpdate`: their price, copy,
+ * images, SKU and publish state are the brand's and are never rewritten.
  */
 
 export interface ProvisionProduct {
@@ -30,6 +33,40 @@ export interface ProvisionResult {
 
 const dollars = (cents: number) => (cents / 100).toFixed(2);
 const SKU_META_KEY = '_ruostack_canonical_sku';
+
+/**
+ * Update payload for a product that already exists in the store — FIELD-SCOPED.
+ *
+ * Fulfillment plan §3: "Updates are field-scoped: RUOStack only rewrites
+ * platform-owned fields, **never** the brand's price/copy once set; SKU is
+ * treated as immutable and any drift is flagged."
+ *
+ * So an update carries ONLY:
+ *   • stock_status — the platform-driven signal (same one the stock push uses);
+ *     prevents the brand selling something we can't fulfil.
+ *   • the canonical-SKU marker meta — our own bookkeeping, self-healing if lost.
+ *
+ * Deliberately ABSENT:
+ *   • regular_price — retail is the brand's, explicitly.
+ *   • name / description / images — seeded at creation, brand-editable after.
+ *   • sku — immutable. A changed SKU is the DRIFTED case: it gets flagged and
+ *     resolved by an explicit operator/brand choice, never silently rewritten.
+ *
+ * FOLLOW-UP: the spec's "once set" implies we could still refresh copy the brand
+ * has NOT customised — which matters because the description carries the
+ * research-use-only disclaimer, and a compliance-text change should be able to
+ * propagate. Detecting "unchanged since our last push" requires storing what we
+ * last pushed, i.e. the `ProductProvisioning` record that arrives with the
+ * pre-flight wizard. Until then this errs toward never clobbering brand content.
+ */
+export function platformOwnedUpdate(p: ProvisionProduct, wooId: number): WooProductUpdate {
+  return {
+    id: wooId,
+    manage_stock: false,
+    stock_status: p.status === 'in_stock' ? 'instock' : 'outofstock',
+    meta_data: [{ key: SKU_META_KEY, value: p.canonicalSku }],
+  };
+}
 
 /** New product → created as a draft (the brand reviews + publishes). */
 function newWooProduct(p: ProvisionProduct): WooProductInput {
@@ -61,25 +98,20 @@ export async function provisionProducts(
   }
 
   const create: WooProductInput[] = [];
-  // Update payload omits `status` so we never flip a brand's published product
-  // back to draft; only the platform-owned fields are refreshed.
-  const update: WooProductInput[] = [];
+  // Updates are field-scoped (see `platformOwnedUpdate`) — a product already in
+  // the store keeps its price, copy, images, SKU and publish state. Only the
+  // platform-driven stock signal is refreshed.
+  const update: WooProductUpdate[] = [];
+  // woo_id → our product, so the update results map back deterministically. The
+  // scoped payload no longer sends `sku`, so matching on the echoed SKU would
+  // rely on Woo returning a field we didn't send.
+  const byWooId = new Map<number, ProvisionProduct>();
   for (const p of products) {
     const id = existing.get(p.id) ?? null;
     if (id === null) create.push(newWooProduct(p));
     else {
-      update.push({
-        id,
-        sku: p.canonicalSku,
-        name: p.name,
-        type: 'simple',
-        regular_price: dollars(p.retailCents),
-        description: p.descriptionTemplate ?? undefined,
-        manage_stock: false,
-        stock_status: p.status === 'in_stock' ? 'instock' : 'outofstock',
-        images: p.images.map((src) => ({ src })),
-        meta_data: [{ key: SKU_META_KEY, value: p.canonicalSku }],
-      });
+      update.push(platformOwnedUpdate(p, id));
+      byWooId.set(id, p);
     }
   }
 
@@ -104,10 +136,10 @@ export async function provisionProducts(
   }
   for (const row of res.update ?? []) {
     if (!row) continue;
-    const p = row.sku ? bySku.get(row.sku) : undefined;
+    const p = (row.id !== undefined ? byWooId.get(row.id) : undefined) ?? (row.sku ? bySku.get(row.sku) : undefined);
     out.push({
       product_id: p?.id ?? '',
-      sku: row.sku ?? p?.canonicalSku ?? '',
+      sku: p?.canonicalSku ?? row.sku ?? '',
       name: p?.name ?? '',
       action: row.error ? 'error' : 'updated',
       woo_id: row.id,
