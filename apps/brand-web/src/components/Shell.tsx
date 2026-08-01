@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.js';
+import { NotificationBell } from './NotificationBell.js';
 
 // Full Pepify IA. Non-Phase-0 items are disabled / routed to "Coming soon" so
 // the structure is visible without implying it's built.
@@ -107,6 +108,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-col">
         <header className="flex items-center justify-end gap-3 border-b border-lline px-8 py-3 dark:border-line">
+          <NotificationBell />
           <button onClick={toggle} className="btn-ghost text-[12px]">{dark ? '☀ Light' : '☾ Dark'}</button>
           <button onClick={handleSignOut} className="btn-ghost text-[12px]">Sign out</button>
         </header>

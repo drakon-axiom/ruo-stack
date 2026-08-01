@@ -164,6 +164,7 @@ model Brand {
   productAliases     ProductAlias[]
   claims             Claim[]
   addresses          Address[]
+  announcements      Announcement[]
 
   @@map("brand")
 }
@@ -797,4 +798,80 @@ model OrderItem {
 
   @@index([orderId])
   @@map("order_item")
+}
+
+// ─────────────────────────── Announcements (architecture §1.1 / §1.3) ────────
+// Operator-authored broadcasts that surface in the brand Notifications inbox.
+
+enum AnnouncementAudience {
+  all_brands
+  /// Reserved: targeting by plan tier / status / store-connection state is a
+  /// later slice. Declared now so adding it never migrates existing rows.
+  segment
+  single_brand
+
+  @@map("announcement_audience")
+}
+
+enum AnnouncementType {
+  announcement
+  restock
+  maintenance
+
+  @@map("announcement_type")
+}
+
+/// NOTE — the architecture doc lists `status = draft | scheduled | published`.
+/// "Scheduled" is fully determined by `publishAt > now`, so storing it as well
+/// would be two sources of truth needing a worker to reconcile them. Status is
+/// the author's INTENT (draft / published / archived); scheduling lives in
+/// `publishAt`, and the admin UI renders a derived "Scheduled" chip. Visibility
+/// is computed at read time — see `isAnnouncementVisible` in @ruostack/shared.
+enum AnnouncementStatus {
+  draft
+  published
+  archived
+
+  @@map("announcement_status")
+}
+
+model Announcement {
+  id        String               @id @default(uuid()) @db.Uuid
+  audience  AnnouncementAudience @default(all_brands)
+  /// Required when audience = single_brand; null otherwise.
+  brandId   String?              @map("brand_id") @db.Uuid
+  type      AnnouncementType     @default(announcement)
+  title     String
+  body      String
+  /// null = visible as soon as published; future = scheduled.
+  publishAt DateTime?            @map("publish_at")
+  /// null = never expires.
+  expiresAt DateTime?            @map("expires_at")
+  status    AnnouncementStatus   @default(draft)
+  createdBy String               @map("created_by") @db.Uuid // AdminUser.id
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  brand Brand?             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  reads AnnouncementRead[]
+
+  @@index([status])
+  @@index([brandId])
+  @@map("announcement")
+}
+
+/// Per-USER read receipt (not per-brand): brand staff each track their own
+/// inbox, which is already correct for when the invite-staff UI lands. Absence
+/// of a row means unread — nothing is written until a user actually reads.
+model AnnouncementRead {
+  id             String   @id @default(uuid()) @db.Uuid
+  announcementId String   @map("announcement_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid // auth.users.id (brand realm)
+  readAt         DateTime @default(now()) @map("read_at")
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+  @@map("announcement_read")
 }

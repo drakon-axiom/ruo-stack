@@ -24,6 +24,8 @@ import { adminAliasRoutes } from './routes/admin-aliases.js';
 import { adminReconciliationRoutes } from './routes/admin-reconciliation.js';
 import { brandClaimRoutes } from './routes/brand-claims.js';
 import { adminClaimRoutes } from './routes/admin-claims.js';
+import { adminAnnouncementRoutes } from './routes/admin-announcements.js';
+import { brandNotificationRoutes } from './routes/brand-notifications.js';
 import { shipstationCustomStoreRoutes } from './routes/shipstation-custom-store.js';
 import { wooWebhookRoutes } from './routes/woo-webhook.js';
 import { webhookRoutes } from './routes/webhook.js';
@@ -91,6 +93,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminReconciliationRoutes);
   await app.register(brandClaimRoutes);
   await app.register(adminClaimRoutes);
+  await app.register(adminAnnouncementRoutes);
+  await app.register(brandNotificationRoutes);
   // ShipStation Custom Store: own scope (raw-body parser for shipnotify XML).
   await app.register(shipstationCustomStoreRoutes);
   // WooCommerce webhook: own scope (raw-body parser for HMAC verification).
