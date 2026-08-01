@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { BrandStoreConnection } from '@ruostack/db';
 import { z } from 'zod';
-import { AUDIT_ACTIONS, PLANS } from '@ruostack/shared';
+import { AUDIT_ACTIONS, CommitRequestSchema, PLANS, PreflightRequestSchema } from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { loadConfig } from '../config.js';
 import { writeAudit } from '../audit.js';
@@ -9,7 +9,9 @@ import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { randomToken } from '../crypto.js';
 import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.js';
-import { buildProductCsv, provisionProducts, type ProvisionProduct } from '../services/store-provision.js';
+import { buildProductCsv, type ProvisionProduct } from '../services/store-provision.js';
+import { wooStoreClient } from '../services/store-client.js';
+import { commit, preflight } from '../services/store-preflight.js';
 import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.js';
 
 /**
@@ -30,6 +32,13 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   async function planAllowsStore(brandId: string): Promise<boolean> {
     const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } });
     return PLANS[effectivePlan(sub)].capabilities.storeConnections;
+  }
+
+  async function requireConnection(brandId: string): Promise<BrandStoreConnection> {
+    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
+    if (!conn) throw BadRequest('not_connected', 'Connect your store before pushing products');
+    return conn;
   }
 
   function webhookUrl(id: string): string | null {
@@ -192,35 +201,93 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
     }));
   }
 
-  // Provision selected products into the store (API push → drafts/updates).
-  app.post('/api/brand/store/provision', { preHandler: requireBrand }, async (req) => {
-    const { brandId, userId } = req.brand!;
-    const { product_ids } = z.object({ product_ids: z.array(z.string().uuid()).min(1).max(200) }).parse(req.body);
-    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
-    const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
-    if (!conn) throw BadRequest('not_connected', 'Connect your store before pushing products');
+  // ── Provisioning wizard (fulfillment plan §3, architecture §3.3) ───────────
+  // Step 2 · Pre-flight: READ-ONLY classification. Nothing is written here.
+  app.post('/api/brand/store/provisioning/preflight', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    const { product_ids } = PreflightRequestSchema.parse(req.body);
+    const conn = await requireConnection(brandId);
 
     const products = await loadProvisionProducts(brandId, product_ids);
     if (products.length === 0) throw BadRequest('no_products', 'None of those products are available');
 
-    let results;
     try {
-      results = await provisionProducts(prisma, conn, products);
+      const rows = await preflight(prisma, wooStoreClient(decryptStoreCreds(conn)), conn.id, products);
+      return { rows };
+    } catch (e) {
+      throw BadRequest('preflight_failed', `Could not read your store: ${e instanceof Error ? e.message.slice(0, 160) : ''}`);
+    }
+  });
+
+  // Step 3 · Commit: applies the brand's per-product decisions. Re-classifies
+  // first, so a store that changed since pre-flight can't be blindly written to.
+  app.post('/api/brand/store/provisioning/commit', { preHandler: requireBrand }, async (req) => {
+    const { brandId, userId } = req.brand!;
+    const { decisions } = CommitRequestSchema.parse(req.body);
+    const conn = await requireConnection(brandId);
+
+    const products = await loadProvisionProducts(brandId, decisions.map((d) => d.product_id));
+    if (products.length === 0) throw BadRequest('no_products', 'None of those products are available');
+
+    let outcomes;
+    try {
+      outcomes = await commit(
+        prisma,
+        wooStoreClient(decryptStoreCreds(conn)),
+        { brandId, connectionId: conn.id, decisions: new Map(decisions.map((d) => [d.product_id, d.action])) },
+        products,
+      );
     } catch (e) {
       throw BadRequest('provision_failed', `Push to the store failed: ${e instanceof Error ? e.message.slice(0, 160) : ''}`);
     }
-    const created = results.filter((r) => r.action === 'created').length;
-    const updated = results.filter((r) => r.action === 'updated').length;
+
+    const tally = (r: string) => outcomes.filter((o) => o.result === r).length;
     await writeAudit(prisma, {
       actorType: 'brand',
       actorId: userId,
       action: AUDIT_ACTIONS.storeProductsProvisioned,
       targetType: 'brand',
       targetId: brandId,
-      after: { requested: products.length, created, updated, errors: results.filter((r) => r.action === 'error').length },
+      after: {
+        requested: decisions.length,
+        created: tally('created'),
+        updated: tally('updated'),
+        adopted: tally('adopted'),
+        sku_restored: tally('sku_restored'),
+        realiased: tally('realiased'),
+        skipped: tally('skipped'),
+        errors: tally('error'),
+      },
       ip: req.ip,
     });
-    return { results, created, updated };
+    return { outcomes };
+  });
+
+  // The persistent "managed products" view — what we look after in this store,
+  // and anything that has drifted since.
+  app.get('/api/brand/store/provisioning/status', { preHandler: requireBrand }, async (req) => {
+    const { brandId } = req.brand!;
+    const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
+    if (!conn) return { managed: [] };
+
+    const rows = await prisma.productProvisioning.findMany({
+      where: { connectionId: conn.id },
+      include: { product: { select: { name: true, canonicalSku: true } } },
+      orderBy: { lastPushedAt: 'desc' },
+    });
+    return {
+      managed: rows.map((r) => ({
+        product_id: r.catalogProductId,
+        name: r.product.name,
+        canonical_sku: r.product.canonicalSku,
+        provisioned_sku: r.provisionedSku,
+        woo_product_id: r.wooProductId,
+        adopted: r.adopted,
+        // Drift as we last recorded it; pre-flight re-checks against the store.
+        drifted: r.provisionedSku !== r.product.canonicalSku,
+        last_pushed_at: r.lastPushedAt,
+      })),
+    };
   });
 
   // CSV export (WooCommerce importer format) — brand-controlled, no store write.

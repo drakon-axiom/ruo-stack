@@ -69,7 +69,7 @@ export function platformOwnedUpdate(p: ProvisionProduct, wooId: number): WooProd
 }
 
 /** New product → created as a draft (the brand reviews + publishes). */
-function newWooProduct(p: ProvisionProduct): WooProductInput {
+export function newWooProductInput(p: ProvisionProduct): WooProductInput {
   return {
     sku: p.canonicalSku,
     name: p.name,
@@ -108,7 +108,7 @@ export async function provisionProducts(
   const byWooId = new Map<number, ProvisionProduct>();
   for (const p of products) {
     const id = existing.get(p.id) ?? null;
-    if (id === null) create.push(newWooProduct(p));
+    if (id === null) create.push(newWooProductInput(p));
     else {
       update.push(platformOwnedUpdate(p, id));
       byWooId.set(id, p);
