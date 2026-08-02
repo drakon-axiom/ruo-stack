@@ -10,12 +10,18 @@ import type { BrandMemberRole } from './realm.js';
  * relationship, or tear down the store connection.
  *
  * The split is by CONSEQUENCE, not by seniority. Staff run the day-to-day
- * business — orders, tracking, claims, customers, addresses, notifications.
- * Owner-only is anything that:
+ * business — orders, tracking, claims, customers, addresses, browsing the
+ * catalog, notifications. Owner-only is anything that:
  *   • moves money or changes the billing relationship (wallet, subscription),
- *   • changes the brand's identity or contact of record (profile, email, branding),
+ *   • SETS PRICING — retail price and shipping markup are both the brand's
+ *     margin, so they belong with the person who owns the P&L, not the person
+ *     fulfilling orders against it,
+ *   • changes the brand's identity or contact of record (profile, branding),
  *   • can break the order pipeline for everyone (store connect/disconnect),
  *   • grants or revokes access (member management).
+ *
+ * Note `catalog` and `catalog_pricing` are separate on purpose: staff need to
+ * browse products to build orders, without being able to reprice them.
  *
  * Enforced SERVER-SIDE by `requireBrandSurface`, never merely hidden in the UI.
  */
@@ -25,6 +31,7 @@ export const BRAND_SURFACES = [
   'customers',
   'addresses',
   'catalog',
+  'catalog_pricing',
   'notifications',
   'store_config',
   'store_connection',
@@ -39,6 +46,8 @@ export type BrandSurface = (typeof BRAND_SURFACES)[number];
 /** Which roles may act on each surface. `owner` is a superset of `staff`. */
 const OWNER_ONLY: BrandSurface[] = [
   'store_connection', // connect/disconnect breaks order intake for the whole brand
+  'store_config', // shipping markup IS the brand's profit on every order
+  'catalog_pricing', // retail price sets the brand's margin
   'branding', // the brand's public identity
   'wallet', // moves money
   'billing', // the subscription relationship

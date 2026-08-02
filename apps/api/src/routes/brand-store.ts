@@ -158,7 +158,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
-  app.patch('/api/brand/store/shipping', { preHandler: requireBrand }, async (req) => {
+  app.patch('/api/brand/store/shipping', { preHandler: requireBrandSurface('store_config') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const { markup_cents } = z.object({ markup_cents: z.number().int().min(0).max(100_000) }).parse(req.body);
     if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');

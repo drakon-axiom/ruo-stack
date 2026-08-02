@@ -21,6 +21,15 @@ describe('canBrandAccess', () => {
     expect(canBrandAccess('staff', 'notifications')).toBe(true);
   });
 
+  it('keeps PRICING away from staff, while still letting them browse the catalog', () => {
+    // Retail price and shipping markup are both the brand's margin — they belong
+    // with whoever owns the P&L, not whoever fulfils orders against it. But staff
+    // must still be able to see products to build an order.
+    expect(canBrandAccess('staff', 'catalog')).toBe(true);
+    expect(canBrandAccess('staff', 'catalog_pricing')).toBe(false);
+    expect(canBrandAccess('staff', 'store_config')).toBe(false);
+  });
+
   it('keeps money away from staff', () => {
     expect(canBrandAccess('staff', 'wallet')).toBe(false);
     expect(canBrandAccess('staff', 'billing')).toBe(false);
@@ -29,8 +38,6 @@ describe('canBrandAccess', () => {
   it('keeps the store connection away from staff', () => {
     // Disconnecting breaks order intake for the entire brand.
     expect(canBrandAccess('staff', 'store_connection')).toBe(false);
-    // But day-to-day store CONFIG (markup, service selection) is theirs.
-    expect(canBrandAccess('staff', 'store_config')).toBe(true);
   });
 
   it('keeps brand identity and access-granting away from staff', () => {

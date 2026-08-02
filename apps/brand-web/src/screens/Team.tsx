@@ -63,8 +63,8 @@ export function Team() {
         <div>
           <h1 className="mb-1 text-[23px] font-bold">Team</h1>
           <p className="text-[13px] text-muted">
-            Staff can run orders, tracking, claims and customers. Only an owner can change billing, the wallet, your store
-            connection, branding or the team.
+            Staff can run orders, tracking, claims and customers, and browse the catalog. Only an owner can set pricing —
+            retail prices and shipping markup — or touch billing, the wallet, your store connection, branding or the team.
           </p>
         </div>
         {isOwner && <button className="btn" onClick={() => setInviting(true)}>Invite someone</button>}
@@ -190,7 +190,7 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
         <label className="mb-4 block">
           <span className="mb-1 block text-[12px] text-muted">Role</span>
           <select className="app-input" value={role} onChange={(e) => setRole(e.target.value as BrandMemberRole)}>
-            <option value="staff">Staff — orders, tracking, claims, customers</option>
+            <option value="staff">Staff — orders, tracking, claims, customers (no pricing)</option>
             <option value="owner">Owner — full access including billing and the wallet</option>
           </select>
         </label>
