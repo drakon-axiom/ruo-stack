@@ -1,5 +1,6 @@
 export * from './realm.js';
 export * from './roles.js';
+export * from './brand-roles.js';
 export * from './payments.js';
 export * from './email.js';
 export * from './audit.js';

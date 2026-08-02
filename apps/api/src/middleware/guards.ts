@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
-import { canView, canWrite, type Surface } from '@ruostack/shared';
+import { canBrandAccess, canView, canWrite, type BrandSurface, type Surface } from '@ruostack/shared';
 import { verifyBrandToken } from '../auth/brand-token.js';
 import { verifyAdminAccessToken } from '../auth/admin-jwt.js';
 import { getClients } from '../clients.js';
@@ -27,11 +27,26 @@ export const requireBrand: preHandlerHookHandler = async (req: FastifyRequest, _
   // so revocation takes effect immediately.
   const member = await prisma.brandMember.findUnique({
     where: { brandId_userId: { brandId: principal.brandId, userId: principal.userId } },
-    select: { status: true },
+    select: { status: true, role: true },
   });
   if (!member || member.status !== 'active') throw Forbidden('Your access to this brand has been revoked');
   req.brand = principal;
+  req.brandRole = member.role;
 };
+
+/**
+ * Brand guard for a surface staff must not reach (architecture §3.1). Runs the
+ * full `requireBrand` check first — suspended brand, revoked membership — then
+ * gates on the member's role. Server-side, never merely hidden in the UI.
+ */
+export function requireBrandSurface(surface: BrandSurface): preHandlerHookHandler {
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    await (requireBrand as (r: FastifyRequest, y: FastifyReply) => Promise<void>)(req, reply);
+    if (!canBrandAccess(req.brandRole!, surface)) {
+      throw Forbidden('Only the brand owner can do that');
+    }
+  };
+}
 
 /**
  * Admin-realm guard, parameterized by the role-gate surface + required access.

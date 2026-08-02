@@ -40,6 +40,7 @@ const GROUPS: { group: string; items: { to: string; label: string; phase0?: bool
     items: [
       { to: '/app/chat', label: 'Live Chat' },
       { to: '/app/referrals', label: 'Referrals', phase0: true },
+      { to: '/app/team', label: 'Team', phase0: true },
       { to: '/app/account', label: 'Account', phase0: true },
     ],
   },

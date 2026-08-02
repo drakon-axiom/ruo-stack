@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AUDIT_ACTIONS } from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
-import { requireBrand } from '../middleware/guards.js';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
 import { BadRequest, NotFound } from '../errors.js';
 
 // Public bucket holding brand logos. Self-provisioned on first upload so there's
@@ -60,7 +60,7 @@ export async function brandBrandingRoutes(app: FastifyInstance): Promise<void> {
   }
 
   // ── Upload / replace logo ──────────────────────────────────────────────────
-  app.post('/api/brand/logo', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/logo', { preHandler: requireBrandSurface('branding') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const { data_url } = LogoUploadSchema.parse(req.body);
     const { buffer, mime, ext } = parseDataUrl(data_url);
@@ -101,7 +101,7 @@ export async function brandBrandingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Remove logo ────────────────────────────────────────────────────────────
-  app.delete('/api/brand/logo', { preHandler: requireBrand }, async (req) => {
+  app.delete('/api/brand/logo', { preHandler: requireBrandSurface('branding') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { logoUrl: true } });
     if (!brand) throw NotFound('Brand not found');
@@ -128,7 +128,7 @@ export async function brandBrandingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Set theme colors ───────────────────────────────────────────────────────
-  app.patch('/api/brand/branding', { preHandler: requireBrand }, async (req) => {
+  app.patch('/api/brand/branding', { preHandler: requireBrandSurface('branding') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const body = BrandingPatchSchema.parse(req.body);
 

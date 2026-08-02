@@ -10,7 +10,7 @@ import {
 import { getClients } from '../clients.js';
 import { loadConfig } from '../config.js';
 import { writeAudit } from '../audit.js';
-import { requireBrand } from '../middleware/guards.js';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
 import { BadRequest, NotFound } from '../errors.js';
 import { getWalletSummary } from '../services/wallet.js';
 import { effectivePlan } from '../services/subscription.js';
@@ -51,7 +51,7 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
 
   // ── Subscribe to a PAID plan (Pro/Volume) via hosted Checkout ──────────────
   // Starter is the free default — selected by cancelling a paid plan in the portal.
-  app.post('/api/brand/billing/subscribe', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/billing/subscribe', { preHandler: requireBrandSurface('billing') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const { plan } = SubscribeSchema.parse(req.body);
     const priceEnv = PLANS[plan].stripePriceEnv!; // paid plans always have one
@@ -80,7 +80,7 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Stripe Billing Portal (manage/cancel/update payment method) ────────────
-  app.post('/api/brand/billing/portal-session', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/billing/portal-session', { preHandler: requireBrandSurface('billing') }, async (req) => {
     const { brandId } = req.brand!;
     const brand = await prisma.brand.findUnique({ where: { id: brandId } });
     if (!brand?.stripeCustomerId) throw BadRequest('no_customer', 'No billing account yet — subscribe first');
@@ -118,7 +118,7 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Wallet top-up (hosted Checkout, payment mode) ──────────────────────────
-  app.post('/api/brand/wallet/topup', { preHandler: requireBrand, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+  app.post('/api/brand/wallet/topup', { preHandler: requireBrandSurface('wallet'), config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
     const { brandId, userId } = req.brand!;
     const body = WalletTopupSchema.parse(req.body); // enforces non-refundable acknowledgment
     const customerId = await ensureCustomer(brandId);

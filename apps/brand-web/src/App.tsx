@@ -19,6 +19,7 @@ import { Branding } from './screens/Branding.js';
 import { Customers } from './screens/Customers.js';
 import { AddressBook } from './screens/AddressBook.js';
 import { Notifications } from './screens/Notifications.js';
+import { Team } from './screens/Team.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -54,6 +55,7 @@ export function App() {
       <Route path="/app/overview" element={<Protected><Overview /></Protected>} />
       <Route path="/app/notifications" element={<Protected><Notifications /></Protected>} />
       <Route path="/app/account" element={<Protected><Account /></Protected>} />
+      <Route path="/app/team" element={<Protected><Team /></Protected>} />
       <Route path="/app/catalog" element={<Protected><Catalog /></Protected>} />
       <Route path="/app/coas" element={<Protected><Coas /></Protected>} />
       <Route path="/app/profit" element={<Protected><Profit /></Protected>} />
