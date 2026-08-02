@@ -91,3 +91,43 @@ export const AuditQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 export type AuditQuery = z.infer<typeof AuditQuerySchema>;
+
+/**
+ * Catalog lifecycle (architecture §1.2 Catalog Admin).
+ *
+ * `status` is the stock state, but it is NOT the whole story for a storefront:
+ * a product that is unpublished or archived must never be purchasable in a
+ * brand's store either, or a customer can buy something we no longer fulfil.
+ *
+ * This is the single definition of "sellable", used by the stock push so that
+ * unpublish/archive pull a product from every store — and, just as importantly,
+ * so a LATER stock toggle can't flip an unpublished product back to in-stock.
+ */
+export interface CatalogSellability {
+  status: string; // in_stock | soon | out_of_stock
+  isPublished: boolean;
+  archived: boolean;
+}
+
+export function isStoreSellable(p: CatalogSellability): boolean {
+  return p.status === 'in_stock' && p.isPublished && !p.archived;
+}
+
+/**
+ * Can this product be hard-deleted? Only a never-published draft with no trace
+ * anywhere. Anything else is archived instead — deleting it would cascade away
+ * our aliases and provisioning records while leaving the product in the brand's
+ * storefront carrying our SKU, orphaned and invisible to the pre-flight.
+ */
+export interface CatalogDeletability {
+  isPublished: boolean;
+  orderItemCount: number;
+  provisioningCount: number;
+}
+
+export function catalogDeleteBlocker(p: CatalogDeletability): string | null {
+  if (p.isPublished) return 'This product is published — unpublish and archive it instead of deleting.';
+  if (p.orderItemCount > 0) return 'This product appears on existing orders — archive it instead of deleting.';
+  if (p.provisioningCount > 0) return 'This product is in at least one brand store — archive it instead of deleting.';
+  return null;
+}

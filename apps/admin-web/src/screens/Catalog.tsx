@@ -18,6 +18,7 @@ interface Product {
   suggestedRetail: number;
   status: 'in_stock' | 'soon' | 'out_of_stock';
   isPublished: boolean;
+  archived: boolean;
   weight?: number | null;
   length?: number | null;
   width?: number | null;
@@ -40,16 +41,19 @@ export function Catalog() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Archived products are retired — a separate view, not mixed into the live catalog.
+  const [showArchived, setShowArchived] = useState(false);
 
-  async function load() {
+  async function load(archived = showArchived) {
     setLoading(true);
-    const { products } = await api<{ products: Product[] }>('/api/admin/catalog');
+    const { products } = await api<{ products: Product[] }>(`/api/admin/catalog?archived=${archived}`);
     setProducts(products);
     setLoading(false);
   }
   useEffect(() => {
-    void load();
-  }, []);
+    void load(showArchived);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchived]);
 
   const counts = useMemo(
     () => ({
@@ -73,13 +77,22 @@ export function Catalog() {
     <>
       <PageHeader
         title="Catalog Manager"
-        subtitle="Operator-owned master for every SKU. The brand catalog is a read projection of published products."
+        subtitle={
+          showArchived
+            ? 'Retired products. They keep their history and stay out of every brand catalog until restored.'
+            : 'Operator-owned master for every SKU. The brand catalog is a read projection of published products.'
+        }
         action={
-          writable && (
-            <button className="btn" onClick={() => setCreating(true)}>
-              + Create product
+          <div className="flex items-center gap-2">
+            <button className="btn-ghost" onClick={() => setShowArchived((v) => !v)}>
+              {showArchived ? 'Back to catalog' : 'View archived'}
             </button>
-          )
+            {writable && !showArchived && (
+              <button className="btn" onClick={() => setCreating(true)}>
+                + Create product
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -193,6 +206,9 @@ function EditDrawer({
   const [status, setStatus] = useState(product.status);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  // UI hint only — the server re-checks orders and provisioning records before
+  // allowing a hard delete, and 409s with the reason if it can't.
+  const canDelete = !product.isPublished;
 
   async function save() {
     setErr('');
@@ -230,6 +246,55 @@ function EditDrawer({
     }
   }
 
+  /** Unpublish also pushes the product out-of-stock in brand storefronts. */
+  async function unpublish() {
+    if (!confirm('Unpublish this product? Brands can no longer order it, and stores that already carry it will be set out-of-stock.')) return;
+    setBusy(true);
+    try {
+      await api(`/api/admin/catalog/${product.id}/unpublish`, { method: 'POST' });
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Unpublish failed');
+      setBusy(false);
+    }
+  }
+
+  async function archive() {
+    if (!confirm('Archive this product? It leaves the catalog entirely. You can restore it later.')) return;
+    setBusy(true);
+    try {
+      await api(`/api/admin/catalog/${product.id}/archive`, { method: 'POST' });
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Archive failed');
+      setBusy(false);
+    }
+  }
+
+  async function unarchive() {
+    setBusy(true);
+    try {
+      await api(`/api/admin/catalog/${product.id}/unarchive`, { method: 'POST' });
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Restore failed');
+      setBusy(false);
+    }
+  }
+
+  /** Hard delete — the API allows it only for a never-published draft. */
+  async function remove() {
+    if (!confirm(`Delete “${product.name}” permanently? This cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await api(`/api/admin/catalog/${product.id}`, { method: 'DELETE' });
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Delete failed');
+      setBusy(false);
+    }
+  }
+
   async function changeStock(next: Product['status']) {
     setStatus(next);
     await api(`/api/admin/catalog/${product.id}/stock`, { method: 'POST', body: { status: next } });
@@ -243,17 +308,47 @@ function EditDrawer({
       onClose={onClose}
       footer={
         writable && (
-          <div className="flex items-center justify-between gap-2">
-            {!product.isPublished ? (
-              <button className="btn-ghost" onClick={publish} disabled={busy}>
-                Publish
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              {product.archived ? (
+                <button className="btn-ghost" onClick={unarchive} disabled={busy}>Restore from archive</button>
+              ) : !product.isPublished ? (
+                <button className="btn-ghost" onClick={publish} disabled={busy}>Publish</button>
+              ) : (
+                <button className="btn-ghost" onClick={unpublish} disabled={busy}>Unpublish</button>
+              )}
+              <button className="btn" onClick={save} disabled={busy || product.archived}>
+                {busy ? '…' : 'Save'}
               </button>
-            ) : (
-              <span className="pill border-success/40 bg-success/10 text-success">🔒 published</span>
+            </div>
+
+            {!product.archived && (
+              <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
+                {canDelete ? (
+                  <button className="btn-danger" onClick={remove} disabled={busy}>Delete</button>
+                ) : (
+                  <button
+                    className="btn-danger disabled:opacity-40"
+                    onClick={archive}
+                    disabled={busy || status !== 'out_of_stock'}
+                    title={
+                      status === 'out_of_stock'
+                        ? 'Retire this product — it leaves the catalog but keeps its history'
+                        : 'Set stock to out_of_stock first, so brand stores stop selling it'
+                    }
+                  >
+                    Archive
+                  </button>
+                )}
+                <span className="text-[11px] text-faint">
+                  {canDelete
+                    ? 'Draft — can be deleted outright'
+                    : status === 'out_of_stock'
+                      ? 'Has history — archive instead of delete'
+                      : 'Set out-of-stock to enable archiving'}
+                </span>
+              </div>
             )}
-            <button className="btn" onClick={save} disabled={busy}>
-              {busy ? '…' : 'Save'}
-            </button>
           </div>
         )
       }

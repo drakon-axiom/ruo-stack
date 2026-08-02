@@ -59,7 +59,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     const wf = wholesaleFieldFor(plan);
     const productIds = body.items.map((i) => i.product_id);
     const products = await prisma.catalogProduct.findMany({
-      where: { id: { in: productIds }, isPublished: true },
+      where: { id: { in: productIds }, isPublished: true, archived: false },
       select: {
         id: true,
         wholesaleStarter: true,
@@ -145,7 +145,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     const plan = effectivePlan(sub);
     const wf = wholesaleFieldFor(plan);
     const products = await prisma.catalogProduct.findMany({
-      where: { id: { in: body.items.map((i) => i.product_id) }, isPublished: true },
+      where: { id: { in: body.items.map((i) => i.product_id) }, isPublished: true, archived: false },
       select: { id: true, wholesaleStarter: true, wholesalePro: true, wholesaleVolume: true, weight: true, length: true, width: true, height: true },
     });
     const byId = new Map(products.map((p) => [p.id, p]));

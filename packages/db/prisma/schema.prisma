@@ -344,6 +344,12 @@ model CatalogProduct {
   suggestedRetail     Int           @map("suggested_retail") // cents (operator suggestion; brand can override)
   status              CatalogStatus @default(soon) // stock state
   isPublished         Boolean       @default(false) @map("is_published")
+  /// Retired. A published product can never be hard-deleted (orders, aliases and
+  /// provisioning records reference it), so retiring one archives it instead.
+  /// Gated on status = out_of_stock, so a product is pulled from brand stores
+  /// before it disappears from the catalog. Archived products are excluded from
+  /// every brand-facing query and are never sellable.
+  archived            Boolean       @default(false)
   weight              Float?
   length              Float?
   width               Float?
@@ -362,6 +368,7 @@ model CatalogProduct {
 
   @@index([status])
   @@index([isPublished])
+  @@index([archived])
   @@map("catalog_product")
 }
 

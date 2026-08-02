@@ -183,7 +183,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   async function loadProvisionProducts(brandId: string, ids?: string[]): Promise<ProvisionProduct[]> {
     const [products, prices] = await Promise.all([
       prisma.catalogProduct.findMany({
-        where: { isPublished: true, ...(ids && ids.length ? { id: { in: ids } } : {}) },
+        where: { isPublished: true, archived: false, ...(ids && ids.length ? { id: { in: ids } } : {}) },
         orderBy: { name: 'asc' },
         select: { id: true, canonicalSku: true, name: true, descriptionTemplate: true, status: true, images: true, suggestedRetail: true },
       }),

@@ -1,5 +1,5 @@
 import type { CatalogProduct } from '@ruostack/db';
-import { AUDIT_ACTIONS } from '@ruostack/shared';
+import { AUDIT_ACTIONS, isStoreSellable } from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
 import { decryptStoreCreds, getProductIdBySku, updateProductStock } from '../services/woo.js';
@@ -7,7 +7,9 @@ import { decryptStoreCreds, getProductIdBySku, updateProductStock } from '../ser
 /**
  * Stock push (fulfillment plan §3): when a catalog SKU's availability changes,
  * flip the matched product in every connected WooCommerce store in/out of stock
- * so brands can't sell the unfulfillable. Best-effort + resilient — one store's
+ * so brands can't sell the unfulfillable. "Availability" means `isStoreSellable`
+ * — in_stock AND published AND not archived — so unpublish/archive pull a product
+ * from every storefront too. Best-effort + resilient — one store's
  * failure neither blocks the others nor throws into the admin stock toggle; a
  * failing store is flagged on its connection. Matched by exact canonical SKU
  * (provisioned products carry it).
@@ -16,7 +18,10 @@ import { decryptStoreCreds, getProductIdBySku, updateProductStock } from '../ser
  */
 export async function onCatalogStockChanged(product: CatalogProduct): Promise<void> {
   const { prisma } = getClients();
-  const inStock = product.status === 'in_stock';
+  // Sellability, not raw stock state: an unpublished or archived product must be
+  // out-of-stock in every store, and must STAY that way if someone later toggles
+  // its stock status.
+  const inStock = isStoreSellable(product);
   const conns = await prisma.brandStoreConnection.findMany({ where: { platform: 'woocommerce', status: 'active' } });
   if (conns.length === 0) return;
 

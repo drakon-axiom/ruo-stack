@@ -5,6 +5,7 @@ import {
   CatalogStatusEnum,
   CatalogStockSchema,
   CatalogUpdateSchema,
+  catalogDeleteBlocker,
 } from '@ruostack/shared';
 import { z } from 'zod';
 import { getClients } from '../clients.js';
@@ -25,10 +26,16 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
   // List / search / filter — view for support+finance, write for ops+super.
   app.get('/api/admin/catalog', { preHandler: requireAdmin('catalog', 'view') }, async (req) => {
     const q = z
-      .object({ status: CatalogStatusEnum.optional(), search: z.string().max(120).optional() })
+      .object({
+        status: CatalogStatusEnum.optional(),
+        search: z.string().max(120).optional(),
+        // Archived products are retired: hidden unless explicitly asked for.
+        archived: z.enum(['true', 'false']).optional(),
+      })
       .parse(req.query);
     const products = await prisma.catalogProduct.findMany({
       where: {
+        archived: q.archived === 'true',
         ...(q.status ? { status: q.status } : {}),
         ...(q.search
           ? {
@@ -103,15 +110,25 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
     const existing = await prisma.catalogProduct.findUnique({ where: { id } });
     if (!existing) throw NotFound('Product not found');
 
-    if (
-      body.canonical_sku !== undefined &&
-      body.canonical_sku !== existing.canonicalSku &&
-      existing.isPublished
-    ) {
-      throw BadRequest(
-        'sku_immutable',
-        'canonical_sku cannot be changed after publish — the SKU is locked',
-      );
+    // SKU immutability (critical invariant #5). Locked while published — and
+    // ALSO once anything actually references it, because unpublishing does not
+    // remove the product from brand storefronts or from past orders. Renaming a
+    // SKU that a store still carries would silently break order matching, which
+    // is the exact failure the canonical-SKU design exists to prevent.
+    if (body.canonical_sku !== undefined && body.canonical_sku !== existing.canonicalSku) {
+      const [provisioningCount, orderItemCount] = await Promise.all([
+        prisma.productProvisioning.count({ where: { catalogProductId: id } }),
+        prisma.orderItem.count({ where: { productId: id } }),
+      ]);
+      if (existing.isPublished) {
+        throw BadRequest('sku_immutable', 'canonical_sku cannot be changed after publish — the SKU is locked');
+      }
+      if (provisioningCount > 0) {
+        throw BadRequest('sku_immutable', 'This SKU is live in at least one brand store — renaming it would break order matching');
+      }
+      if (orderItemCount > 0) {
+        throw BadRequest('sku_immutable', 'This SKU appears on existing orders and cannot be renamed');
+      }
     }
 
     const data: Record<string, unknown> = { updatedBy: req.admin!.adminUserId };
@@ -205,6 +222,129 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
     // Seam: TODO(Phase 1) Woo stock push. No-op in Phase 0.
     await onCatalogStockChanged(updated);
     return updated;
+  });
+
+  // Unpublish — pulls it from the brand catalog, order forms and provisioning.
+  // Fires the stock push so storefronts that already carry it go out-of-stock:
+  // a brand must not keep selling something we no longer offer.
+  //
+  // The SKU stays locked. It was locked by publishing because brand stores now
+  // carry it, and unpublishing doesn't remove it from them.
+  app.post('/api/admin/catalog/:id/unpublish', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
+    if (!existing) throw NotFound('Product not found');
+    if (!existing.isPublished) return { ...existing }; // idempotent
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const p = await tx.catalogProduct.update({ where: { id }, data: { isPublished: false, updatedBy: req.admin!.adminUserId } });
+      await writeAudit(tx, {
+        actorType: 'admin',
+        actorId: req.admin!.adminUserId,
+        action: AUDIT_ACTIONS.catalogUnpublished,
+        targetType: 'catalog_product',
+        targetId: id,
+        before: { is_published: true },
+        after: { is_published: false },
+        ip: req.ip,
+      });
+      return p;
+    });
+
+    await onCatalogStockChanged(updated);
+    return updated;
+  });
+
+  // Archive — retire a product that can't be deleted because it has history.
+  // Gated on out_of_stock so the stock push has already pulled it from brand
+  // stores before it leaves the catalog; enforced here, not just in the UI.
+  app.post('/api/admin/catalog/:id/archive', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
+    if (!existing) throw NotFound('Product not found');
+    if (existing.archived) return { ...existing }; // idempotent
+    if (existing.status !== 'out_of_stock') {
+      throw BadRequest(
+        'not_out_of_stock',
+        'Set the product to out-of-stock before archiving it, so brand stores stop selling it first',
+      );
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const p = await tx.catalogProduct.update({ where: { id }, data: { archived: true, updatedBy: req.admin!.adminUserId } });
+      await writeAudit(tx, {
+        actorType: 'admin',
+        actorId: req.admin!.adminUserId,
+        action: AUDIT_ACTIONS.catalogArchived,
+        targetType: 'catalog_product',
+        targetId: id,
+        before: { archived: false, status: existing.status, is_published: existing.isPublished },
+        after: { archived: true },
+        ip: req.ip,
+      });
+      return p;
+    });
+
+    // Belt and braces: it is already out_of_stock, but this makes the storefront
+    // state unambiguous and re-asserts it for any store that missed the earlier push.
+    await onCatalogStockChanged(updated);
+    return updated;
+  });
+
+  // Restore from archive. Comes back OUT OF STOCK and unchanged otherwise — the
+  // operator re-stocks and re-publishes deliberately rather than a restore
+  // silently putting a product back on sale.
+  app.post('/api/admin/catalog/:id/unarchive', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
+    if (!existing) throw NotFound('Product not found');
+    if (!existing.archived) return { ...existing }; // idempotent
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const p = await tx.catalogProduct.update({ where: { id }, data: { archived: false, updatedBy: req.admin!.adminUserId } });
+      await writeAudit(tx, {
+        actorType: 'admin',
+        actorId: req.admin!.adminUserId,
+        action: AUDIT_ACTIONS.catalogUnarchived,
+        targetType: 'catalog_product',
+        targetId: id,
+        before: { archived: true },
+        after: { archived: false, status: p.status, is_published: p.isPublished },
+        ip: req.ip,
+      });
+      return p;
+    });
+    return updated;
+  });
+
+  // Hard delete — never-published drafts only. Anything with history is archived
+  // instead: deleting it would cascade away our aliases and provisioning records
+  // while leaving the product in the brand's storefront carrying our SKU.
+  app.delete('/api/admin/catalog/:id', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
+    if (!existing) throw NotFound('Product not found');
+
+    const [orderItemCount, provisioningCount] = await Promise.all([
+      prisma.orderItem.count({ where: { productId: id } }),
+      prisma.productProvisioning.count({ where: { catalogProductId: id } }),
+    ]);
+    const blocker = catalogDeleteBlocker({ isPublished: existing.isPublished, orderItemCount, provisioningCount });
+    if (blocker) throw Conflict('delete_blocked', blocker);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.catalogProduct.delete({ where: { id } });
+      await writeAudit(tx, {
+        actorType: 'admin',
+        actorId: req.admin!.adminUserId,
+        action: AUDIT_ACTIONS.catalogDeleted,
+        targetType: 'catalog_product',
+        targetId: id,
+        before: snapshot(existing),
+        ip: req.ip,
+      });
+    });
+    return { deleted: true };
   });
 }
 
