@@ -233,7 +233,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
 
     const [products, brandPrices] = await Promise.all([
       prisma.catalogProduct.findMany({
-        where: { isPublished: true },
+        where: { isPublished: true, archived: false },
         orderBy: { name: 'asc' },
         select: {
           id: true,
@@ -283,7 +283,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const { retail_cents } = BrandRetailSchema.parse(req.body);
     const product = await prisma.catalogProduct.findFirst({
-      where: { id, isPublished: true },
+      where: { id, isPublished: true, archived: false },
       select: { id: true },
     });
     if (!product) throw NotFound('Product not found');
