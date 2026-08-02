@@ -5,7 +5,7 @@ import { AUDIT_ACTIONS, CommitRequestSchema, PLANS, PreflightRequestSchema } fro
 import { getClients } from '../clients.js';
 import { loadConfig } from '../config.js';
 import { writeAudit } from '../audit.js';
-import { requireBrand } from '../middleware/guards.js';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { randomToken } from '../crypto.js';
 import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.js';
@@ -71,7 +71,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Connect a store.
-  app.post('/api/brand/store/connect', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/store/connect', { preHandler: requireBrandSurface('store_connection') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const body = ConnectSchema.parse(req.body);
     if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
@@ -307,7 +307,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Disconnect (tears down our webhooks best-effort).
-  app.post('/api/brand/store/disconnect', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/store/disconnect', { preHandler: requireBrandSurface('store_connection') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
     if (!conn) throw NotFound('No store connected');

@@ -10,7 +10,7 @@ import {
 } from '@ruostack/shared';
 import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
-import { requireBrand } from '../middleware/guards.js';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
 import { BadRequest, Conflict, NotFound } from '../errors.js';
 
@@ -121,7 +121,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Patch profile (7-day name lock; audited as a sensitive brand action) ──
-  app.patch('/api/brand/profile', { preHandler: requireBrand }, async (req) => {
+  app.patch('/api/brand/profile', { preHandler: requireBrandSurface('profile') }, async (req) => {
     const { userId, brandId } = req.brand!;
     const body = BrandProfilePatchSchema.parse(req.body);
 
