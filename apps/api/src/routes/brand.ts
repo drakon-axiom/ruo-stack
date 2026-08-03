@@ -278,7 +278,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Brand sets its own retail price for a product (overrides suggestion) ───
-  app.patch('/api/brand/catalog/:id/retail', { preHandler: requireBrand }, async (req) => {
+  app.patch('/api/brand/catalog/:id/retail', { preHandler: requireBrandSurface('catalog_pricing') }, async (req) => {
     const { brandId } = req.brand!;
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const { retail_cents } = BrandRetailSchema.parse(req.body);
