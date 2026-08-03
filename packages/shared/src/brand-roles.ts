@@ -17,6 +17,7 @@ import type { BrandMemberRole } from './realm.js';
  *     margin, so they belong with the person who owns the P&L, not the person
  *     fulfilling orders against it,
  *   • changes the brand's identity or contact of record (profile, branding),
+ *   • writes to the brand's live storefront (provisioning),
  *   • can break the order pipeline for everyone (store connect/disconnect),
  *   • grants or revokes access (member management).
  *
@@ -35,6 +36,7 @@ export const BRAND_SURFACES = [
   'notifications',
   'store_config',
   'store_connection',
+  'provisioning',
   'branding',
   'wallet',
   'billing',
@@ -47,6 +49,8 @@ export type BrandSurface = (typeof BRAND_SURFACES)[number];
 const OWNER_ONLY: BrandSurface[] = [
   'store_connection', // connect/disconnect breaks order intake for the whole brand
   'store_config', // shipping markup IS the brand's profit on every order
+  'provisioning', // writes products into the brand's live storefront
+
   'catalog_pricing', // retail price sets the brand's margin
   'branding', // the brand's public identity
   'wallet', // moves money

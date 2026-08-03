@@ -64,7 +64,8 @@ export function Team() {
           <h1 className="mb-1 text-[23px] font-bold">Team</h1>
           <p className="text-[13px] text-muted">
             Staff can run orders, tracking, claims and customers, and browse the catalog. Only an owner can set pricing —
-            retail prices and shipping markup — or touch billing, the wallet, your store connection, branding or the team.
+            retail prices and shipping markup — add products to your store, or touch billing, the wallet, your store
+            connection, branding or the team.
           </p>
         </div>
         {isOwner && <button className="btn" onClick={() => setInviting(true)}>Invite someone</button>}
