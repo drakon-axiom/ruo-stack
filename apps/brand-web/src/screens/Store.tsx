@@ -26,12 +26,20 @@ export function Store() {
   const [state, setState] = useState<StoreState | null>(null);
   const [loading, setLoading] = useState(true);
   const [manual, setManual] = useState<ManualSetup | null>(null);
+  // Connecting the store, setting the markup and pushing products are all
+  // owner-only server-side — don't show staff controls that will 403.
+  const [isOwner, setIsOwner] = useState(false);
 
   function load() {
     setLoading(true);
     api<StoreState>('/api/brand/store').then((s) => { setState(s); setLoading(false); });
   }
   useEffect(load, []);
+  useEffect(() => {
+    api<{ membership: { role: string } }>('/api/brand/me')
+      .then((r) => setIsOwner(r.membership.role === 'owner'))
+      .catch(() => setIsOwner(false));
+  }, []);
 
   return (
     <>
@@ -45,12 +53,23 @@ export function Store() {
       ) : state.connection ? (
         <>
           <Connected conn={state.connection} onChanged={() => { setManual(null); load(); }} />
-          <ShippingMarkup />
-          <ProvisioningWizard />
+          {isOwner && <ShippingMarkup />}
+          {isOwner ? (
+            <ProvisioningWizard />
+          ) : (
+            <div className="surface mt-4 p-6 text-[13px] text-muted">
+              Only an owner can add products to your store or change shipping rates. You can still see what’s already
+              synced below.
+            </div>
+          )}
           <ManagedProducts />
         </>
-      ) : (
+      ) : isOwner ? (
         <ConnectForm onConnected={(m) => { setManual(m); load(); }} />
+      ) : (
+        <div className="surface p-10 text-center text-muted">
+          No store is connected yet. Ask an owner to connect it.
+        </div>
       )}
 
       {manual && <ManualSetupCard setup={manual} onDismiss={() => setManual(null)} />}

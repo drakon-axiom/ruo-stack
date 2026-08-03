@@ -40,6 +40,14 @@ describe('canBrandAccess', () => {
     expect(canBrandAccess('staff', 'store_connection')).toBe(false);
   });
 
+  it('keeps staff from writing into the brand’s live storefront', () => {
+    // Provisioning is non-destructive — pre-flight refuses to overwrite and a
+    // push only writes the SKU — but it still creates and edits products in a
+    // store the brand's customers are looking at.
+    expect(canBrandAccess('staff', 'provisioning')).toBe(false);
+    expect(canBrandAccess('owner', 'provisioning')).toBe(true);
+  });
+
   it('keeps brand identity and access-granting away from staff', () => {
     expect(canBrandAccess('staff', 'profile')).toBe(false);
     expect(canBrandAccess('staff', 'branding')).toBe(false);

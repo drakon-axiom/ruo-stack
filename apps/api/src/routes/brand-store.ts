@@ -203,7 +203,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
 
   // ── Provisioning wizard (fulfillment plan §3, architecture §3.3) ───────────
   // Step 2 · Pre-flight: READ-ONLY classification. Nothing is written here.
-  app.post('/api/brand/store/provisioning/preflight', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/store/provisioning/preflight', { preHandler: requireBrandSurface('provisioning') }, async (req) => {
     const { brandId } = req.brand!;
     const { product_ids } = PreflightRequestSchema.parse(req.body);
     const conn = await requireConnection(brandId);
@@ -221,7 +221,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
 
   // Step 3 · Commit: applies the brand's per-product decisions. Re-classifies
   // first, so a store that changed since pre-flight can't be blindly written to.
-  app.post('/api/brand/store/provisioning/commit', { preHandler: requireBrand }, async (req) => {
+  app.post('/api/brand/store/provisioning/commit', { preHandler: requireBrandSurface('provisioning') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const { decisions } = CommitRequestSchema.parse(req.body);
     const conn = await requireConnection(brandId);
@@ -294,7 +294,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // CSV export (WooCommerce importer format) — brand-controlled, no store write.
-  app.get('/api/brand/store/provision.csv', { preHandler: requireBrand }, async (req, reply) => {
+  app.get('/api/brand/store/provision.csv', { preHandler: requireBrandSurface('provisioning') }, async (req, reply) => {
     const { brandId } = req.brand!;
     const { ids } = z.object({ ids: z.string().optional() }).parse(req.query);
     if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
