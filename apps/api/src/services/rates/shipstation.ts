@@ -1,5 +1,8 @@
 import type { RateOption, RateQuoteInput, RatesAdapter } from '@ruostack/shared';
 
+// Abort a stalled carrier call instead of hanging the checkout rate proxy on it.
+const HTTP_TIMEOUT_MS = 15_000;
+
 /** Friendly carrier name from a ShipStation carrier code. */
 const CARRIER_NAMES: Record<string, string> = {
   stamps_com: 'USPS',
@@ -38,6 +41,7 @@ export class ShipStationRatesAdapter implements RatesAdapter {
     const res = await fetch(`${this.base}${path}`, {
       ...init,
       headers: { authorization: this.auth, 'content-type': 'application/json', ...(init?.headers ?? {}) },
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`ShipStation ${path} → ${res.status}`);
     return res.json();

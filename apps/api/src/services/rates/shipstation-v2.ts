@@ -14,6 +14,8 @@ interface SsV2Rate {
 // Phase 2 service-mapping rules engine).
 const DENY = new Set(['usps_media_mail']);
 const MAX_OPTIONS = 6;
+// Abort a stalled call instead of hanging the checkout rate proxy on it.
+const HTTP_TIMEOUT_MS = 15_000;
 
 /**
  * Real rates via the ShipStation v2 API (ShipEngine engine). Single API-Key
@@ -34,7 +36,7 @@ export class ShipStationV2RatesAdapter implements RatesAdapter {
 
   private async getCarrierIds(): Promise<string[]> {
     if (this.carrierIds) return this.carrierIds;
-    const res = await fetch(`${this.base}/carriers`, { headers: this.headers() });
+    const res = await fetch(`${this.base}/carriers`, { headers: this.headers(), signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`ShipStation v2 /carriers → ${res.status}`);
     const d = (await res.json()) as { carriers?: { carrier_id: string }[] };
     this.carrierIds = (d.carriers ?? []).map((c) => c.carrier_id);
@@ -48,6 +50,7 @@ export class ShipStationV2RatesAdapter implements RatesAdapter {
     const res = await fetch(`${this.base}/rates/estimate`, {
       method: 'POST',
       headers: this.headers(),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
       body: JSON.stringify({
         carrier_ids: carrierIds,
         from_country_code: 'US',
