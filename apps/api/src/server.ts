@@ -4,6 +4,7 @@ import { getClients } from './clients.js';
 import { startRateQuoteSweeper } from './services/rate-quote.js';
 import { startReconciliationWorker } from './services/reconciliation.js';
 import { startDunningWorker } from './services/dunning.js';
+import { startSubscriptionLapseWorker } from './services/subscription.js';
 
 async function main() {
   const cfg = loadConfig();
@@ -25,6 +26,13 @@ async function main() {
   startReconciliationWorker(
     getClients().prisma,
     cfg.RECONCILE_INTERVAL_SECONDS * 1000,
+    (m) => app.log.info(m),
+  );
+  // Background: lapse sweep — suspend memberships whose paid-through date has
+  // passed. Purely local, so it holds whatever collected the money (or didn't).
+  startSubscriptionLapseWorker(
+    getClients().prisma,
+    cfg.DUNNING_SWEEP_INTERVAL_SECONDS * 1000,
     (m) => app.log.info(m),
   );
   // Background: dunning — notify on past-due, suspend after the grace window.

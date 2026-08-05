@@ -35,7 +35,7 @@ export async function shippingRatesRoutes(app: FastifyInstance): Promise<void> {
     }
     if (conn.status === 'disabled') return reply.code(403).send({ error: 'disabled' });
 
-    const sub = await prisma.subscriptionState.findUnique({ where: { brandId: conn.brandId }, select: { plan: true, status: true } });
+    const sub = await prisma.subscriptionState.findUnique({ where: { brandId: conn.brandId }, select: { plan: true, status: true, currentPeriodEnd: true } });
     const plan = effectivePlan(sub);
     const pricing = await resolveShippingPricing(prisma, conn.brandId);
     const fallback = { rates: [toRate(priceOption(FLAT_FALLBACK, pricing, true))], source: 'fallback' };

@@ -30,7 +30,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
 
   async function planAllowsStore(brandId: string): Promise<boolean> {
-    const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } });
+    const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true, currentPeriodEnd: true } });
     return PLANS[effectivePlan(sub)].capabilities.storeConnections;
   }
 

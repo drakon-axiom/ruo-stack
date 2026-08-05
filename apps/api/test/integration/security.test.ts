@@ -105,6 +105,47 @@ describe.skipIf(!RUN)('security spine (DB integration)', () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it('manual subscription grant: finance may record one, operations may not', async () => {
+    // Recording an off-gateway payment hands out paid features with no processor
+    // record behind it — same privilege class as a manual wallet adjustment.
+    const brand = await prisma.brand.create({
+      data: { brandName: 'Grant Co', referralCode: `GR-${randomToken(5)}` },
+    });
+    const paidThrough = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const grant = (token: string, payload: unknown) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/admin/brands/${brand.id}/subscription`,
+        headers: { authorization: `Bearer ${token}` },
+        payload,
+      });
+
+    const ops = await seedAdmin('operations');
+    expect((await grant(ops.token, { plan: 'pro', paid_through: paidThrough, reason: 'x' })).statusCode).toBe(403);
+
+    const fin = await seedAdmin('finance');
+    const ok = await grant(fin.token, { plan: 'pro', paid_through: paidThrough, reason: 'bank transfer #4471' });
+    expect(ok.statusCode).toBe(200);
+    const state = await prisma.subscriptionState.findUnique({ where: { brandId: brand.id } });
+    expect(state!.status).toBe('active');
+    expect(state!.currentPeriodEnd?.toISOString()).toBe(paidThrough);
+    // No gateway was involved — there is no subscription id to point at.
+    expect(state!.stripeSubscriptionId).toBeNull();
+
+    // A back-dated grant is refused: it would be lapsed the moment it's written.
+    const stale = await grant(fin.token, {
+      plan: 'pro',
+      paid_through: new Date(Date.now() - 86_400_000).toISOString(),
+      reason: 'typo',
+    });
+    expect(stale.statusCode).toBe(400);
+
+    // No audit cleanup: audit_log is append-only (see the first test in this
+    // file). targetId is a loose reference, so the brand still deletes.
+    await prisma.subscriptionState.deleteMany({ where: { brandId: brand.id } });
+    await prisma.brand.delete({ where: { id: brand.id } });
+  });
+
   it('cross-realm: a garbage brand token cannot hit an admin route; an admin token cannot hit a brand route', async () => {
     const garbageBrand = await app.inject({ method: 'GET', url: '/api/admin/catalog', headers: { authorization: 'Bearer not-a-real-jwt' } });
     expect([401, 403]).toContain(garbageBrand.statusCode);

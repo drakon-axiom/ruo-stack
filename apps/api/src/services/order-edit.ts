@@ -36,7 +36,7 @@ export async function applyOrderEdit(
 
   const sub = await prisma.subscriptionState.findUnique({
     where: { brandId: order.brandId },
-    select: { plan: true, status: true },
+    select: { plan: true, status: true, currentPeriodEnd: true },
   });
   const plan = effectivePlan(sub);
   const wf = wholesaleFieldFor(plan);

@@ -78,7 +78,7 @@ export async function importWooOrder(
     return { created: false, orderId: dupe.id, blocker: dupe.blocker, matched: 0, unmatched: 0 };
   }
 
-  const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } });
+  const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true, currentPeriodEnd: true } });
   const plan = effectivePlan(sub);
   const wf = wholesaleFieldFor(plan);
 
