@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import type { Address } from './AddressBook.js';
+
+/**
+ * A recipient handed to this screen by "Ship again" on Customers. It prefills a
+ * NEW order — it is not a link to the old one, exactly like the address-book
+ * picker: fields are copied, nothing is referenced.
+ */
+export interface ShipTo {
+  recipient_name: string;
+  recipient_email: string | null;
+  address1: string;
+  address2: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -46,13 +62,29 @@ export function Orders() {
   const [filter, setFilter] = useState<Filter>('all');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
+  const [prefill, setPrefill] = useState<ShipTo | null>(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   function load() {
     setLoading(true);
     api<{ orders: Order[] }>('/api/brand/orders').then((r) => { setOrders(r.orders); setLoading(false); });
   }
   useEffect(load, []);
+
+  // "Ship again" on Customers routes here with a recipient in history state.
+  // Consume it once and strip it, or a refresh — or a Back into this entry —
+  // reopens the drawer with a stale address the operator didn't ask for.
+  useEffect(() => {
+    const shipTo = (location.state as { shipTo?: ShipTo } | null)?.shipTo;
+    if (!shipTo) return;
+    setPrefill(shipTo);
+    setCreating(true);
+    navigate('/app/orders', { replace: true, state: null });
+  }, [location.state, navigate]);
+
+  function closeDrawer() { setCreating(false); setPrefill(null); }
 
   const visible = orders.filter((o) => filter === 'all' || o.status === filter);
   const awaiting = orders.filter((o) => o.blocker !== 'none').length;
@@ -64,7 +96,7 @@ export function Orders() {
           <h1 className="text-[23px] font-bold">Orders</h1>
           <p className="mt-1 text-[13px] text-muted">Enter orders manually; we fulfill under your label and deduct your wallet.</p>
         </div>
-        <button className="btn" onClick={() => setCreating(true)}>+ New manual order</button>
+        <button className="btn" onClick={() => { setPrefill(null); setCreating(true); }}>+ New manual order</button>
       </div>
 
       {awaiting > 0 && (
@@ -127,13 +159,13 @@ export function Orders() {
         </div>
       )}
 
-      {creating && <OrderDrawer onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />}
+      {creating && <OrderDrawer prefill={prefill ?? undefined} onClose={closeDrawer} onSaved={() => { closeDrawer(); load(); }} />}
       {editing && <OrderDrawer editing={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </>
   );
 }
 
-function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: () => void; onSaved: () => void }) {
+function OrderDrawer({ editing, prefill, onClose, onSaved }: { editing?: Order; prefill?: ShipTo; onClose: () => void; onSaved: () => void }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [lines, setLines] = useState<{ product_id: string; qty: number }[]>(
     editing ? editing.items.map((i) => ({ product_id: i.product_id, qty: i.qty })) : [],
@@ -150,7 +182,18 @@ function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: 
           zip: editing.recipient.zip,
           country: editing.recipient.country,
         }
-      : { recipient_name: '', recipient_email: '', address1: '', address2: '', city: '', state: '', zip: '', country: 'US' },
+      : prefill
+        ? {
+            recipient_name: prefill.recipient_name,
+            recipient_email: prefill.recipient_email ?? '',
+            address1: prefill.address1,
+            address2: prefill.address2 ?? '',
+            city: prefill.city,
+            state: prefill.state,
+            zip: prefill.zip,
+            country: prefill.country,
+          }
+        : { recipient_name: '', recipient_email: '', address1: '', address2: '', city: '', state: '', zip: '', country: 'US' },
   );
   const [quote, setQuote] = useState<Quote | null>(null);
   const [service, setService] = useState(editing?.shipping_service_code ?? '');
@@ -248,11 +291,17 @@ function OrderDrawer({ editing, onClose, onSaved }: { editing?: Order; onClose: 
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={onClose}>
       <div className="flex h-full w-full max-w-md flex-col border-l border-lline bg-white dark:border-line dark:bg-bg2" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-lline px-5 py-4 dark:border-line">
-          <h2 className="text-[16px] font-semibold">{editing ? 'Edit order' : 'New manual order'}</h2>
+          <h2 className="text-[16px] font-semibold">{editing ? 'Edit order' : prefill ? 'Ship again' : 'New manual order'}</h2>
           <button onClick={onClose} className="text-faint hover:text-text">✕</button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+          {prefill && (
+            <div className="rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-[12px] text-teal">
+              Shipping again to <span className="font-medium">{prefill.recipient_name}</span>, using the address from their
+              most recent order. This is a brand-new order — add products and check the address before you place it.
+            </div>
+          )}
           {editing?.exported_at && (
             <div className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[12px] text-amber">
               This order is already at the shipping platform. Edits update your record but won't be pushed to ShipStation automatically — contact support to change the shipment.
