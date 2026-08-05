@@ -1,6 +1,7 @@
 import type { BrandStoreConnection } from '@ruostack/db';
 import { loadConfig } from '../config.js';
 import { decryptSecret, encryptSecret } from '../crypto.js';
+import { assertPublicHttpUrl } from './ssrf-guard.js';
 
 /**
  * WooCommerce REST connector. RUOStack is the hub: it pulls orders via webhook
@@ -39,16 +40,23 @@ export function decryptStoreCreds(
 const trimSlashes = (u: string) => u.replace(/\/+$/, '');
 
 export async function wooRequest<T = unknown>(creds: WooCreds, method: string, path: string, body?: unknown): Promise<T> {
+  // SSRF guard: the store URL is brand-supplied. Reject non-public hosts before
+  // we issue an authenticated request from the API's network.
+  await assertPublicHttpUrl(creds.storeUrl);
   const url = `${trimSlashes(creds.storeUrl)}/wp-json/wc/v3${path}`;
   const auth = Buffer.from(`${creds.consumerKey}:${creds.consumerSecret}`).toString('base64');
   const res = await fetch(url, {
     method,
     headers: { authorization: `Basic ${auth}`, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    // Don't auto-follow redirects: a public host could 3xx to an internal one,
+    // bypassing the guard above. Surface the redirect as a plain failure instead.
+    redirect: 'manual',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Woo ${method} ${path} → ${res.status} ${text.slice(0, 200)}`);
+    // Do NOT reflect the upstream response body to the caller — it could carry
+    // internal detail. The status is enough to diagnose a bad key / bad URL.
+    throw new Error(`Woo ${method} ${path} → ${res.status}`);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
