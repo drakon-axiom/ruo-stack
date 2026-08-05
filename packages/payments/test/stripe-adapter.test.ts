@@ -19,14 +19,42 @@ describe('StripeAdapter.verifyAndParseWebhook', () => {
     expect(() => adapter.verifyAndParseWebhook(raw, 't=1,v1=deadbeef')).toThrow();
   });
 
-  it('normalizes a wallet top-up checkout completion', () => {
+  it('normalizes a settled (paid) wallet top-up checkout completion', () => {
     const { raw, sig } = signed({
       id: 'evt_topup',
       type: 'checkout.session.completed',
-      data: { object: { metadata: { kind: 'wallet_topup', brand_id: 'brand-123' }, amount_total: 5000, currency: 'usd' } },
+      data: { object: { payment_status: 'paid', metadata: { kind: 'wallet_topup', brand_id: 'brand-123' }, amount_total: 5000, currency: 'usd' } },
     });
     const event = adapter.verifyAndParseWebhook(raw, sig);
     expect(event).toMatchObject({ kind: 'wallet.topup_succeeded', externalId: 'evt_topup', brandId: 'brand-123', amount: 5000 });
+  });
+
+  it('does NOT credit an unpaid (async, not-yet-settled) top-up completion', () => {
+    const { raw, sig } = signed({
+      id: 'evt_unpaid',
+      type: 'checkout.session.completed',
+      data: { object: { payment_status: 'unpaid', metadata: { kind: 'wallet_topup', brand_id: 'brand-123' }, amount_total: 5000, currency: 'usd' } },
+    });
+    // Unpaid → not a top-up-succeeded; the wallet must not be credited until it settles.
+    expect(adapter.verifyAndParseWebhook(raw, sig)).toMatchObject({ kind: 'unknown' });
+  });
+
+  it('credits a wallet top-up once the async payment succeeds', () => {
+    const { raw, sig } = signed({
+      id: 'evt_async_ok',
+      type: 'checkout.session.async_payment_succeeded',
+      data: { object: { payment_status: 'paid', metadata: { kind: 'wallet_topup', brand_id: 'brand-123' }, amount_total: 5000, currency: 'usd' } },
+    });
+    expect(adapter.verifyAndParseWebhook(raw, sig)).toMatchObject({ kind: 'wallet.topup_succeeded', brandId: 'brand-123', amount: 5000 });
+  });
+
+  it('maps an async payment failure to topup_failed', () => {
+    const { raw, sig } = signed({
+      id: 'evt_async_fail',
+      type: 'checkout.session.async_payment_failed',
+      data: { object: { payment_status: 'unpaid', metadata: { kind: 'wallet_topup', brand_id: 'brand-123' }, amount_total: 5000 } },
+    });
+    expect(adapter.verifyAndParseWebhook(raw, sig)).toMatchObject({ kind: 'wallet.topup_failed', brandId: 'brand-123' });
   });
 
   it('maps a subscription deletion to cancelled', () => {
@@ -41,6 +69,27 @@ describe('StripeAdapter.verifyAndParseWebhook', () => {
   it('falls back to unknown for unhandled event types', () => {
     const { raw, sig } = signed({ id: 'evt_x', type: 'invoice.created', data: { object: {} } });
     expect(adapter.verifyAndParseWebhook(raw, sig)).toMatchObject({ kind: 'unknown', rawType: 'invoice.created' });
+  });
+});
+
+describe('StripeAdapter.updateSubscription', () => {
+  it('replaces the existing item (passes its id) instead of adding a second one', async () => {
+    const a = new StripeAdapter({ secretKey: 'sk_test_dummy', webhookSecret: WEBHOOK_SECRET });
+    const captured: { id: string; params: Stripe.SubscriptionUpdateParams }[] = [];
+    // Stub the private Stripe client's subscription methods (no network).
+    (a as unknown as { stripe: Stripe }).stripe.subscriptions = {
+      retrieve: async () => ({ items: { data: [{ id: 'si_existing' }] } }),
+      update: async (id: string, params: Stripe.SubscriptionUpdateParams) => {
+        captured.push({ id, params });
+        return { id: 'sub_1', status: 'active' };
+      },
+    } as unknown as Stripe['subscriptions'];
+
+    await a.updateSubscription('sub_1', { priceId: 'price_volume' });
+
+    expect(captured).toHaveLength(1);
+    // The existing item id must be present so Stripe swaps the price in place.
+    expect(captured[0]!.params.items).toEqual([{ id: 'si_existing', price: 'price_volume' }]);
   });
 });
 

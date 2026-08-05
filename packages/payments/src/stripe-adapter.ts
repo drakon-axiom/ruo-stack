@@ -59,10 +59,19 @@ export class StripeAdapter implements PaymentsAdapter {
     subscriptionId: string,
     input: Partial<CreateSubscriptionInput>,
   ): Promise<{ subscriptionId: string; status: string }> {
-    const sub = await this.stripe.subscriptions.update(subscriptionId, {
-      ...(input.priceId ? { items: [{ price: input.priceId }] } : {}),
-      ...(input.metadata ? { metadata: input.metadata } : {}),
-    });
+    const params: Stripe.SubscriptionUpdateParams = {};
+    if (input.priceId) {
+      // An items[] entry WITHOUT an `id` is ADDED, not replaced — that would
+      // leave the old plan item in place and bill both plans every cycle. Pass
+      // the existing item's id so the price is swapped in place (a plan change).
+      const current = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const existingItemId = current.items.data[0]?.id;
+      params.items = [
+        existingItemId ? { id: existingItemId, price: input.priceId } : { price: input.priceId },
+      ];
+    }
+    if (input.metadata) params.metadata = input.metadata;
+    const sub = await this.stripe.subscriptions.update(subscriptionId, params);
     return { subscriptionId: sub.id, status: sub.status };
   }
 
@@ -152,15 +161,35 @@ export class StripeAdapter implements PaymentsAdapter {
 function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
   const externalId = event.id;
   switch (event.type) {
-    case 'checkout.session.completed': {
+    // A wallet top-up only credits the wallet once the payment has SETTLED. Card
+    // top-ups settle synchronously — `checkout.session.completed` arrives with
+    // payment_status 'paid'. Delayed-notification methods (ACH, etc.) complete
+    // 'unpaid' and settle later via `async_payment_succeeded` (or fail via
+    // `async_payment_failed`), so gating on payment_status === 'paid' here stops
+    // an unsettled (or ultimately-failed) payment from funding fulfillment.
+    case 'checkout.session.completed':
+    case 'checkout.session.async_payment_succeeded': {
       const s = event.data.object as Stripe.Checkout.Session;
-      if (s.metadata?.kind === 'wallet_topup') {
+      if (s.metadata?.kind === 'wallet_topup' && s.payment_status === 'paid') {
         return {
           kind: 'wallet.topup_succeeded',
           externalId,
           brandId: s.metadata?.brand_id,
           amount: s.amount_total ?? undefined,
           currency: s.currency ?? undefined,
+          customerId: typeof s.customer === 'string' ? s.customer : undefined,
+        };
+      }
+      return { kind: 'unknown', externalId, rawType: `${event.type}:${s.payment_status ?? 'unknown'}` };
+    }
+    case 'checkout.session.async_payment_failed': {
+      const s = event.data.object as Stripe.Checkout.Session;
+      if (s.metadata?.kind === 'wallet_topup') {
+        return {
+          kind: 'wallet.topup_failed',
+          externalId,
+          brandId: s.metadata?.brand_id,
+          amount: s.amount_total ?? undefined,
           customerId: typeof s.customer === 'string' ? s.customer : undefined,
         };
       }
