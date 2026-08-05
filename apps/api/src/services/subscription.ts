@@ -124,7 +124,7 @@ export interface LapseSweepResult {
 }
 
 /**
- * Flip subscriptions whose paid-through date has lapsed to `suspended`.
+ * Flip subscriptions whose paid-through date has lapsed to `expired`.
  *
  * Purely LOCAL — it reads our own `currentPeriodEnd` and calls no payment
  * processor. That is the point: the mechanism has to hold for Stripe, for any
@@ -148,7 +148,7 @@ export async function sweepLapsedSubscriptions(prisma: PrismaClient, now: Date =
   });
 
   for (const s of lapsed) {
-    await upsertSubscriptionState(prisma, { brandId: s.brandId, status: 'suspended', plan: s.plan });
+    await upsertSubscriptionState(prisma, { brandId: s.brandId, status: 'expired', plan: s.plan });
     await writeAudit(prisma, {
       actorType: 'system',
       actorId: null,
@@ -157,7 +157,7 @@ export async function sweepLapsedSubscriptions(prisma: PrismaClient, now: Date =
       targetId: s.brandId,
       before: { status: s.status },
       after: {
-        status: 'suspended',
+        status: 'expired',
         reason: 'paid_through_lapsed',
         paid_through: s.currentPeriodEnd?.toISOString() ?? null,
         grace_days: LAPSE_GRACE_DAYS,

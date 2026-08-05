@@ -61,11 +61,14 @@ describe.skipIf(!RUN)('subscription lapse sweep (DB integration)', () => {
     expect(effectivePlan(await stateOf(inGrace))).toBe('pro');
   });
 
-  it('suspends exactly the subscriptions past the grace margin', async () => {
+  it('expires exactly the subscriptions past the grace margin', async () => {
     const r = await sweepLapsedSubscriptions(prisma);
     expect(r.suspended).toBeGreaterThanOrEqual(1);
 
-    expect((await stateOf(lapsed))!.status).toBe('suspended');
+    // `expired`, not `suspended`: nothing is locked, the brand is on Starter.
+    // Account-level suspension (brand.status) is an admin action for cause and
+    // is the only one that denies requests — see guards.ts.
+    expect((await stateOf(lapsed))!.status).toBe('expired');
     expect((await stateOf(inGrace))!.status).toBe('active');
     expect((await stateOf(current))!.status).toBe('active');
     expect((await stateOf(openEnded))!.status).toBe('active');
@@ -78,6 +81,13 @@ describe.skipIf(!RUN)('subscription lapse sweep (DB integration)', () => {
   it('clears the coarse brand.subscription_status mirror the other screens read', async () => {
     const b = await prisma.brand.findUnique({ where: { id: lapsed }, select: { subscriptionStatus: true } });
     expect(b!.subscriptionStatus).toBe('none');
+  });
+
+  it('does NOT suspend the account — an expired plan is not enforcement', async () => {
+    // The whole point of the `expired` split. brand.status is what `requireBrand`
+    // reads to 403 every request; a lapsed payment must never touch it.
+    const b = await prisma.brand.findUnique({ where: { id: lapsed }, select: { status: true } });
+    expect(b!.status).toBe('active');
   });
 
   it('writes an audit entry naming the reason', async () => {

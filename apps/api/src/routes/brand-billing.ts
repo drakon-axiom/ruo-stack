@@ -109,8 +109,13 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
       // must never render "Renews <date>" for a date that has already gone by.
       lapsed: sub ? isLapsed(sub) : false,
       paid_through_passed: !!sub?.currentPeriodEnd && sub.currentPeriodEnd.getTime() < Date.now(),
+      // `cancelled` is deliberate — the brand chose Starter, so don't nag. The
+      // rest mean we didn't get paid. ('suspended' only appears on pre-025 rows.)
       payment_action_needed:
-        sub?.status === 'past_due' || sub?.status === 'suspended' || (sub ? isLapsed(sub) : false),
+        sub?.status === 'past_due' ||
+        sub?.status === 'expired' ||
+        sub?.status === 'suspended' ||
+        (sub ? isLapsed(sub) : false),
       capabilities: PLANS[current].capabilities,
       // The catalogue the plan-picker renders.
       plans: PLAN_LIST.map((p) => ({

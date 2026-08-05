@@ -550,12 +550,17 @@ model BrandTaxExemption {
 // (architecture §4.1): a membership charge never touches WalletLedger; a wallet
 // deposit never touches SubscriptionState.
 
+/// How a membership stands. `suspended` is RETAINED for historical rows only —
+/// it is no longer written (migration 025/026). A membership that lapsed for
+/// non-payment is `expired`; account-level suspension for cause lives on
+/// `Brand.status` and is the only one of the two that denies requests.
 enum SubscriptionStateStatus {
   none
   active
   past_due
-  suspended
+  expired
   cancelled
+  suspended
 
   @@map("subscription_state_status")
 }
