@@ -13,7 +13,7 @@ import { writeAudit } from '../audit.js';
 import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
 import { BadRequest, NotFound } from '../errors.js';
 import { getWalletSummary } from '../services/wallet.js';
-import { effectivePlan } from '../services/subscription.js';
+import { effectivePlan, isLapsed } from '../services/subscription.js';
 
 /**
  * Brand-facing money layer (Phase 1): Pro membership + prepaid wallet. Core never
@@ -104,7 +104,18 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
       // Dunning surface: a failed payment keeps features during the grace window.
       past_due_since: sub?.pastDueSince ?? null,
       grace_ends_at: graceEndsAt,
-      payment_action_needed: sub?.status === 'past_due' || sub?.status === 'suspended',
+      // Paid-through has passed. Surfaced separately from `status` because the
+      // stored status is only as fresh as the last event we received — the UI
+      // must never render "Renews <date>" for a date that has already gone by.
+      lapsed: sub ? isLapsed(sub) : false,
+      paid_through_passed: !!sub?.currentPeriodEnd && sub.currentPeriodEnd.getTime() < Date.now(),
+      // `cancelled` is deliberate — the brand chose Starter, so don't nag. The
+      // rest mean we didn't get paid. ('suspended' only appears on pre-025 rows.)
+      payment_action_needed:
+        sub?.status === 'past_due' ||
+        sub?.status === 'expired' ||
+        sub?.status === 'suspended' ||
+        (sub ? isLapsed(sub) : false),
       capabilities: PLANS[current].capabilities,
       // The catalogue the plan-picker renders.
       plans: PLAN_LIST.map((p) => ({

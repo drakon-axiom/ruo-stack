@@ -14,7 +14,8 @@ export const WALLET_TXN_TYPES = [
 ] as const;
 export type WalletTxnType = (typeof WALLET_TXN_TYPES)[number];
 
-export const SUBSCRIPTION_STATUSES = ['none', 'active', 'past_due', 'suspended', 'cancelled'] as const;
+// `suspended` is retained for historical rows only — see migration 025/026.
+export const SUBSCRIPTION_STATUSES = ['none', 'active', 'past_due', 'expired', 'cancelled', 'suspended'] as const;
 export type SubscriptionStatusState = (typeof SUBSCRIPTION_STATUSES)[number];
 
 /** Wallet top-up. Funds are NON-REFUNDABLE / non-withdrawable (closed-loop,

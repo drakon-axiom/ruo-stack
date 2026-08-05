@@ -1,0 +1,13 @@
+-- A membership that simply wasn't paid for is EXPIRED, not suspended.
+--
+-- `suspended` meant three unrelated things: an account locked by an admin for
+-- cause (brand.status — the only one that actually denies requests), a revoked
+-- staff seat (brand_member.status), and a membership that lapsed. The third is
+-- not enforcement — the brand keeps its account, its orders and its wallet, and
+-- simply drops to Starter pricing — so it gets its own name and `suspended`
+-- stops being written for subscriptions at all.
+--
+-- Added alone: Postgres will not let a new enum value be USED in the same
+-- transaction that adds it, and Prisma runs each migration in one. The backfill
+-- of existing rows is migration 026.
+ALTER TYPE "subscription_state_status" ADD VALUE IF NOT EXISTS 'expired';

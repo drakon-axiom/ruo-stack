@@ -5,7 +5,7 @@ import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
 import { requireAdmin } from '../middleware/guards.js';
 import { loadConfig } from '../config.js';
-import { effectivePlan } from '../services/subscription.js';
+import { effectivePlan, isLapsed, upsertSubscriptionState } from '../services/subscription.js';
 import { appendEntry, getWalletSummary } from '../services/wallet.js';
 import { BadRequest, NotFound } from '../errors.js';
 
@@ -65,6 +65,9 @@ export async function adminBrandRoutes(app: FastifyInstance): Promise<void> {
         status: brand.subscriptionState?.status ?? 'none',
         cancel_at_period_end: brand.subscriptionState?.cancelAtPeriodEnd ?? false,
         current_period_end: brand.subscriptionState?.currentPeriodEnd ?? null,
+        // Paid-through has passed; `status` may still say active if no gateway
+        // event ever arrived to say otherwise.
+        lapsed: brand.subscriptionState ? isLapsed(brand.subscriptionState) : false,
       },
       wallet: { balance_cents: wallet.balance, held_cents: wallet.held, available_cents: wallet.available },
       shipping: {
@@ -175,5 +178,71 @@ export async function adminBrandRoutes(app: FastifyInstance): Promise<void> {
       ip: req.ip,
     });
     return { ok: true, balance_after_cents: entry.balanceAfter };
+  });
+
+  /**
+   * Record a membership payment taken outside a payment gateway — a bank
+   * transfer, a cheque, an invoice settled by hand — or comp an account.
+   *
+   * This is the non-gateway half of the same mechanism: entitlement is derived
+   * locally from `currentPeriodEnd` (see `effectivePlan`), so every payment
+   * route does the one same thing, move the paid-through date forward. A manual
+   * payment is therefore a first-class way to hold a membership, not a special
+   * case that has to be taught to every feature gate.
+   *
+   * `paid_through: null` grants an open-ended membership (comp) — `isLapsed`
+   * treats a null date as no expiry. That's deliberate but it is also the one
+   * way to create a membership nothing will ever reap, so it's audited like any
+   * other grant.
+   */
+  app.post('/api/admin/brands/:id/subscription', { preHandler: requireAdmin('subscription', 'write') }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z
+      .object({
+        plan: z.enum(['starter', 'pro', 'volume']),
+        // ISO date. Null = open-ended (comped); omitted is not the same thing.
+        paid_through: z.string().datetime().nullable(),
+        reason: z.string().min(1).max(300),
+      })
+      .parse(req.body);
+
+    const brand = await prisma.brand.findUnique({ where: { id }, select: { id: true } });
+    if (!brand) throw NotFound('Brand not found');
+
+    const paidThrough = body.paid_through ? new Date(body.paid_through) : null;
+    if (paidThrough && paidThrough.getTime() < Date.now()) {
+      // Backdating would book a payment that is already lapsed — almost always a
+      // typo (wrong year), and the sweep would suspend it on the next tick.
+      throw BadRequest('paid_through_in_past', 'Paid-through date is already in the past');
+    }
+
+    const before = await prisma.subscriptionState.findUnique({
+      where: { brandId: id },
+      select: { plan: true, status: true, currentPeriodEnd: true },
+    });
+
+    await upsertSubscriptionState(prisma, {
+      brandId: id,
+      status: 'active',
+      plan: body.plan,
+      currentPeriodEnd: paidThrough,
+      cancelAtPeriodEnd: false,
+    });
+
+    await writeAudit(prisma, {
+      actorType: 'admin',
+      actorId: req.admin!.adminUserId,
+      action: AUDIT_ACTIONS.subscriptionStatusChanged,
+      targetType: 'brand',
+      targetId: id,
+      before: before
+        ? { plan: before.plan, status: before.status, paid_through: before.currentPeriodEnd?.toISOString() ?? null }
+        : null,
+      after: { plan: body.plan, status: 'active', paid_through: paidThrough?.toISOString() ?? null, source: 'manual' },
+      reason: body.reason,
+      ip: req.ip,
+    });
+
+    return { ok: true, plan: body.plan, status: 'active', paid_through: paidThrough };
   });
 }

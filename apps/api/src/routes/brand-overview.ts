@@ -41,7 +41,7 @@ export async function brandOverviewRoutes(app: FastifyInstance): Promise<void> {
       prisma.order.count({ where: { brandId, blocker: { not: 'none' } } }),
       prisma.order.count({ where: { brandId } }),
       prisma.order.findMany({ where: { brandId }, orderBy: { createdAt: 'desc' }, take: 8 }),
-      prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } }),
+      prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true, currentPeriodEnd: true } }),
       getWalletSummary(prisma, brandId),
       prisma.brandStoreConnection.findFirst({ where: { brandId } }),
       prisma.brandProductPrice.count({ where: { brandId } }),

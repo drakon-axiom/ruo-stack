@@ -156,13 +156,17 @@ interface PlanCard {
   features: string[];
 }
 interface Sub {
-  status: 'none' | 'active' | 'past_due' | 'suspended' | 'cancelled';
+  status: 'none' | 'active' | 'past_due' | 'expired' | 'cancelled' | 'suspended';
   current_plan: 'starter' | 'pro' | 'volume';
   billed_plan: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   past_due_since: string | null;
   grace_ends_at: string | null;
+  /** Paid-through date has passed (any amount). */
+  paid_through_passed: boolean;
+  /** Passed by more than the grace margin — entitlement has already dropped. */
+  lapsed: boolean;
   payment_action_needed: boolean;
   plans: PlanCard[];
 }
@@ -209,6 +213,10 @@ function SubscriptionSection() {
   const current = sub?.current_plan ?? 'starter';
   const status = sub?.status ?? 'none';
   const onPaid = current === 'pro' || current === 'volume';
+  // The membership ran out for non-payment. NOT the same as a suspended account:
+  // nothing is locked, the brand is simply back on Starter. ('suspended' here is
+  // only ever a pre-025 row — see the enum comment in schema.prisma.)
+  const ended = status === 'expired' || status === 'suspended';
   const dollars = (c: number) => (c === 0 ? 'Free' : `$${c / 100}/mo`);
 
   return (
@@ -223,10 +231,25 @@ function SubscriptionSection() {
           <button className="btn shrink-0" disabled={busy} onClick={manage}>Update payment method</button>
         </div>
       )}
-      {status === 'suspended' && (
+      {/* Paid-through has passed but the stored status hasn't caught up (or the
+          payment simply never came). The expired banner below takes over once
+          the lapse sweep flips the row; this covers the window before that. */}
+      {!ended && sub?.paid_through_passed && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
-          <span>Membership suspended for non-payment — fulfillment features are paused. Update your payment method to restore them.</span>
-          <button className="btn shrink-0" disabled={busy} onClick={manage}>Update payment method</button>
+          <span>
+            Your membership ended {new Date(sub.current_period_end!).toLocaleDateString()}. Renew to keep your plan
+            features — they'll drop back to Starter shortly.
+          </span>
+          <button className="btn shrink-0" disabled={busy} onClick={manage}>Renew</button>
+        </div>
+      )}
+      {ended && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-amber">
+          <span>
+            Your membership expired and you're on the Starter plan. Your account, orders and wallet are unaffected —
+            add a payment method to restore your plan pricing.
+          </span>
+          <button className="btn shrink-0" disabled={busy} onClick={manage}>Restore plan</button>
         </div>
       )}
 
@@ -259,12 +282,22 @@ function SubscriptionSection() {
 
       <div className="mt-3 flex items-center justify-between text-[12px] text-muted">
         <span>
-          {sub?.current_period_end && status === 'active' && (
-            sub.cancel_at_period_end ? (
-              <span className="text-amber">Ends {new Date(sub.current_period_end).toLocaleDateString()} — won't renew.</span>
-            ) : (
-              <>Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>
-            )
+          {sub?.current_period_end && (
+            // Past-dated first: "Renews <date>" for a date that has already gone
+            // by is the exact thing that hid an expired plan for weeks. A stale
+            // `status` can still say active, so the DATE decides what we claim.
+            sub.paid_through_passed ? (
+              <span className="text-danger">
+                Expired {new Date(sub.current_period_end).toLocaleDateString()}
+                {!sub.lapsed && ' — renew now to keep your plan'}.
+              </span>
+            ) : status === 'active' ? (
+              sub.cancel_at_period_end ? (
+                <span className="text-amber">Ends {new Date(sub.current_period_end).toLocaleDateString()} — won't renew.</span>
+              ) : (
+                <>Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>
+              )
+            ) : null
           )}
         </span>
         {onPaid && <button className="text-teal hover:underline" onClick={manage}>Manage billing →</button>}

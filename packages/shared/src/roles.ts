@@ -21,6 +21,10 @@ export const ROLE_GATE: Record<string, Record<AdminRole, Access>> = {
   claims: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },
   brand_suspend: { super_admin: 'write', operations: 'none', support: 'none', finance: 'none' },
   wallet_adjust: { super_admin: 'write', operations: 'none', support: 'none', finance: 'write' },
+  // Recording a membership payment taken OUTSIDE a gateway (bank transfer, cheque,
+  // a comped account) grants paid features with no processor record to reconcile
+  // against — same shape as wallet_adjust for the same reason.
+  subscription: { super_admin: 'write', operations: 'none', support: 'none', finance: 'write' },
   role_grants: { super_admin: 'write', operations: 'none', support: 'none', finance: 'none' },
   // Authoring broadcasts is an ops function — same shape as `catalog`.
   announcements: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },

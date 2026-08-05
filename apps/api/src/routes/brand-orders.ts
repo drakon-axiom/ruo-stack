@@ -40,7 +40,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     // Resolve the brand's effective tier (drives wholesale pricing + the cap).
     const sub = await prisma.subscriptionState.findUnique({
       where: { brandId },
-      select: { plan: true, status: true },
+      select: { plan: true, status: true, currentPeriodEnd: true },
     });
     const plan = effectivePlan(sub);
 
@@ -141,7 +141,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/brand/orders/quote', { preHandler: requireBrand, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
     const { brandId } = req.brand!;
     const body = OrderQuoteSchema.parse(req.body);
-    const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true } });
+    const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true, currentPeriodEnd: true } });
     const plan = effectivePlan(sub);
     const wf = wholesaleFieldFor(plan);
     const products = await prisma.catalogProduct.findMany({

@@ -226,7 +226,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
     const { brandId } = req.brand!;
     const sub = await prisma.subscriptionState.findUnique({
       where: { brandId },
-      select: { plan: true, status: true },
+      select: { plan: true, status: true, currentPeriodEnd: true },
     });
     const plan = effectivePlan(sub);
     const wf = wholesaleFieldFor(plan); // 'wholesaleStarter' | 'wholesalePro' | 'wholesaleVolume'
