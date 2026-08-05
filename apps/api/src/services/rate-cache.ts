@@ -16,11 +16,21 @@ interface Entry {
 
 const cache = new Map<string, Entry>();
 const MAX_ENTRIES = 500;
-const WEIGHT_BUCKET_OZ = 8;
 
-function cacheKey(input: RateQuoteInput): string {
-  const bucket = Math.ceil(input.weightOz / WEIGHT_BUCKET_OZ);
-  return `${input.fromZip}|${input.toZip}|${bucket}`;
+// Key on everything that changes the carrier rate: origin/destination, the exact
+// weight actually sent to the carrier (rounded oz), the parcel dimensions
+// (dimensional weight / surcharges), and residential vs commercial. The previous
+// key used only zips + an 8oz weight bucket, so two different parcels to the same
+// ZIP (e.g. a 9oz small box and a 16oz large box) collided and the second was
+// served the first's rates.
+export function cacheKey(input: RateQuoteInput): string {
+  const wt = Math.max(1, Math.round(input.weightOz)); // the oz value sent to the carrier
+  const dims =
+    input.lengthIn && input.widthIn && input.heightIn
+      ? `${input.lengthIn}x${input.widthIn}x${input.heightIn}`
+      : 'nodim';
+  const res = input.residential === false ? 'comm' : 'res';
+  return `${input.fromZip}|${input.toZip}|${input.toState}|${input.toCountry}|${wt}|${dims}|${res}`;
 }
 
 export async function cachedQuoteRates(input: RateQuoteInput): Promise<{ source: string; options: RateOption[]; cached: boolean }> {
