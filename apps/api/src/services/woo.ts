@@ -39,6 +39,10 @@ export function decryptStoreCreds(
 
 const trimSlashes = (u: string) => u.replace(/\/+$/, '');
 
+// Abort a stalled store call instead of hanging the request (e.g. the admin
+// stock toggle, which fans out sequential Woo calls per SKU per store).
+const HTTP_TIMEOUT_MS = 15_000;
+
 export async function wooRequest<T = unknown>(creds: WooCreds, method: string, path: string, body?: unknown): Promise<T> {
   // SSRF guard: the store URL is brand-supplied. Reject non-public hosts before
   // we issue an authenticated request from the API's network.
@@ -52,6 +56,7 @@ export async function wooRequest<T = unknown>(creds: WooCreds, method: string, p
     // Don't auto-follow redirects: a public host could 3xx to an internal one,
     // bypassing the guard above. Surface the redirect as a plain failure instead.
     redirect: 'manual',
+    signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
   });
   if (!res.ok) {
     // Do NOT reflect the upstream response body to the caller — it could carry
