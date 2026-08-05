@@ -112,7 +112,7 @@ describe.skipIf(!RUN)('security spine (DB integration)', () => {
       data: { brandName: 'Grant Co', referralCode: `GR-${randomToken(5)}` },
     });
     const paidThrough = new Date(Date.now() + 30 * 86_400_000).toISOString();
-    const grant = (token: string, payload: unknown) =>
+    const grant = (token: string, payload: { plan: string; paid_through: string | null; reason: string }) =>
       app.inject({
         method: 'POST',
         url: `/api/admin/brands/${brand.id}/subscription`,
