@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
+import { Prisma } from '@ruostack/db';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, shipstationStatus } from '@ruostack/shared';
 import { getClients } from '../clients.js';
@@ -71,7 +72,18 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
     const start = parseSsDate(q.start_date) ?? new Date(0);
     const end = parseSsDate(q.end_date) ?? new Date(Date.now() + 86_400_000);
 
-    const where = { updatedAt: { gte: start, lte: end } };
+    // Fail closed: never export an order still blocked on a missing address,
+    // missing customer info, or an unmapped SKU — ShipStation would treat it as
+    // fulfillable and the warehouse would ship it incomplete/unaddressable.
+    // (awaiting_funds still exports, as on_hold; terminal shipped/cancelled
+    // orders still export so ShipStation can sync their final state.)
+    const where: Prisma.OrderWhereInput = {
+      updatedAt: { gte: start, lte: end },
+      NOT: {
+        blocker: { in: ['needs_address', 'needs_customer_info', 'needs_mapping'] },
+        status: { notIn: ['shipped', 'delivered', 'cancelled'] },
+      },
+    };
     const total = await prisma.order.count({ where });
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     const orders = await prisma.order.findMany({
