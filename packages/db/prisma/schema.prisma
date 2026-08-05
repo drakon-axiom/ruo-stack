@@ -736,6 +736,10 @@ model Order {
   items OrderItem[]
   claims Claim[]
 
+  // Store-order idempotency: at most one order per (brand, source, external id).
+  // externalOrderId is NULL for manual orders — Postgres treats NULLs as distinct,
+  // so manual orders never collide; store orders (Woo/Wix) dedupe on their id.
+  @@unique([brandId, source, externalOrderId])
   @@index([brandId, status])
   @@index([status])
   @@map("order")

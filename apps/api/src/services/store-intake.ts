@@ -154,46 +154,58 @@ export async function importWooOrder(
     if (available < walletCharge) blocker = 'awaiting_funds';
   }
 
-  const order = await prisma.$transaction(async (tx) => {
-    const o = await tx.order.create({
-      data: {
-        brandId,
-        source: 'woocommerce',
-        status: 'ready_for_fulfillment',
-        blocker,
-        externalOrderId,
-        recipientName,
-        recipientEmail: bill.email ?? ship.email ?? null,
-        recipientPhone: ship.phone ?? bill.phone ?? null,
-        address1,
-        address2: ship.address_2?.trim() || null,
-        city,
-        state,
-        zip,
-        country,
-        wholesaleTotalCents: wholesaleTotal,
-        shippingTotalCents: shipping,
-        walletChargeCents: walletCharge,
-        sourceItems: sourceItems as unknown as Prisma.InputJsonValue,
-        unmatchedSkus,
-        ...(serviceCode ? { shippingServiceCode: serviceCode } : {}),
-        ...(carrier ? { shippingCarrier: carrier } : {}),
-        ...(rateSource ? { rateSource } : {}),
-        ...(boxFields ?? {}),
-        ...(lines.length ? { items: { create: lines } } : {}),
-      },
+  let order;
+  try {
+    order = await prisma.$transaction(async (tx) => {
+      const o = await tx.order.create({
+        data: {
+          brandId,
+          source: 'woocommerce',
+          status: 'ready_for_fulfillment',
+          blocker,
+          externalOrderId,
+          recipientName,
+          recipientEmail: bill.email ?? ship.email ?? null,
+          recipientPhone: ship.phone ?? bill.phone ?? null,
+          address1,
+          address2: ship.address_2?.trim() || null,
+          city,
+          state,
+          zip,
+          country,
+          wholesaleTotalCents: wholesaleTotal,
+          shippingTotalCents: shipping,
+          walletChargeCents: walletCharge,
+          sourceItems: sourceItems as unknown as Prisma.InputJsonValue,
+          unmatchedSkus,
+          ...(serviceCode ? { shippingServiceCode: serviceCode } : {}),
+          ...(carrier ? { shippingCarrier: carrier } : {}),
+          ...(rateSource ? { rateSource } : {}),
+          ...(boxFields ?? {}),
+          ...(lines.length ? { items: { create: lines } } : {}),
+        },
+      });
+      await writeAudit(tx, {
+        actorType: 'system',
+        actorId: null,
+        action: AUDIT_ACTIONS.storeOrderImported,
+        targetType: 'order',
+        targetId: o.id,
+        after: { source: 'woocommerce', external_order_id: externalOrderId, blocker, matched: lines.length, unmatched, wallet_charge_cents: walletCharge, from_quote: fromQuote },
+        ip: null,
+      });
+      return o;
     });
-    await writeAudit(tx, {
-      actorType: 'system',
-      actorId: null,
-      action: AUDIT_ACTIONS.storeOrderImported,
-      targetType: 'order',
-      targetId: o.id,
-      after: { source: 'woocommerce', external_order_id: externalOrderId, blocker, matched: lines.length, unmatched, wallet_charge_cents: walletCharge, from_quote: fromQuote },
-      ip: null,
-    });
-    return o;
-  });
+  } catch (err) {
+    // Lost the idempotency race: a concurrent order.created/order.updated delivery
+    // for the same store order inserted first. The unique index on
+    // (brand_id, source, external_order_id) makes this a no-op, not a duplicate.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const existing = await prisma.order.findFirst({ where: { brandId, source: 'woocommerce', externalOrderId } });
+      if (existing) return { created: false, orderId: existing.id, blocker: existing.blocker, matched: 0, unmatched: 0 };
+    }
+    throw err;
+  }
 
   await prisma.brandStoreConnection.update({ where: { id: connection.id }, data: { lastOrderAt: new Date(), status: 'active', lastError: null } });
   return { created: true, orderId: order.id, blocker, matched: lines.length, unmatched };
