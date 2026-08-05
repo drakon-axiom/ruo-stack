@@ -147,13 +147,16 @@ export async function adminFulfillmentRoutes(app: FastifyInstance): Promise<void
       throw BadRequest('insufficient_funds', "Brand's wallet can't cover this order — awaiting funds");
     }
 
-    await captureOrder(prisma, order);
     const carrier = body.carrier ?? order.shippingCarrier ?? 'USPS';
     const shipped = await prisma.$transaction(async (tx) => {
-      const o = await tx.order.update({
-        where: { id },
+      // Conditional transition: only ship an order still in a pre-ship state, so a
+      // cancel that raced in between the read above and here isn't overwritten.
+      const gate = await tx.order.updateMany({
+        where: { id, status: { in: ['ready_for_fulfillment', 'processing'] } },
         data: { status: 'shipped', blocker: 'none', trackingNumber: body.tracking_number, carrier, shippedAt: new Date() },
       });
+      if (gate.count === 0) throw Conflict('not_shippable', 'Order can no longer be shipped — it may have been cancelled');
+      const o = await tx.order.findUniqueOrThrow({ where: { id } });
       await writeAudit(tx, {
         actorType: 'admin',
         actorId: req.admin!.adminUserId,
@@ -166,6 +169,9 @@ export async function adminFulfillmentRoutes(app: FastifyInstance): Promise<void
       return o;
     });
 
+    // Capture AFTER the ship is committed, so a cancel that won the race above is
+    // never debited. captureOrder is idempotent on the order id.
+    await captureOrder(prisma, shipped);
     await onOrderShipped(shipped); // WooCommerce/Wix tracking writeback seam
     return { ok: true, status: shipped.status, tracking_number: body.tracking_number, carrier };
   });

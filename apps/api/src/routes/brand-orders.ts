@@ -229,11 +229,15 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     if (order.status === 'cancelled') return serializeOrder({ ...order, items: [] });
 
     const updated = await prisma.$transaction(async (tx) => {
-      const o = await tx.order.update({
-        where: { id },
+      // Conditional transition: only cancel an order still in a pre-ship state.
+      // If a ship (admin or shipnotify) committed between the read above and here,
+      // this matches 0 rows and we bail — so cancel can't overwrite a shipped,
+      // already-captured order.
+      const gate = await tx.order.updateMany({
+        where: { id, status: { in: ['ready_for_fulfillment', 'processing'] } },
         data: { status: 'cancelled', blocker: 'none' },
-        include: { items: true },
       });
+      if (gate.count === 0) throw Conflict('not_cancellable', 'Order can no longer be cancelled — it may have shipped');
       await writeAudit(tx, {
         actorType: 'brand',
         actorId: userId,
@@ -242,7 +246,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
         targetId: id,
         ip: req.ip,
       });
-      return o;
+      return tx.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
     });
     return serializeOrder(updated);
   });
