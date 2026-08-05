@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api } from '../lib/api.js';
+import type { ShipTo } from './Orders.js';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -43,6 +44,8 @@ interface Customer {
   last_status: string;
   last_blocker: string;
   last_exported_at: string | null;
+  /** Null when we hold no complete address for them — see `shipToFrom` on the API. */
+  ship_to: ShipTo | null;
   order_list: OrderRow[];
 }
 
@@ -65,6 +68,12 @@ export function Customers() {
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<SortKey>('recent');
   const [open, setOpen] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  // Hand the recipient to the manual-order drawer. Nothing is written here — the
+  // Orders screen prefills a NEW order from it, the same copy-the-fields shape as
+  // the address-book picker, so this never touches the address book.
+  const shipAgain = (c: Customer) => navigate('/app/orders', { state: { shipTo: c.ship_to } });
 
   useEffect(() => {
     api<{ customers: Customer[]; totals: Totals }>('/api/brand/customers').then((r) => {
@@ -172,6 +181,7 @@ export function Customers() {
                 ) : (
                   rows.map((c) => {
                     const isOpen = open === c.key;
+                    const st = c.ship_to;
                     return (
                       <Fragment key={c.key}>
                         <tr
@@ -193,11 +203,25 @@ export function Customers() {
                         {isOpen && (
                           <tr className="border-b border-lline/60 bg-slate-50/60 dark:border-line/60 dark:bg-card/40">
                             <td colSpan={6} className="px-4 py-3">
-                              <div className="mb-2 flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-muted">
-                                {c.phone && <span>📞 {c.phone}</span>}
-                                <span>First order {fmtDate(c.first_order)}</span>
-                                <span>{c.orders} order{c.orders === 1 ? '' : 's'} total</span>
+                              <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-muted">
+                                  {c.phone && <span>📞 {c.phone}</span>}
+                                  <span>First order {fmtDate(c.first_order)}</span>
+                                  <span>{c.orders} order{c.orders === 1 ? '' : 's'} total</span>
+                                </div>
+                                {st ? (
+                                  <button className="btn text-[12px]" onClick={() => shipAgain(c)}>📦 Ship again</button>
+                                ) : (
+                                  <span className="text-[11.5px] text-faint">No complete address on file — can’t reship</span>
+                                )}
                               </div>
+                              {st && (
+                                // Spelled out so "again" is never ambiguous: this is the
+                                // address from their most recent order that had one.
+                                <div className="mb-3 text-[11.5px] text-faint">
+                                  Ships to {st.address1}{st.address2 ? `, ${st.address2}` : ''}, {st.city} {st.state} {st.zip}
+                                </div>
+                              )}
                               <table className="w-full text-[12.5px]">
                                 <thead>
                                   <tr className="text-left text-[10.5px] uppercase tracking-wide text-faint">
