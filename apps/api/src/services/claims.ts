@@ -22,13 +22,22 @@ export async function resolveClaim(prisma: PrismaClient, claimId: string, input:
   if (claim.status === 'resolved') throw Conflict('resolved', 'Claim is already resolved');
 
   let amountCents: number | null = null;
-  let reshipOrderId: string | null = null;
 
+  // Credit is idempotent on the claim id (unique ledger externalId), so issuing
+  // it before the resolve transaction is safe against retries — a replay returns
+  // the existing entry instead of double-crediting.
   if (input.resolution === 'credited') {
     if (!input.amountCents || input.amountCents <= 0) throw BadRequest('amount_required', 'A credit amount is required');
     amountCents = input.amountCents;
     await appendEntry(prisma, { brandId: claim.brandId, type: 'refund_credit', amount: amountCents, externalId: `claim:${claimId}:credit`, reason: `Claim ${claimId}: ${input.reason}`, createdBy: adminId });
-  } else if (input.resolution === 'reshipped') {
+  }
+
+  // Pre-compute the reship charge/blocker. The order.create itself runs INSIDE the
+  // resolve transaction below, gated on the status flip — so concurrent resolves
+  // and retries can't produce a second physical shipment (unlike the credit path,
+  // the reship has no natural idempotency key).
+  let reship: { charge: number; blocker: 'none' | 'awaiting_funds'; comp: boolean; wholesale: number; shipping: number } | null = null;
+  if (input.resolution === 'reshipped') {
     const o = claim.order;
     const comp = input.comp !== false; // default to platform comp
     const wholesale = comp ? 0 : o.wholesaleTotalCents;
@@ -39,42 +48,59 @@ export async function resolveClaim(prisma: PrismaClient, claimId: string, input:
       const { available } = await getWalletSummary(prisma, o.brandId);
       if (available < charge) blocker = 'awaiting_funds';
     }
-    const reship = await prisma.order.create({
-      data: {
-        brandId: o.brandId,
-        source: 'manual',
-        status: 'ready_for_fulfillment',
-        blocker,
-        recipientName: o.recipientName,
-        recipientEmail: o.recipientEmail,
-        recipientPhone: o.recipientPhone,
-        address1: o.address1,
-        address2: o.address2,
-        city: o.city,
-        state: o.state,
-        zip: o.zip,
-        country: o.country,
-        wholesaleTotalCents: wholesale,
-        shippingTotalCents: shipping,
-        walletChargeCents: charge,
-        shippingServiceCode: o.shippingServiceCode,
-        shippingCarrier: o.shippingCarrier,
-        boxId: o.boxId,
-        boxName: o.boxName,
-        boxLengthIn: o.boxLengthIn,
-        boxWidthIn: o.boxWidthIn,
-        boxHeightIn: o.boxHeightIn,
-        billableWeightOz: o.billableWeightOz,
-        items: { create: o.items.map((i) => ({ productId: i.productId, qty: i.qty, unitWholesaleCents: comp ? 0 : i.unitWholesaleCents })) },
-      },
-    });
-    reshipOrderId = reship.id;
+    reship = { charge, blocker, comp, wholesale, shipping };
   }
 
   return prisma.$transaction(async (tx) => {
+    // Gate: atomically flip a non-resolved claim to resolved. Concurrent resolves
+    // serialize on this row update; the loser matches 0 rows and bails, so at most
+    // one reship is created. Any failure below rolls the flip back with the
+    // transaction, so a crashed attempt leaves the claim open (no orphan reship).
+    const gate = await tx.claim.updateMany({
+      where: { id: claimId, status: { not: 'resolved' } },
+      data: { status: 'resolved' },
+    });
+    if (gate.count === 0) throw Conflict('resolved', 'Claim is already resolved');
+
+    let reshipOrderId: string | null = null;
+    if (reship) {
+      const o = claim.order;
+      const { charge, blocker, comp, wholesale, shipping } = reship;
+      const created = await tx.order.create({
+        data: {
+          brandId: o.brandId,
+          source: 'manual',
+          status: 'ready_for_fulfillment',
+          blocker,
+          recipientName: o.recipientName,
+          recipientEmail: o.recipientEmail,
+          recipientPhone: o.recipientPhone,
+          address1: o.address1,
+          address2: o.address2,
+          city: o.city,
+          state: o.state,
+          zip: o.zip,
+          country: o.country,
+          wholesaleTotalCents: wholesale,
+          shippingTotalCents: shipping,
+          walletChargeCents: charge,
+          shippingServiceCode: o.shippingServiceCode,
+          shippingCarrier: o.shippingCarrier,
+          boxId: o.boxId,
+          boxName: o.boxName,
+          boxLengthIn: o.boxLengthIn,
+          boxWidthIn: o.boxWidthIn,
+          boxHeightIn: o.boxHeightIn,
+          billableWeightOz: o.billableWeightOz,
+          items: { create: o.items.map((i) => ({ productId: i.productId, qty: i.qty, unitWholesaleCents: comp ? 0 : i.unitWholesaleCents })) },
+        },
+      });
+      reshipOrderId = created.id;
+    }
+
     const c = await tx.claim.update({
       where: { id: claimId },
-      data: { status: 'resolved', resolution: input.resolution, reason: input.reason, amountCents, reshipOrderId, resolvedAt: new Date() },
+      data: { resolution: input.resolution, reason: input.reason, amountCents, reshipOrderId, resolvedAt: new Date() },
     });
     await writeAudit(tx, {
       actorType: 'admin',
