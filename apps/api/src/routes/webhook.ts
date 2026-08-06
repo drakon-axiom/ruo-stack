@@ -99,7 +99,9 @@ async function resolveBrandId(
 ): Promise<string | null> {
   if (event.brandId) return event.brandId;
   if (event.customerId) {
-    const brand = await db.brand.findFirst({ where: { stripeCustomerId: event.customerId }, select: { id: true } });
+    // stripe_customer_id is unique — a direct, indexed lookup (no seq scan, no
+    // ambiguity about which brand an event belongs to).
+    const brand = await db.brand.findUnique({ where: { stripeCustomerId: event.customerId }, select: { id: true } });
     return brand?.id ?? null;
   }
   return null;
