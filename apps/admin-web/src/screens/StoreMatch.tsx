@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, PageHeader, Tabs } from '../components/ui.js';
+import { EmptyState, PageHeader, Tabs } from '@ruostack/ui';
 
 interface NoMatchOrder {
   id: string;

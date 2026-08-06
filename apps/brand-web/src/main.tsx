@@ -1,21 +1,22 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { ThemeProvider } from '@ruostack/ui';
 import { AuthProvider } from './lib/auth.js';
 import { App } from './App.js';
 import './index.css';
 
-// Default the in-app theme to dark (Pepify pattern); auth pages are light.
-if (localStorage.getItem('ruostack_theme') !== 'light') {
-  document.documentElement.classList.add('dark');
-}
-
+// ThemeProvider owns the html.dark class now. It keeps the existing
+// `ruostack_theme` key, so a user who already chose light or dark keeps that
+// choice; only users with nothing stored fall through to the OS preference.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider storageKey="ruostack_theme">
+      <BrowserRouter>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   </StrictMode>,
 );

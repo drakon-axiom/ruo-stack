@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, PageHeader } from '../components/ui.js';
+import { EmptyState, PageHeader } from '@ruostack/ui';
 
 interface DeadLetter { id: string; source: string; type: string; attempts: number; external_id: string; created_at: string }
 interface Drift { kind: string; order_id: string; brand_name: string; detail: string; at: string | null }

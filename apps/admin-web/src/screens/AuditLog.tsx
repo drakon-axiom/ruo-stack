@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { EmptyState, PageHeader } from '../components/ui.js';
+import { EmptyState, PageHeader } from '@ruostack/ui';
 
 interface Entry {
   id: string;

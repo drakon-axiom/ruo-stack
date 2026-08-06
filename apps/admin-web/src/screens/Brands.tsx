@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, StatusPill } from '../components/ui.js';
+import { Drawer, EmptyState, Field, PageHeader, StatusPill } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const PLAN_PILL: Record<string, string> = {
@@ -143,7 +143,7 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
   }
 
   return (
-    <Drawer open title={d?.brand_name ?? 'Brand'} onClose={onClose}>
+    <Drawer open title={d?.brand_name ?? 'Brand'} onOpenChange={(o) => { if (!o) onClose(); }}>
       {!d ? <div className="text-muted">Loading…</div> : (
         <div className="space-y-4 text-[13px]">
           {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">{err}</div>}

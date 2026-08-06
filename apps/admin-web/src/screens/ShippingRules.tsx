@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, Tabs } from '../components/ui.js';
+import { Drawer, EmptyState, Field, PageHeader, Tabs } from '@ruostack/ui';
 
 interface Box {
   id: string;
@@ -148,7 +148,7 @@ function BoxDrawer({ box, onClose, onSaved }: { box: Box | null; onClose: () => 
   const valid = f.name && num(f.inner_length_in) > 0 && num(f.inner_width_in) > 0 && num(f.inner_height_in) > 0 && num(f.max_weight_oz) > 0;
 
   return (
-    <Drawer open title={box ? 'Edit box' : 'New box'} onClose={onClose} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
+    <Drawer open title={box ? 'Edit box' : 'New box'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
       <Field label="Name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
       <div className="grid grid-cols-3 gap-2">
@@ -185,7 +185,7 @@ function ServiceDrawer({ svc, onClose, onSaved }: { svc: Service | null; onClose
   const valid = f.carrier_service_code && f.display_label && f.transit_estimate && num(f.max_weight_oz) > 0;
 
   return (
-    <Drawer open title={svc ? 'Edit service' : 'New service'} onClose={onClose} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
+    <Drawer open title={svc ? 'Edit service' : 'New service'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
       <Field label="Tier">
         <select className="input" value={f.tier} onChange={(e) => setF({ ...f, tier: e.target.value })}>

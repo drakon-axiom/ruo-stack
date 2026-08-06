@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, KpiCard, PageHeader, Tabs } from '../components/ui.js';
+import { Drawer, EmptyState, Field, KpiTile, PageHeader, Tabs } from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -101,10 +101,10 @@ export function Announcements() {
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Live now" value={counts.live ?? 0} />
-        <KpiCard label="Scheduled" value={counts.scheduled ?? 0} />
-        <KpiCard label="Drafts" value={counts.draft ?? 0} />
-        <KpiCard label="Total" value={rows.length} />
+        <KpiTile label="Live now" value={counts.live ?? 0} />
+        <KpiTile label="Scheduled" value={counts.scheduled ?? 0} />
+        <KpiTile label="Drafts" value={counts.draft ?? 0} />
+        <KpiTile label="Total" value={rows.length} />
       </div>
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
@@ -246,7 +246,7 @@ function Compose({
     <Drawer
       open
       title={existing ? 'Edit announcement' : 'Compose announcement'}
-      onClose={onClose}
+      onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         <div className="flex gap-2">
           <button className="btn-ghost flex-1" onClick={() => save(false)} disabled={busy || !title || !body}>

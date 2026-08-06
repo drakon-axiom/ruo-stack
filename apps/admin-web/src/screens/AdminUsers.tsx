@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ADMIN_ROLES, type AdminRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, StatusPill } from '../components/ui.js';
+import { Drawer, EmptyState, Field, PageHeader, StatusPill } from '@ruostack/ui';
 
 interface Admin {
   id: string;
@@ -143,7 +143,7 @@ function CreateAdmin({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   }
 
   return (
-    <Drawer open title="Create admin" onClose={onClose} footer={
+    <Drawer open title="Create admin" onOpenChange={(o) => { if (!o) onClose(); }} footer={
       <button className="btn w-full" onClick={create} disabled={busy || !email || !fullName}>
         {busy ? '…' : 'Create + send invite'}
       </button>

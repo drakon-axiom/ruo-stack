@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { KpiCard, PageHeader } from '../components/ui.js';
+import { KpiTile, PageHeader } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -63,10 +63,10 @@ export function Reporting() {
       {!r ? <div className="card p-10 text-center text-muted">Loading…</div> : (
         <div className="space-y-5">
           <div className="grid grid-cols-4 gap-3">
-            <KpiCard label="Shipping margin" value={dollars(r.shipping.margin_cents)} />
-            <KpiCard label="Fallback rate" value={pct(r.fallback.share)} />
-            <KpiCard label="Captured GMV" value={dollars(r.money.captured_cents)} />
-            <KpiCard label="Claims overdue" value={r.claims.sla_overdue} />
+            <KpiTile label="Shipping margin" value={dollars(r.shipping.margin_cents)} />
+            <KpiTile label="Fallback rate" value={pct(r.fallback.share)} />
+            <KpiTile label="Captured GMV" value={dollars(r.money.captured_cents)} />
+            <KpiTile label="Claims overdue" value={r.claims.sla_overdue} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, Tabs } from '../components/ui.js';
+import { Drawer, EmptyState, Field, PageHeader, Tabs } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -258,7 +258,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
     <Drawer
       open
       title={`Edit order · ${order.brand_name}`}
-      onClose={onClose}
+      onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         <button className="btn w-full" disabled={!valid || busy || !detail} onClick={save}>{busy ? '…' : 'Save changes (re-prices wallet)'}</button>
       }

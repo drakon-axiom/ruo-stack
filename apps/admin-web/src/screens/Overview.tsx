@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { KpiCard, PageHeader } from '../components/ui.js';
+import { KpiTile, PageHeader } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -28,16 +28,16 @@ export function Overview() {
       <PageHeader title="Overview" subtitle="Platform health at a glance." />
 
       <div className="mb-4 grid grid-cols-4 gap-3">
-        <KpiCard label="Brands" value={d.brands.total} />
-        <KpiCard label="Orders today" value={d.orders.today} />
-        <KpiCard label="Captured GMV" value={dollars(d.money.captured_gmv_cents)} />
-        <KpiCard label="Wallet float" value={dollars(d.money.wallet_float_cents)} />
+        <KpiTile label="Brands" value={d.brands.total} />
+        <KpiTile label="Orders today" value={d.orders.today} />
+        <KpiTile label="Captured GMV" value={dollars(d.money.captured_gmv_cents)} />
+        <KpiTile label="Wallet float" value={dollars(d.money.wallet_float_cents)} />
       </div>
       <div className="mb-4 grid grid-cols-4 gap-3">
-        <KpiCard label="Ready to ship" value={d.orders.ready} />
-        <KpiCard label="Shipped" value={d.orders.shipped} />
-        <KpiCard label="Action required" value={<span className={d.orders.action_required ? 'text-amber' : ''}>{d.orders.action_required}</span>} />
-        <KpiCard label="Published SKUs" value={d.catalog.published} />
+        <KpiTile label="Ready to ship" value={d.orders.ready} />
+        <KpiTile label="Shipped" value={d.orders.shipped} />
+        <KpiTile label="Action required" value={<span className={d.orders.action_required ? 'text-amber' : ''}>{d.orders.action_required}</span>} />
+        <KpiTile label="Published SKUs" value={d.catalog.published} />
       </div>
 
       <div className="grid grid-cols-[1fr_1fr] gap-4">

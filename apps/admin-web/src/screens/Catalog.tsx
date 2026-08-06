@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, KpiCard, PageHeader, StatusPill, Tabs } from '../components/ui.js';
+import { Drawer, EmptyState, Field, KpiTile, PageHeader, StatusPill, Tabs } from '@ruostack/ui';
 
 interface Product {
   id: string;
@@ -97,10 +97,10 @@ export function Catalog() {
       />
 
       <div className="mb-4 grid grid-cols-4 gap-3">
-        <KpiCard label="Total SKUs" value={counts.all} />
-        <KpiCard label="In stock" value={counts.in_stock} />
-        <KpiCard label="Soon" value={counts.soon} />
-        <KpiCard label="Published" value={products.filter((p) => p.isPublished).length} />
+        <KpiTile label="Total SKUs" value={counts.all} />
+        <KpiTile label="In stock" value={counts.in_stock} />
+        <KpiTile label="Soon" value={counts.soon} />
+        <KpiTile label="Published" value={products.filter((p) => p.isPublished).length} />
       </div>
 
       <div className="mb-3 flex items-center justify-between gap-4">
@@ -305,7 +305,7 @@ function EditDrawer({
     <Drawer
       open
       title={product.name}
-      onClose={onClose}
+      onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         writable && (
           <div className="space-y-2">
@@ -442,7 +442,7 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     <Drawer
       open
       title="Create product"
-      onClose={onClose}
+      onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         <button className="btn w-full" onClick={create} disabled={busy || !sku || !name || !compound}>
           {busy ? '…' : 'Create (unpublished)'}

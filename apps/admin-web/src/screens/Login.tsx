@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login, mfaEnroll, mfaVerify, setTokens, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Field } from '../components/ui.js';
+import { Field } from '@ruostack/ui';
 
 type Stage = 'credentials' | 'totp' | 'enroll';
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, KpiCard, PageHeader, Tabs } from '../components/ui.js';
+import { EmptyState, KpiTile, PageHeader, Tabs } from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -173,10 +173,10 @@ export function Ledger() {
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Wallet float (all brands)" value={summary ? money(summary.wallet_float_cents) : '—'} />
-        <KpiCard label="Net movement (period)" value={summary ? money(summary.totals.net) : '—'} />
-        <KpiCard label="Entries (period)" value={summary ? summary.totals.entryCount : '—'} />
-        <KpiCard label="Uncaptured drift" value={uncaptured.length} />
+        <KpiTile label="Wallet float (all brands)" value={summary ? money(summary.wallet_float_cents) : '—'} />
+        <KpiTile label="Net movement (period)" value={summary ? money(summary.totals.net) : '—'} />
+        <KpiTile label="Entries (period)" value={summary ? summary.totals.entryCount : '—'} />
+        <KpiTile label="Uncaptured drift" value={uncaptured.length} />
       </div>
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite, canResolveClaim, claimTypeLabel, type ClaimType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, Tabs } from '../components/ui.js';
+import { Drawer, EmptyState, Field, PageHeader, Tabs } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -122,7 +122,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
   }
 
   return (
-    <Drawer open title={c ? `${claimTypeLabel(c.type)} — ${c.brand_name}` : 'Claim'} onClose={onClose}>
+    <Drawer open title={c ? `${claimTypeLabel(c.type)} — ${c.brand_name}` : 'Claim'} onOpenChange={(o) => { if (!o) onClose(); }}>
       {!c ? <div className="text-muted">Loading…</div> : (
         <div className="space-y-4 text-[13px]">
           {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">{err}</div>}
