@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, StatusPill, buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
+import {
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  PageHeader,
+  StatusPill,
+  buttonClass,
+  cardClass,
+  inputClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const PLAN_PILL: Record<string, string> = {
@@ -19,6 +31,29 @@ interface BrandRow {
   balance_cents: number;
 }
 
+const COLUMNS: Column<BrandRow>[] = [
+  { key: 'name', header: 'Brand', priority: 'primary', cell: (b) => b.brand_name },
+  {
+    key: 'plan',
+    header: 'Plan',
+    cell: (b) => <span className={pillClass(PLAN_PILL[b.plan])}>{b.plan}</span>,
+  },
+  {
+    key: 'wallet',
+    header: 'Wallet',
+    align: 'right',
+    mono: true,
+    cell: (b) => dollars(b.balance_cents),
+  },
+  { key: 'status', header: 'Status', cell: (b) => <StatusPill value={b.status} /> },
+  {
+    key: 'since',
+    header: 'Member since',
+    priority: 'meta',
+    cell: (b) => new Date(b.member_since).toLocaleDateString(),
+  },
+];
+
 export function Brands() {
   const [brands, setBrands] = useState<BrandRow[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -34,36 +69,15 @@ export function Brands() {
     <>
       <PageHeader title="Brand Manager" subtitle="Every brand — plan, wallet, and status." />
 
-      {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
-      ) : brands.length === 0 ? (
-        <EmptyState title="No brands yet" hint="Brands appear here as they sign up." />
-      ) : (
-        <div className={cardClass('overflow-hidden')}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Wallet</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Member since</th>
-              </tr>
-            </thead>
-            <tbody>
-              {brands.map((b) => (
-                <tr key={b.id} onClick={() => setOpenId(b.id)} className="cursor-pointer border-b border-line/60 hover:bg-surface-3">
-                  <td className="px-4 py-3 text-content">{b.brand_name}</td>
-                  <td className="px-4 py-3"><span className={pillClass(`${PLAN_PILL[b.plan]}`)}>{b.plan}</span></td>
-                  <td className="px-4 py-3">{dollars(b.balance_cents)}</td>
-                  <td className="px-4 py-3"><StatusPill value={b.status} /></td>
-                  <td className="px-4 py-3 text-content-muted">{new Date(b.member_since).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="All brands with plan, wallet balance and status"
+        columns={COLUMNS}
+        rows={brands}
+        rowKey={(b) => b.id}
+        loading={loading}
+        onRowClick={(b) => setOpenId(b.id)}
+        empty={<EmptyState title="No brands yet" hint="Brands appear here as they sign up." />}
+      />
 
       {openId && <BrandDetail id={openId} onClose={() => setOpenId(null)} onChanged={load} />}
     </>
