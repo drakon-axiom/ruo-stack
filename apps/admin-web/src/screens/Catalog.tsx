@@ -2,7 +2,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, KpiTile, PageHeader, StatusPill, Tabs, buttonClass, cardClass, inputClass } from '@ruostack/ui';
+import {
+  Button,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  KpiTile,
+  Lock,
+  PageHeader,
+  Plus,
+  StatusPill,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  type Column,
+} from '@ruostack/ui';
 
 interface Product {
   id: string;
@@ -31,6 +47,50 @@ const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const toCents = (v: string) => Math.round(parseFloat(v || '0') * 100);
 
 type Filter = 'all' | 'in_stock' | 'soon' | 'out_of_stock';
+
+// scroll mode: the three wholesale tiers only make sense read across, beside
+// the SKU they price.
+const COLUMNS: Column<Product>[] = [
+  {
+    key: 'sku',
+    header: 'SKU',
+    priority: 'primary',
+    mono: true,
+    minWidth: 160,
+    cell: (p) => <span className="text-accent-hover">{p.canonicalSku}</span>,
+  },
+  { key: 'name', header: 'Name', minWidth: 200, cell: (p) => p.name },
+  {
+    key: 'wholesale',
+    header: 'Wholesale (S / P / V)',
+    mono: true,
+    minWidth: 190,
+    cell: (p) =>
+      `${dollars(p.wholesaleStarter)} / ${dollars(p.wholesalePro)} / ${dollars(p.wholesaleVolume)}`,
+  },
+  {
+    key: 'retail',
+    header: 'Retail',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (p) => <span className="text-success">{dollars(p.suggestedRetail)}</span>,
+  },
+  { key: 'status', header: 'Status', minWidth: 120, cell: (p) => <StatusPill value={p.status} /> },
+  {
+    key: 'published',
+    header: 'Published',
+    minWidth: 110,
+    cell: (p) =>
+      p.isPublished ? (
+        <span className="inline-flex items-center gap-1">
+          <Lock aria-hidden className="h-3 w-3" /> yes
+        </span>
+      ) : (
+        'draft'
+      ),
+  },
+];
 
 export function Catalog() {
   const { claims } = useAuth();
@@ -122,48 +182,32 @@ export function Catalog() {
         />
       </div>
 
-      {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
-      ) : visible.length === 0 ? (
-        <EmptyState
-          title="No products"
-          hint={writable ? 'Create the first catalog product to get started.' : 'Nothing matches your filters.'}
-          action={writable && <button className={buttonClass('primary', 'md')} onClick={() => setCreating(true)}>+ Create product</button>}
-        />
-      ) : (
-        <div className={cardClass('overflow-hidden')}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
-                <th className="px-4 py-3">SKU</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Wholesale (S / P / V)</th>
-                <th className="px-4 py-3">Retail</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Published</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => setEditing(p)}
-                  className="cursor-pointer border-b border-line/60 hover:bg-surface-3"
-                >
-                  <td className="px-4 py-3 font-mono text-xs text-accent-hover">{p.canonicalSku}</td>
-                  <td className="px-4 py-3 text-content">{p.name}</td>
-                  <td className="px-4 py-3 text-xs text-content-muted">
-                    {dollars(p.wholesaleStarter)} / {dollars(p.wholesalePro)} / {dollars(p.wholesaleVolume)}
-                  </td>
-                  <td className="px-4 py-3 text-success">{dollars(p.suggestedRetail)}</td>
-                  <td className="px-4 py-3"><StatusPill value={p.status} /></td>
-                  <td className="px-4 py-3 text-content-muted">{p.isPublished ? '🔒 yes' : 'draft'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Catalog products with tiered wholesale pricing"
+        mode="scroll"
+        columns={COLUMNS}
+        rows={visible}
+        rowKey={(p) => p.id}
+        loading={loading}
+        onRowClick={setEditing}
+        empty={
+          <EmptyState
+            title="No products"
+            hint={
+              writable
+                ? 'Create the first catalog product to get started.'
+                : 'Nothing matches your filters.'
+            }
+            action={
+              writable ? (
+                <Button icon={Plus} onClick={() => setCreating(true)}>
+                  Create product
+                </Button>
+              ) : undefined
+            }
+          />
+        }
+      />
 
       {editing && (
         <EditDrawer

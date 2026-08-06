@@ -52,4 +52,5 @@ export {
   PanelLeftClose,
   PanelLeftOpen,
   Loader2,
+  Lock,
 } from 'lucide-react';
