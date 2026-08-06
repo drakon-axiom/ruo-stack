@@ -46,6 +46,11 @@ jobs:
       - name: Token contrast gate
         run: pnpm lint:contrast
 
+      # No screen may reference a class from the deleted @layer components
+      # blocks -- such elements render with no styling and nothing else catches it.
+      - name: Legacy-class gate
+        run: pnpm lint:legacy-classes
+
       - name: Generate Prisma client
         run: pnpm db:generate
 
