@@ -63,14 +63,23 @@ else
   # The guard that matters: the two checkouts are identical except for .env, so
   # a prod deploy fired from the dev directory would publish dev's database
   # config to the prod hosts. It must also fail FAST, before any build.
+  #
+  # A bare non-zero exit isn't proof: deleting the guard entirely still exits
+  # non-zero (and quickly) on a box where deploy/nginx/env.prod is missing, so
+  # both a specific exit code AND the guard's own refusal message are required
+  # -- only actually hitting the guard can produce both.
   if [[ "$ROOT" == */apps/dev/* ]]; then
     start=$SECONDS
-    if "$ROOT/deploy/deploy.sh" prod >/dev/null 2>&1; then
-      bad "blocks prod from a dev checkout" "exited 0"
-    else
+    stderr="$("$ROOT/deploy/deploy.sh" prod 2>&1 >/dev/null)"
+    status=$?
+    if [[ "$status" -eq 1 && "$stderr" == *refusing* ]]; then
       ok "blocks prod from a dev checkout"
+      # Exit code + message together are the proof it hit the guard; the
+      # timing alone would also be satisfied by any other fast failure.
       (( SECONDS - start < 10 )) && ok "guard fails fast (before any build)" \
                                  || bad "guard fails fast (before any build)" "took $((SECONDS-start))s"
+    else
+      bad "blocks prod from a dev checkout" "exit $status, stderr: $stderr"
     fi
   fi
 fi

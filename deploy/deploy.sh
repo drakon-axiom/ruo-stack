@@ -16,7 +16,7 @@ if [[ "$ENV_NAME" != "dev" && "$ENV_NAME" != "prod" ]]; then
   exit 2
 fi
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 ENV_FILE="$ROOT/deploy/nginx/env.$ENV_NAME"
 [[ -f "$ENV_FILE" ]] || { echo "deploy: missing $ENV_FILE" >&2; exit 2; }
 
@@ -34,11 +34,31 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# set -u catches unset but NOT empty. An empty *_ROOT would make the rsync
+# target "/", so require both to be non-empty and under /var/www before any
+# --delete runs.
+for var in BRAND_HOST ADMIN_HOST BRAND_ROOT ADMIN_ROOT; do
+  [[ -n "${!var:-}" ]] || { echo "deploy: $ENV_FILE has empty $var" >&2; exit 1; }
+done
+for var in BRAND_ROOT ADMIN_ROOT; do
+  case "${!var}" in
+    /var/www/*) ;;
+    *) echo "deploy: refusing -- $var must be under /var/www (got '${!var}')" >&2; exit 1 ;;
+  esac
+done
+
 echo "==> deploying $ENV_NAME from $ROOT"
 
 cd "$ROOT"
+# Every step below is idempotent (install, migrate deploy, build, rsync
+# --delete, pm2 reload/start) -- if the script dies partway through, re-run it
+# rather than trying to hand-roll a rollback.
 pnpm install --frozen-lockfile
 
+# Migrations run before the build. If the build then fails, the database is
+# left ahead of the deployed code. That ordering is a recorded project
+# decision, not an oversight here -- it is flagged for deliberate review
+# before the first production deploy.
 echo "==> applying database migrations"
 pnpm --filter @ruostack/db run deploy
 
@@ -61,6 +81,9 @@ sudo rsync -a --delete "$ROOT/apps/brand-web/dist/" "$BRAND_ROOT/"
 sudo rsync -a --delete "$ROOT/apps/admin-web/dist/" "$ADMIN_ROOT/"
 
 echo "==> reloading api"
+# pm2 reload does NOT re-read ecosystem.config.cjs -- it restarts the running
+# process with its already-loaded settings. A port or env change here needs a
+# delete-and-start, not a reload, or the process keeps its stale config.
 if pm2 describe "ruostack-api-$ENV_NAME" >/dev/null 2>&1; then
   pm2 reload "ruostack-api-$ENV_NAME"
 else
