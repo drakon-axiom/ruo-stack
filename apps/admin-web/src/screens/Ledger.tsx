@@ -2,7 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
+import {
+  DataTable,
+  EmptyState,
+  KpiTile,
+  PageHeader,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -74,6 +85,69 @@ const TABS: { key: string; label: string; types?: TxnType[] }[] = [
 
 /** `YYYY-MM-DD` (what <input type="date"> wants) for N days ago. */
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+
+const SUMMARY_COLUMNS: Column<BrandSummary>[] = [
+  { key: 'brand', header: 'Brand', priority: 'primary', minWidth: 160, cell: (b) => b.brandName },
+  { key: 'opening', header: 'Opening', align: 'right', mono: true, minWidth: 110, cell: (b) => money(b.openingBalance) },
+  { key: 'deposits', header: 'Deposits', align: 'right', mono: true, minWidth: 110, cell: (b) => money(b.byType.deposit ?? 0) },
+  { key: 'captures', header: 'Captures', align: 'right', mono: true, minWidth: 110, cell: (b) => money(b.byType.capture ?? 0) },
+  {
+    key: 'credits',
+    header: 'Credits',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (b) => money((b.byType.refund_credit ?? 0) + (b.byType.referral_credit ?? 0)),
+  },
+  {
+    key: 'net',
+    header: 'Net',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (b) => <span className={b.net < 0 ? 'text-danger' : 'text-success'}>{money(b.net)}</span>,
+  },
+  {
+    key: 'closing',
+    header: 'Closing',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (b) => <span className="font-medium">{money(b.closingBalance)}</span>,
+  },
+];
+
+const ENTRY_COLUMNS: Column<Entry>[] = [
+  { key: 'date', header: 'Date', priority: 'primary', minWidth: 120, cell: (e) => day(e.createdAt) },
+  { key: 'brand', header: 'Brand', minWidth: 150, cell: (e) => e.brandName },
+  { key: 'type', header: 'Type', minWidth: 130, cell: (e) => TYPE_LABEL[e.type] },
+  {
+    key: 'reason',
+    header: 'Reason',
+    minWidth: 200,
+    cell: (e) => (
+      <span className="block max-w-[280px] truncate" title={e.reason ?? ''}>
+        {e.reason ?? '\u2014'}
+      </span>
+    ),
+  },
+  {
+    key: 'amount',
+    header: 'Amount',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (e) => <span className={e.amount < 0 ? 'text-danger' : 'text-success'}>{money(e.amount)}</span>,
+  },
+  {
+    key: 'balance',
+    header: 'Balance after',
+    align: 'right',
+    mono: true,
+    minWidth: 130,
+    cell: (e) => money(e.balanceAfter),
+  },
+];
 
 export function Ledger() {
   const { claims } = useAuth();
@@ -230,69 +304,32 @@ export function Ledger() {
 
       {/* ── Per-brand period summary ──────────────────────────────────────── */}
       {summary && summary.brands.length > 0 && (
-        <div className={cardClass('mb-5 overflow-x-auto')}>
-          <table className="w-full text-sm">
-            <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
-              <tr>
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3 text-right">Opening</th>
-                <th className="px-4 py-3 text-right">Deposits</th>
-                <th className="px-4 py-3 text-right">Captures</th>
-                <th className="px-4 py-3 text-right">Credits</th>
-                <th className="px-4 py-3 text-right">Net</th>
-                <th className="px-4 py-3 text-right">Closing</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.brands.map((b) => (
-                <tr key={b.brandId} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-2.5">{b.brandName}</td>
-                  <td className="px-4 py-2.5 text-right text-content-muted">{money(b.openingBalance)}</td>
-                  <td className="px-4 py-2.5 text-right">{money(b.byType.deposit ?? 0)}</td>
-                  <td className="px-4 py-2.5 text-right">{money(b.byType.capture ?? 0)}</td>
-                  <td className="px-4 py-2.5 text-right">{money((b.byType.refund_credit ?? 0) + (b.byType.referral_credit ?? 0))}</td>
-                  <td className={`px-4 py-2.5 text-right ${b.net < 0 ? 'text-danger' : 'text-success'}`}>{money(b.net)}</td>
-                  <td className="px-4 py-2.5 text-right font-medium">{money(b.closingBalance)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mb-5">
+          <DataTable
+            caption="Per-brand wallet summary for the selected period"
+            mode="scroll"
+            columns={SUMMARY_COLUMNS}
+            rows={summary.brands}
+            rowKey={(b) => b.brandId}
+          />
         </div>
       )}
 
       {/* ── Entries ───────────────────────────────────────────────────────── */}
-      {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
-      ) : visible.length === 0 ? (
-        <EmptyState title="No wallet movement in this period" hint="Widen the date range or clear the filters." />
-      ) : (
-        <div className={cardClass('overflow-x-auto')}>
-          <table className="w-full text-sm">
-            <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
-              <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3 text-right">Balance after</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((e) => (
-                <tr key={e.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-2.5 text-content-muted">{day(e.createdAt)}</td>
-                  <td className="px-4 py-2.5">{e.brandName}</td>
-                  <td className="px-4 py-2.5">{TYPE_LABEL[e.type]}</td>
-                  <td className="px-4 py-2.5 max-w-[280px] truncate text-content-muted" title={e.reason ?? ''}>{e.reason ?? '—'}</td>
-                  <td className={`px-4 py-2.5 text-right ${e.amount < 0 ? 'text-danger' : 'text-success'}`}>{money(e.amount)}</td>
-                  <td className="px-4 py-2.5 text-right text-content-muted">{money(e.balanceAfter)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Wallet ledger entries"
+        mode="scroll"
+        columns={ENTRY_COLUMNS}
+        rows={visible}
+        rowKey={(e) => e.id}
+        loading={loading}
+        empty={
+          <EmptyState
+            title="No wallet movement in this period"
+            hint="Widen the date range or clear the filters."
+          />
+        }
+      />
     </>
   );
 }

@@ -2,7 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, Tabs, buttonClass, cardClass, inputClass, labelClass, pillClass } from '@ruostack/ui';
+import {
+  Button,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  PageHeader,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  labelClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -74,6 +88,67 @@ export function Fulfillment() {
     finally { setBusyId(null); }
   }
 
+  // scroll mode: an operator queue row carries brand + destination + charge +
+  // status + three actions; stacking that into a card buries the actions.
+  const columns: Column<Order>[] = [
+    { key: 'brand', header: 'Brand', priority: 'primary', minWidth: 140, cell: (o) => o.brand_name },
+    {
+      key: 'shipto',
+      header: 'Ship to',
+      minWidth: 220,
+      cell: (o) => `${o.recipient.name} \u00b7 ${o.recipient.city}, ${o.recipient.state} ${o.recipient.zip}`,
+    },
+    { key: 'items', header: 'Items', align: 'right', mono: true, minWidth: 70, cell: (o) => o.item_count },
+    {
+      key: 'charge',
+      header: 'Charge',
+      align: 'right',
+      mono: true,
+      minWidth: 100,
+      cell: (o) => dollars(o.wallet_charge_cents),
+    },
+    { key: 'status', header: 'Status', minWidth: 130, cell: (o) => <FulfillmentBadge order={o} /> },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      minWidth: 260,
+      cell: (o) => (
+        <>
+          {writable && isPreShip(o) && (
+            <div className="flex items-center justify-end gap-1.5">
+              <Button variant="ghost" size="sm" onClick={() => setEditing(o)}>
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={busyId === o.id}
+                onClick={() => resend(o.id)}
+                title="Re-queue for ShipStation's next export pull"
+              >
+                {o.exported_at ? 'Re-send' : 'Send'}
+              </Button>
+              <Button size="sm" onClick={() => setShipping(o)} title="Manually mark shipped (failsafe)">
+                Mark shipped
+              </Button>
+            </div>
+          )}
+          {writable && o.status === 'shipped' && (
+            <Button variant="ghost" size="sm" onClick={() => deliver(o.id)}>
+              Mark delivered
+            </Button>
+          )}
+          {o.status === 'shipped' && o.tracking_number && (
+            <div className="mt-1 font-mono text-2xs text-accent-hover">
+              {o.carrier} {o.tracking_number}
+            </div>
+          )}
+        </>
+      ),
+    },
+  ];
+
   return (
     <>
       <PageHeader title="Fulfillment Monitor" subtitle="Orders flow to ShipStation for fulfillment; tracking flows back via shipnotify. Failsafes below for exceptions." />
@@ -92,54 +167,15 @@ export function Fulfillment() {
         />
       </div>
 
-      {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
-      ) : visible.length === 0 ? (
-        <EmptyState title="Nothing here" hint="No orders in this state." />
-      ) : (
-        <div className={cardClass('overflow-hidden')}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3">Ship to</th>
-                <th className="px-4 py-3">Items</th>
-                <th className="px-4 py-3">Charge</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((o) => (
-                <tr key={o.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-content">{o.brand_name}</td>
-                  <td className="px-4 py-3 text-content-muted">{o.recipient.name} · {o.recipient.city}, {o.recipient.state} {o.recipient.zip}</td>
-                  <td className="px-4 py-3">{o.item_count}</td>
-                  <td className="px-4 py-3">{dollars(o.wallet_charge_cents)}</td>
-                  <td className="px-4 py-3"><FulfillmentBadge order={o} /></td>
-                  <td className="px-4 py-3 text-right">
-                    {writable && isPreShip(o) && (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={() => setEditing(o)}>Edit</button>
-                        <button className={buttonClass('ghost', 'md', 'text-xs')} disabled={busyId === o.id} onClick={() => resend(o.id)} title="Re-queue for ShipStation's next export pull">
-                          {busyId === o.id ? '…' : o.exported_at ? 'Re-send' : 'Send'}
-                        </button>
-                        <button className={buttonClass('primary', 'md')} onClick={() => setShipping(o)} title="Manually mark shipped (failsafe)">Mark shipped</button>
-                      </div>
-                    )}
-                    {writable && o.status === 'shipped' && (
-                      <button className={buttonClass('ghost', 'md')} onClick={() => deliver(o.id)}>Mark delivered</button>
-                    )}
-                    {o.status === 'shipped' && o.tracking_number && (
-                      <div className="mt-1 font-mono text-2xs text-accent-hover">{o.carrier} {o.tracking_number}</div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Fulfillment queue"
+        mode="scroll"
+        columns={columns}
+        rows={visible}
+        rowKey={(o) => o.id}
+        loading={loading}
+        empty={<EmptyState title="Nothing here" hint="No orders in this state." />}
+      />
 
       {shipping && <ShipModal order={shipping} onClose={() => setShipping(null)} onShipped={() => { setShipping(null); load(); }} />}
       {editing && <EditDrawer order={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
