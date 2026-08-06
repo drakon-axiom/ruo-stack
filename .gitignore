@@ -46,3 +46,4 @@ packages/db/generated/
 
 # vite
 **/.vite/
+.superpowers/

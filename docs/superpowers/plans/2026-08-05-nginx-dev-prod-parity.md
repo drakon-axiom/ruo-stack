@@ -178,15 +178,18 @@ done
 assert_contains "$NGINX_DIR/origin-shared.conf" 'map $http_x_forwarded_proto $ruostack_forwarded_proto' \
   "map lives in origin-shared.conf"
 
+# `grep -c` prints 0 and exits 1 when there is no match; the script runs
+# without `set -e`, so capture the count directly. Adding `|| echo 0` here
+# would append a SECOND line and break the arithmetic below.
 for f in "$O_DEV" "$E_DEV"; do
-  n=$(grep -c 'proxy_set_header   X-Forwarded-For' "$f" 2>/dev/null || echo 0)
+  n=$(grep -c 'proxy_set_header   X-Forwarded-For' "$f")
   [[ "$n" -ge 2 ]] && ok "X-Forwarded-For in both blocks of $(basename "$f")" \
                    || bad "X-Forwarded-For in both blocks of $(basename "$f")" "found $n, want >= 2"
 done
 
 echo "== admin-only surface =="
 
-a=$(grep -c 'location /auth/' "$O_DEV" 2>/dev/null || echo 0)
+a=$(grep -c 'location /auth/' "$O_DEV")
 [[ "$a" -eq 1 ]] && ok "/auth/ proxied exactly once (admin site only)" \
                  || bad "/auth/ proxied exactly once (admin site only)" "found $a"
 
