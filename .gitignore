@@ -47,3 +47,6 @@ packages/db/generated/
 # vite
 **/.vite/
 .superpowers/
+
+# rendered nginx configs (derived; certbot edits the deployed edge copy)
+deploy/nginx/out/
