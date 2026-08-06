@@ -58,6 +58,23 @@ jobs:
 
       - run: pnpm -r test
 
+  # Drives the @ruostack/ui component harness: every app screen is behind auth,
+  # so a browser hitting the real app reaches only the login page and exercises
+  # none of the shell or table behaviour this guards.
+  responsive:
+    name: Responsive regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+
   # The integration suites self-skip without RUN_DB_TESTS=1. Run them against a
   # throwaway Postgres so migrations, the audit trigger and the RLS/hook spine
   # are verified on every PR instead of only by hand against Supabase.

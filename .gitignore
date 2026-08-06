@@ -50,3 +50,8 @@ packages/db/generated/
 
 # rendered nginx configs (derived; certbot edits the deployed edge copy)
 deploy/nginx/out/
+
+# Playwright
+test-results/
+playwright-report/
+packages/ui/gallery/dist/
