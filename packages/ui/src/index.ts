@@ -23,3 +23,9 @@ export { Drawer } from './overlays/Drawer.js';
 export { DropdownMenu, type MenuItem } from './overlays/DropdownMenu.js';
 export { Popover } from './overlays/Popover.js';
 export { Tooltip, TooltipProvider } from './overlays/Tooltip.js';
+
+export { Tabs, type TabDef } from './data/Tabs.js';
+export { Toolbar } from './data/Toolbar.js';
+export { PageHeader, type Crumb } from './nav/PageHeader.js';
+export { InlineAlert } from './feedback/InlineAlert.js';
+export { Toaster, toast } from './feedback/Toaster.js';
