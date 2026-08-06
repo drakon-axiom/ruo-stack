@@ -2,7 +2,7 @@ import type { BrandStoreConnection, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, wholesaleFieldFor } from '@ruostack/shared';
 import { writeAudit } from '../audit.js';
 import { effectivePlan } from './subscription.js';
-import { getWalletSummary } from './wallet.js';
+import { getWalletSummary, lockBrandWallet } from './wallet.js';
 import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
 import { findRateQuote } from './rate-quote.js';
 import { resolveSkus } from './sku-resolver.js';
@@ -145,18 +145,21 @@ export async function importWooOrder(
   }
   const walletCharge = wholesaleTotal + shipping;
 
-  // Blocker precedence: can't ship without an address; then SKU mapping; then funds.
+  // Blocker precedence: can't ship without an address; then SKU mapping; then
+  // funds. The funds decision is made INSIDE the transaction under the per-brand
+  // lock so concurrent imports can't both reserve the same balance.
   let blocker: 'none' | 'needs_address' | 'needs_mapping' | 'awaiting_funds' = 'none';
   if (!hasAddress) blocker = 'needs_address';
   else if (unmatched > 0 || lines.length === 0) blocker = 'needs_mapping';
-  else {
-    const { available } = await getWalletSummary(prisma, brandId);
-    if (available < walletCharge) blocker = 'awaiting_funds';
-  }
 
   let order;
   try {
     order = await prisma.$transaction(async (tx) => {
+      await lockBrandWallet(tx, brandId);
+      if (blocker === 'none') {
+        const { available } = await getWalletSummary(tx, brandId);
+        if (available < walletCharge) blocker = 'awaiting_funds';
+      }
       const o = await tx.order.create({
         data: {
           brandId,

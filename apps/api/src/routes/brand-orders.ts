@@ -12,7 +12,7 @@ import { getClients } from '../clients.js';
 import { writeAudit } from '../audit.js';
 import { requireBrand } from '../middleware/guards.js';
 import { effectivePlan } from '../services/subscription.js';
-import { getWalletSummary } from '../services/wallet.js';
+import { getWalletSummary, lockBrandWallet } from '../services/wallet.js';
 import { applyOrderEdit } from '../services/order-edit.js';
 import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
 import { loadConfig } from '../config.js';
@@ -91,11 +91,13 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     const shipping = shipQuote.chosen.amountCents; // brand cost = carrier + pick-&-pack
     const walletCharge = wholesaleTotal + shipping;
 
-    // Funds check against available = balance − held (existing open orders).
-    const { available } = await getWalletSummary(prisma, brandId);
-    const blocker = available >= walletCharge ? 'none' : 'awaiting_funds';
-
     const order = await prisma.$transaction(async (tx) => {
+      // Decide funds under the per-brand lock so two concurrent orders can't both
+      // reserve the same balance (available = balance − held over open orders).
+      await lockBrandWallet(tx, brandId);
+      const { available } = await getWalletSummary(tx, brandId);
+      const blocker = available >= walletCharge ? 'none' : 'awaiting_funds';
+
       const o = await tx.order.create({
         data: {
           brandId,
