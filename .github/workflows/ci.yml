@@ -41,6 +41,11 @@ jobs:
       - name: Payments-isolation guard
         run: pnpm lint:stripe-guard
 
+      # Design tokens must meet WCAG AA in both themes. Reads the hex values
+      # straight out of packages/ui/src/tokens.css, so it cannot drift.
+      - name: Token contrast gate
+        run: pnpm lint:contrast
+
       - name: Generate Prisma client
         run: pnpm db:generate
 

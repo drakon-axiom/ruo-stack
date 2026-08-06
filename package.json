@@ -19,6 +19,7 @@
     "seed:superadmin": "pnpm --filter @ruostack/api seed:superadmin",
     "test": "pnpm -r test",
     "lint:stripe-guard": "node scripts/check-stripe-imports.mjs",
+    "lint:contrast": "node scripts/check-contrast.mjs",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
