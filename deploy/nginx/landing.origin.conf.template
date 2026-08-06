@@ -8,6 +8,7 @@ server {
     server_name ${LANDING_HOST} www.${LANDING_HOST};
 
     allow ${EDGE_IP};
+    allow ${ORIGIN_IP};
     allow 127.0.0.1;
     deny  all;
 

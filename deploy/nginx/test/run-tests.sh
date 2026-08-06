@@ -80,6 +80,7 @@ assert_contains "$O_DEV" "listen 100.99.76.119:8901;" "origin binds the tailscal
 assert_contains "$O_DEV" "server 127.0.0.1:3901;"     "dev origin API upstream is loopback"
 assert_contains "$O_PRD" "server 127.0.0.1:3911;"     "prod origin API upstream is loopback"
 assert_contains "$O_DEV" "allow 100.99.76.10;"        "origin allows the edge"
+assert_contains "$O_DEV" "allow 100.99.76.119;"       "origin allows self (runbook curl)"
 assert_contains "$O_DEV" "deny  all;"                 "origin denies everyone else"
 
 # Upstream names must differ, or both origin configs cannot be enabled at once.

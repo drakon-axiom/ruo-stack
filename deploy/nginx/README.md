@@ -178,7 +178,7 @@ hop; if it does not, `X-Forwarded-Proto` passthrough is broken.
 | nginx won't start: `duplicate "map" directive` | `origin-shared.conf` content leaked into a rendered config, or it is installed twice. |
 | API sees every request as insecure | Origin is setting `X-Forwarded-Proto` from `$scheme`. It must use `$ruostack_forwarded_proto`. |
 | Audit log shows a Tailscale IP | A hop dropped `X-Forwarded-For`. Both must set `$proxy_add_x_forwarded_for`. |
-| 403 from the origin | The edge's Tailscale IP is not in the origin's `allow` list — check `EDGE_IP`. |
+| 403 from the origin | The edge's Tailscale IP is missing from the origin's `allow` list (check `EDGE_IP`), or a self-check from the origin box is denied because `ORIGIN_IP` is missing (check the origin config has `allow ${ORIGIN_IP};`). |
 | Deploy succeeded, browser shows old build | A cached `index.html`. It should be `no-store`; verify the header. |
 | Certbot fails HTTP-01 | DNS points at this box instead of the VPS, or `/var/www/certbot` is missing on the VPS. |
 

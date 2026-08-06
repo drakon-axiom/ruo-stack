@@ -22,8 +22,11 @@ server {
     listen ${ORIGIN_IP}:${BRAND_ORIGIN_PORT};
     server_name ${BRAND_HOST};
 
-    # Only the edge may connect. 127.0.0.1 stays open for local curl checks.
+    # Only the edge may connect. ORIGIN_IP is allowed too because a self-check
+    # from this box to its own tailscale address arrives with THAT source
+    # address, not 127.0.0.1 -- without it the runbook's own origin curl 403s.
     allow ${EDGE_IP};
+    allow ${ORIGIN_IP};
     allow 127.0.0.1;
     deny  all;
 
@@ -79,7 +82,11 @@ server {
     listen ${ORIGIN_IP}:${ADMIN_ORIGIN_PORT};
     server_name ${ADMIN_HOST};
 
+    # Only the edge may connect. ORIGIN_IP is allowed too because a self-check
+    # from this box to its own tailscale address arrives with THAT source
+    # address, not 127.0.0.1 -- without it the runbook's own origin curl 403s.
     allow ${EDGE_IP};
+    allow ${ORIGIN_IP};
     allow 127.0.0.1;
     deny  all;
 
