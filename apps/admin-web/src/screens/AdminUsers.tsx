@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ADMIN_ROLES, type AdminRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, StatusPill } from '@ruostack/ui';
+import { Drawer, EmptyState, Field, PageHeader, StatusPill, buttonClass, cardClass, inputClass } from '@ruostack/ui';
 
 interface Admin {
   id: string;
@@ -61,14 +61,14 @@ export function AdminUsers() {
       <PageHeader
         title="Admin Users & Roles"
         subtitle="Create admins, grant roles, and suspend access. Every action is audited."
-        action={<button className="btn" onClick={() => setCreating(true)}>+ Create admin</button>}
+        action={<button className={buttonClass('primary', 'md')} onClick={() => setCreating(true)}>+ Create admin</button>}
       />
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       {loading ? (
-        <div className="card p-10 text-center text-content-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className={cardClass('overflow-hidden')}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
@@ -100,9 +100,9 @@ export function AdminUsers() {
                   <td className="px-4 py-3"><StatusPill value={a.status} /></td>
                   <td className="px-4 py-3 text-right">
                     {a.status === 'active' ? (
-                      <button className="btn-danger" onClick={() => changeStatus(a.id, 'suspended')}>Suspend</button>
+                      <button className={buttonClass('danger', 'md')} onClick={() => changeStatus(a.id, 'suspended')}>Suspend</button>
                     ) : (
-                      <button className="btn-ghost" onClick={() => changeStatus(a.id, 'active')}>Activate</button>
+                      <button className={buttonClass('ghost', 'md')} onClick={() => changeStatus(a.id, 'active')}>Activate</button>
                     )}
                   </td>
                 </tr>
@@ -144,19 +144,19 @@ function CreateAdmin({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 
   return (
     <Drawer open title="Create admin" onOpenChange={(o) => { if (!o) onClose(); }} footer={
-      <button className="btn w-full" onClick={create} disabled={busy || !email || !fullName}>
+      <button className={buttonClass('primary', 'md', 'w-full')} onClick={create} disabled={busy || !email || !fullName}>
         {busy ? '…' : 'Create + send invite'}
       </button>
     }>
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Full name">
-        <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        <input className={inputClass()} value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </Field>
       <Field label="Email">
-        <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className={inputClass()} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
       <Field label="Role">
-        <select className="input" value={role} onChange={(e) => setRole(e.target.value as AdminRole)}>
+        <select className={inputClass()} value={role} onChange={(e) => setRole(e.target.value as AdminRole)}>
           {ADMIN_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
       </Field>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
+import { buttonClass, cardClass, inputClass, labelClass } from '@ruostack/ui';
 
 interface Me {
   brand: {
@@ -108,7 +109,7 @@ export function Branding() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Logo */}
-        <div className="surface p-5">
+        <div className={cardClass('p-5')}>
           <h2 className="mb-3 text-lg font-semibold">Logo</h2>
           <div className="mb-4 flex items-center gap-4">
             <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-lg border border-line bg-surface-3 dark:border-line">
@@ -119,10 +120,10 @@ export function Branding() {
               )}
             </div>
             <div className="flex flex-col gap-2">
-              <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>
+              <button className={buttonClass('primary', 'md')} disabled={busy} onClick={() => fileRef.current?.click()}>
                 {logoUrl ? 'Replace logo' : 'Upload logo'}
               </button>
-              {logoUrl && <button className="btn-ghost text-xs" disabled={busy} onClick={removeLogo}>Remove</button>}
+              {logoUrl && <button className={buttonClass('ghost', 'md', 'text-xs')} disabled={busy} onClick={removeLogo}>Remove</button>}
             </div>
             <input
               ref={fileRef}
@@ -136,19 +137,19 @@ export function Branding() {
         </div>
 
         {/* Colors */}
-        <div className="surface p-5">
+        <div className={cardClass('p-5')}>
           <h2 className="mb-3 text-lg font-semibold">Brand colors</h2>
           <div className="space-y-3">
             <ColorField label="Primary" value={primary} onChange={setPrimary} />
             <ColorField label="Accent" value={accent} onChange={setAccent} />
           </div>
-          <button className="btn mt-4" disabled={busy || !colorsDirty} onClick={saveColors}>Save colors</button>
+          <button className={buttonClass('primary', 'md', 'mt-4')} disabled={busy || !colorsDirty} onClick={saveColors}>Save colors</button>
         </div>
       </div>
 
       {/* Preview */}
       <h2 className="mb-2 mt-6 text-sm uppercase tracking-[0.12em] text-content-faint">Preview</h2>
-      <div className="surface overflow-hidden">
+      <div className={cardClass('overflow-hidden')}>
         <div className="flex items-center gap-3 px-5 py-4" style={{ backgroundColor: accent }}>
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-8 w-8 rounded object-contain" />
@@ -183,9 +184,9 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
         className="h-9 w-12 cursor-pointer rounded border border-line bg-transparent dark:border-line"
       />
       <div className="flex-1">
-        <span className="label mb-1 block">{label}</span>
+        <span className={labelClass('mb-1 block')}>{label}</span>
         <input
-          className="app-input font-mono"
+          className={inputClass('font-mono')}
           value={value}
           spellCheck={false}
           onChange={(e) => onChange(e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`)}

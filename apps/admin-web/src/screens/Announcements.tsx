@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, KpiTile, PageHeader, Tabs } from '@ruostack/ui';
+import { Drawer, EmptyState, Field, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, labelClass, pillClass } from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -97,7 +97,7 @@ export function Announcements() {
       <PageHeader
         title="Announcements"
         subtitle="Broadcasts that appear in every brand's Notifications inbox."
-        action={writable ? <button className="btn" onClick={() => setEditing('new')}>Compose</button> : undefined}
+        action={writable ? <button className={buttonClass('primary', 'md')} onClick={() => setEditing('new')}>Compose</button> : undefined}
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -122,18 +122,18 @@ export function Announcements() {
             { key: 'archived', label: 'Archived', count: counts.archived ?? 0 },
           ]}
         />
-        <input className="input max-w-xs" placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className={inputClass('max-w-xs')} placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       {loading ? (
-        <div className="card p-10 text-center text-content-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState
           title={rows.length === 0 ? 'No announcements yet' : 'Nothing matches that filter'}
           hint={rows.length === 0 ? 'Compose one to broadcast it to every brand’s inbox.' : undefined}
         />
       ) : (
-        <div className="card overflow-x-auto">
+        <div className={cardClass('overflow-x-auto')}>
           <table className="w-full text-sm">
             <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <tr>
@@ -155,16 +155,16 @@ export function Announcements() {
                   </td>
                   <td className="px-4 py-3 text-content-muted">{a.audience === 'all_brands' ? 'All brands' : (a.brand_name ?? 'One brand')}</td>
                   <td className="px-4 py-3 text-content-muted">{announcementTypeLabel(a.type)}</td>
-                  <td className="px-4 py-3"><span className={`pill ${STATE_STYLE[a.display_state]}`}>{a.display_state}</span></td>
+                  <td className="px-4 py-3"><span className={pillClass(`${STATE_STYLE[a.display_state]}`)}>{a.display_state}</span></td>
                   <td className="px-4 py-3 text-content-muted">{fmt(a.publish_at)}</td>
                   <td className="px-4 py-3 text-content-muted">{fmt(a.expires_at)}</td>
                   <td className="px-4 py-3 text-right">
                     {writable && (
                       <div className="flex justify-end gap-2">
-                        {a.status === 'draft' && <button className="btn-ghost" onClick={() => setStatus(a, 'published')}>Publish</button>}
-                        {a.status === 'published' && <button className="btn-ghost" onClick={() => setStatus(a, 'archived')}>Archive</button>}
-                        {a.status === 'archived' && <button className="btn-ghost" onClick={() => setStatus(a, 'published')}>Restore</button>}
-                        {a.status === 'draft' && <button className="btn-danger" onClick={() => remove(a)}>Delete</button>}
+                        {a.status === 'draft' && <button className={buttonClass('ghost', 'md')} onClick={() => setStatus(a, 'published')}>Publish</button>}
+                        {a.status === 'published' && <button className={buttonClass('ghost', 'md')} onClick={() => setStatus(a, 'archived')}>Archive</button>}
+                        {a.status === 'archived' && <button className={buttonClass('ghost', 'md')} onClick={() => setStatus(a, 'published')}>Restore</button>}
+                        {a.status === 'draft' && <button className={buttonClass('danger', 'md')} onClick={() => remove(a)}>Delete</button>}
                       </div>
                     )}
                   </td>
@@ -249,10 +249,10 @@ function Compose({
       onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={() => save(false)} disabled={busy || !title || !body}>
+          <button className={buttonClass('ghost', 'md', 'flex-1')} onClick={() => save(false)} disabled={busy || !title || !body}>
             {busy ? '…' : 'Save draft'}
           </button>
-          <button className="btn flex-1" onClick={() => save(true)} disabled={busy || !title || !body || (audience === 'single_brand' && !brandId)}>
+          <button className={buttonClass('primary', 'md', 'flex-1')} onClick={() => save(true)} disabled={busy || !title || !body || (audience === 'single_brand' && !brandId)}>
             {busy ? '…' : scheduled ? 'Schedule' : 'Publish now'}
           </button>
         </div>
@@ -261,7 +261,7 @@ function Compose({
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <Field label="Audience">
-        <select className="input" value={audience} onChange={(e) => setAudience(e.target.value as 'all_brands' | 'single_brand')}>
+        <select className={inputClass()} value={audience} onChange={(e) => setAudience(e.target.value as 'all_brands' | 'single_brand')}>
           <option value="all_brands">All brands</option>
           <option value="single_brand">A single brand</option>
         </select>
@@ -269,7 +269,7 @@ function Compose({
 
       {audience === 'single_brand' && (
         <Field label="Brand">
-          <select className="input" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+          <select className={inputClass()} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
             <option value="">Select a brand…</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
           </select>
@@ -277,26 +277,26 @@ function Compose({
       )}
 
       <Field label="Type">
-        <select className="input" value={type} onChange={(e) => setType(e.target.value as AnnouncementType)}>
+        <select className={inputClass()} value={type} onChange={(e) => setType(e.target.value as AnnouncementType)}>
           {ANNOUNCEMENT_TYPES.map((t) => <option key={t} value={t}>{announcementTypeLabel(t)}</option>)}
         </select>
       </Field>
 
-      <Field label="Title"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
-      <Field label="Body"><textarea className="input min-h-[120px]" value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
+      <Field label="Title"><input className={inputClass()} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
+      <Field label="Body"><textarea className={inputClass('min-h-[120px]')} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Publish at (blank = now)">
-          <input className="input" type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+          <input className={inputClass()} type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
         </Field>
         <Field label="Expires at (blank = never)">
-          <input className="input" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+          <input className={inputClass()} type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         </Field>
       </div>
 
       {/* §1.3: "preview as it appears in the brand Notifications inbox" */}
       <div className="mt-4">
-        <div className="label mb-1.5">Preview — as the brand sees it</div>
+        <div className={labelClass('mb-1.5')}>Preview — as the brand sees it</div>
         <div className="rounded-xl border border-line bg-canvas p-3">
           <div className="flex items-start gap-2.5">
             <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent/15 text-sm">

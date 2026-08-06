@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { signupBrand, ApiError } from '../lib/api.js';
+import { buttonClass, inputClass } from '@ruostack/ui';
 
 // Light-theme auth shell (Pepify pattern: light for auth, dark for the app).
 function AuthShell({ title, children, footer }: { title: string; children: React.ReactNode; footer?: React.ReactNode }) {
@@ -71,11 +72,11 @@ export function Signup() {
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
         {ref && <div className="rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent">Referral code applied: {ref}</div>}
-        <input className="l-input" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-        <input className="l-input" placeholder="Research company name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
-        <input className="l-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className="l-input" type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
-        <button className="btn w-full" disabled={busy}>{busy ? '…' : 'Create account'}</button>
+        <input className={inputClass()} placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+        <input className={inputClass()} placeholder="Research company name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
+        <input className={inputClass()} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input className={inputClass()} type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+        <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Create account'}</button>
         <p className="text-center text-2xs text-slate-400">No card required. Research use only.</p>
       </form>
     </AuthShell>
@@ -103,9 +104,9 @@ export function Login() {
     <AuthShell title="Sign in" footer={<>New here? <Link className="text-accent" to="/signup">Create an account</Link></>}>
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
-        <input className="l-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className="l-input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <button className="btn w-full" disabled={busy}>{busy ? '…' : 'Sign in'}</button>
+        <input className={inputClass()} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input className={inputClass()} type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Sign in'}</button>
         <div className="text-center"><Link className="text-xs text-slate-500 hover:text-accent" to="/forgot">Forgot password?</Link></div>
       </form>
     </AuthShell>
@@ -134,8 +135,8 @@ export function Forgot() {
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <Err msg={err} />
-          <input className="l-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <button className="btn w-full">Send reset link</button>
+          <input className={inputClass()} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <button className={buttonClass('primary', 'md', 'w-full')}>Send reset link</button>
         </form>
       )}
     </AuthShell>
@@ -162,8 +163,8 @@ export function Reset() {
     <AuthShell title="Choose a new password" footer={<Link className="text-accent" to="/login">Back to sign in</Link>}>
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
-        <input className="l-input" type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
-        <button className="btn w-full" disabled={busy}>{busy ? '…' : 'Update password'}</button>
+        <input className={inputClass()} type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+        <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Update password'}</button>
       </form>
     </AuthShell>
   );

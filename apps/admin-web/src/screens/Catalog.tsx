@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, KpiTile, PageHeader, StatusPill, Tabs } from '@ruostack/ui';
+import { Drawer, EmptyState, Field, KpiTile, PageHeader, StatusPill, Tabs, buttonClass, cardClass, inputClass } from '@ruostack/ui';
 
 interface Product {
   id: string;
@@ -84,11 +84,11 @@ export function Catalog() {
         }
         action={
           <div className="flex items-center gap-2">
-            <button className="btn-ghost" onClick={() => setShowArchived((v) => !v)}>
+            <button className={buttonClass('ghost', 'md')} onClick={() => setShowArchived((v) => !v)}>
               {showArchived ? 'Back to catalog' : 'View archived'}
             </button>
             {writable && !showArchived && (
-              <button className="btn" onClick={() => setCreating(true)}>
+              <button className={buttonClass('primary', 'md')} onClick={() => setCreating(true)}>
                 + Create product
               </button>
             )}
@@ -115,7 +115,7 @@ export function Catalog() {
           ]}
         />
         <input
-          className="input max-w-xs"
+          className={inputClass('max-w-xs')}
           placeholder="Search name, SKU, compound…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -123,15 +123,15 @@ export function Catalog() {
       </div>
 
       {loading ? (
-        <div className="card p-10 text-center text-content-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState
           title="No products"
           hint={writable ? 'Create the first catalog product to get started.' : 'Nothing matches your filters.'}
-          action={writable && <button className="btn" onClick={() => setCreating(true)}>+ Create product</button>}
+          action={writable && <button className={buttonClass('primary', 'md')} onClick={() => setCreating(true)}>+ Create product</button>}
         />
       ) : (
-        <div className="card overflow-hidden">
+        <div className={cardClass('overflow-hidden')}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
@@ -311,13 +311,13 @@ function EditDrawer({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               {product.archived ? (
-                <button className="btn-ghost" onClick={unarchive} disabled={busy}>Restore from archive</button>
+                <button className={buttonClass('ghost', 'md')} onClick={unarchive} disabled={busy}>Restore from archive</button>
               ) : !product.isPublished ? (
-                <button className="btn-ghost" onClick={publish} disabled={busy}>Publish</button>
+                <button className={buttonClass('ghost', 'md')} onClick={publish} disabled={busy}>Publish</button>
               ) : (
-                <button className="btn-ghost" onClick={unpublish} disabled={busy}>Unpublish</button>
+                <button className={buttonClass('ghost', 'md')} onClick={unpublish} disabled={busy}>Unpublish</button>
               )}
-              <button className="btn" onClick={save} disabled={busy || product.archived}>
+              <button className={buttonClass('primary', 'md')} onClick={save} disabled={busy || product.archived}>
                 {busy ? '…' : 'Save'}
               </button>
             </div>
@@ -325,10 +325,10 @@ function EditDrawer({
             {!product.archived && (
               <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
                 {canDelete ? (
-                  <button className="btn-danger" onClick={remove} disabled={busy}>Delete</button>
+                  <button className={buttonClass('danger', 'md')} onClick={remove} disabled={busy}>Delete</button>
                 ) : (
                   <button
-                    className="btn-danger disabled:opacity-40"
+                    className={buttonClass('danger', 'md', 'disabled:opacity-40')}
                     onClick={archive}
                     disabled={busy || status !== 'out_of_stock'}
                     title={
@@ -356,7 +356,7 @@ function EditDrawer({
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Canonical SKU">
         <input
-          className="input disabled:opacity-50"
+          className={inputClass('disabled:opacity-50')}
           value={sku}
           disabled={product.isPublished || !writable}
           title={product.isPublished ? 'SKU is locked once the product is published (immutable)' : ''}
@@ -365,25 +365,25 @@ function EditDrawer({
         {product.isPublished && <span className="mt-1 block text-2xs text-content-faint">Locked — immutable after publish.</span>}
       </Field>
       <Field label="Name">
-        <input className="input" value={name} disabled={!writable} onChange={(e) => setName(e.target.value)} />
+        <input className={inputClass()} value={name} disabled={!writable} onChange={(e) => setName(e.target.value)} />
       </Field>
       <div className="mb-1 mt-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Wholesale cost by plan ($)</div>
       <div className="grid grid-cols-3 gap-3">
         <Field label="Starter">
-          <input className="input" value={costS} disabled={!writable} onChange={(e) => setCostS(e.target.value)} />
+          <input className={inputClass()} value={costS} disabled={!writable} onChange={(e) => setCostS(e.target.value)} />
         </Field>
         <Field label="Pro">
-          <input className="input" value={costP} disabled={!writable} onChange={(e) => setCostP(e.target.value)} />
+          <input className={inputClass()} value={costP} disabled={!writable} onChange={(e) => setCostP(e.target.value)} />
         </Field>
         <Field label="Volume">
-          <input className="input" value={costV} disabled={!writable} onChange={(e) => setCostV(e.target.value)} />
+          <input className={inputClass()} value={costV} disabled={!writable} onChange={(e) => setCostV(e.target.value)} />
         </Field>
       </div>
       <Field label="Suggested retail ($)">
-        <input className="input" value={retail} disabled={!writable} onChange={(e) => setRetail(e.target.value)} />
+        <input className={inputClass()} value={retail} disabled={!writable} onChange={(e) => setRetail(e.target.value)} />
       </Field>
       <Field label="Stock status">
-        <select className="input" value={status} disabled={!writable} onChange={(e) => changeStock(e.target.value as Product['status'])}>
+        <select className={inputClass()} value={status} disabled={!writable} onChange={(e) => changeStock(e.target.value as Product['status'])}>
           <option value="in_stock">in_stock</option>
           <option value="soon">soon</option>
           <option value="out_of_stock">out_of_stock</option>
@@ -391,14 +391,14 @@ function EditDrawer({
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Weight">
-          <input className="input" value={weight} disabled={!writable} onChange={(e) => setWeight(e.target.value)} />
+          <input className={inputClass()} value={weight} disabled={!writable} onChange={(e) => setWeight(e.target.value)} />
         </Field>
         <Field label="COA id">
-          <input className="input" value={coa} disabled={!writable} onChange={(e) => setCoa(e.target.value)} />
+          <input className={inputClass()} value={coa} disabled={!writable} onChange={(e) => setCoa(e.target.value)} />
         </Field>
       </div>
       <Field label="Packaging rule">
-        <input className="input" value={packaging} disabled={!writable} onChange={(e) => setPackaging(e.target.value)} />
+        <input className={inputClass()} value={packaging} disabled={!writable} onChange={(e) => setPackaging(e.target.value)} />
       </Field>
     </Drawer>
   );
@@ -444,35 +444,35 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       title="Create product"
       onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
-        <button className="btn w-full" onClick={create} disabled={busy || !sku || !name || !compound}>
+        <button className={buttonClass('primary', 'md', 'w-full')} onClick={create} disabled={busy || !sku || !name || !compound}>
           {busy ? '…' : 'Create (unpublished)'}
         </button>
       }
     >
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Canonical SKU">
-        <input className="input" value={sku} onChange={(e) => setSku(e.target.value)} />
+        <input className={inputClass()} value={sku} onChange={(e) => setSku(e.target.value)} />
       </Field>
       <Field label="Name">
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className={inputClass()} value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
       <Field label="Compound">
-        <input className="input" value={compound} onChange={(e) => setCompound(e.target.value)} />
+        <input className={inputClass()} value={compound} onChange={(e) => setCompound(e.target.value)} />
       </Field>
       <div className="mb-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Wholesale cost by plan ($)</div>
       <div className="grid grid-cols-3 gap-3">
         <Field label="Starter">
-          <input className="input" value={costS} onChange={(e) => setCostS(e.target.value)} />
+          <input className={inputClass()} value={costS} onChange={(e) => setCostS(e.target.value)} />
         </Field>
         <Field label="Pro">
-          <input className="input" value={costP} onChange={(e) => setCostP(e.target.value)} />
+          <input className={inputClass()} value={costP} onChange={(e) => setCostP(e.target.value)} />
         </Field>
         <Field label="Volume">
-          <input className="input" value={costV} onChange={(e) => setCostV(e.target.value)} />
+          <input className={inputClass()} value={costV} onChange={(e) => setCostV(e.target.value)} />
         </Field>
       </div>
       <Field label="Suggested retail ($)">
-        <input className="input" value={retail} onChange={(e) => setRetail(e.target.value)} />
+        <input className={inputClass()} value={retail} onChange={(e) => setRetail(e.target.value)} />
       </Field>
       <p className="text-2xs text-content-faint">SKU is editable until you publish. Publishing locks it permanently.</p>
     </Drawer>

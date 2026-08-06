@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, KpiTile, PageHeader, Tabs } from '@ruostack/ui';
+import { EmptyState, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -166,8 +166,8 @@ export function Ledger() {
         subtitle="Wallet movement across every brand, the float, and drift that needs resolving."
         action={
           <div className="flex gap-2">
-            <button className="btn-ghost" onClick={() => exportCsv('summary')}>Export summary</button>
-            <button className="btn-ghost" onClick={() => exportCsv('detail')}>Export detail</button>
+            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('summary')}>Export summary</button>
+            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('detail')}>Export detail</button>
           </div>
         }
       />
@@ -184,13 +184,13 @@ export function Ledger() {
 
       {/* ── Drift: the actionable face of the reconciliation worker ────────── */}
       {drift.length > 0 && (
-        <div className="card mb-5 p-4">
+        <div className={cardClass('mb-5 p-4')}>
           <div className="mb-2 text-base font-semibold">Reconciliation drift</div>
           <div className="space-y-2">
             {drift.map((d) => (
               <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <span className={`pill mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-warning/40 bg-warning/10 text-warning'}`}>
+                  <span className={pillClass(`mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-warning/40 bg-warning/10 text-warning'}`)}>
                     {d.kind === 'shipped_not_captured' ? 'not captured' : 'stale export'}
                   </span>
                   <span className="text-content">{d.brand_name}</span>
@@ -199,7 +199,7 @@ export function Ledger() {
                 </div>
                 {d.kind === 'shipped_not_captured' ? (
                   canHeal ? (
-                    <button className="btn" disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
+                    <button className={buttonClass('primary', 'md')} disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
                       {healing === d.order_id ? '…' : 'Re-run capture'}
                     </button>
                   ) : (
@@ -219,18 +219,18 @@ export function Ledger() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={setTab} />
         <div className="flex flex-wrap items-center gap-2">
-          <select className="input max-w-[180px]" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+          <select className={inputClass('max-w-[180px]')} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
             <option value="">All brands</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
           </select>
-          <input className="input w-[150px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input className="input w-[150px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <input className={inputClass('w-[150px]')} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <input className={inputClass('w-[150px]')} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
 
       {/* ── Per-brand period summary ──────────────────────────────────────── */}
       {summary && summary.brands.length > 0 && (
-        <div className="card mb-5 overflow-x-auto">
+        <div className={cardClass('mb-5 overflow-x-auto')}>
           <table className="w-full text-sm">
             <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <tr>
@@ -262,11 +262,11 @@ export function Ledger() {
 
       {/* ── Entries ───────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="card p-10 text-center text-content-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState title="No wallet movement in this period" hint="Widen the date range or clear the filters." />
       ) : (
-        <div className="card overflow-x-auto">
+        <div className={cardClass('overflow-x-auto')}>
           <table className="w-full text-sm">
             <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <tr>

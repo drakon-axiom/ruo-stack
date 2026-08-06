@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, PageHeader, Tabs } from '@ruostack/ui';
+import { EmptyState, PageHeader, Tabs, buttonClass, cardClass, inputClass } from '@ruostack/ui';
 
 interface NoMatchOrder {
   id: string;
@@ -78,7 +78,7 @@ export function StoreMatch() {
         orders.length === 0 ? <EmptyState title="All clear" hint="No unmatched store orders." /> : (
           <div className="space-y-3">
             {orders.map((o) => (
-              <div key={o.id} className="card p-4">
+              <div key={o.id} className={cardClass('p-4')}>
                 <div className="mb-2 flex items-center justify-between text-sm">
                   <div><span className="text-content">{o.brand_name}</span> · {o.recipient.name} · {o.recipient.city}, {o.recipient.state}</div>
                   <div className="font-mono text-2xs text-content-faint">{o.external_order_id}</div>
@@ -90,11 +90,11 @@ export function StoreMatch() {
                       <div key={sku} className="flex items-center gap-2 text-sm">
                         <span className="rounded-pill border border-warning/40 bg-warning/10 px-2 py-0.5 font-mono text-2xs text-warning">{sku}</span>
                         <span className="text-content-faint">→</span>
-                        <select className="input flex-1" value={pick[key] ?? ''} onChange={(e) => setPick({ ...pick, [key]: e.target.value })}>
+                        <select className={inputClass('flex-1')} value={pick[key] ?? ''} onChange={(e) => setPick({ ...pick, [key]: e.target.value })}>
                           <option value="">Select a catalog product…</option>
                           {catalog.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.canonicalSku})</option>)}
                         </select>
-                        {writable && <button className="btn" disabled={busy === key || !pick[key]} onClick={() => mapSku(o, sku)}>{busy === key ? '…' : 'Map'}</button>}
+                        {writable && <button className={buttonClass('primary', 'md')} disabled={busy === key || !pick[key]} onClick={() => mapSku(o, sku)}>{busy === key ? '…' : 'Map'}</button>}
                       </div>
                     );
                   })}
@@ -104,7 +104,7 @@ export function StoreMatch() {
           </div>
         )
       ) : aliases.length === 0 ? <EmptyState title="No aliases" hint="Aliases you create here will appear in this list." /> : (
-        <div className="card overflow-hidden">
+        <div className={cardClass('overflow-hidden')}>
           <table className="w-full text-sm">
             <thead><tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <th className="px-4 py-3">Brand</th><th className="px-4 py-3">Store SKU</th><th className="px-4 py-3">→ Canonical</th><th className="px-4 py-3">Product</th><th className="px-4 py-3 text-right"></th>
@@ -116,7 +116,7 @@ export function StoreMatch() {
                   <td className="px-4 py-3 font-mono text-2xs text-content-muted">{a.woo_sku}</td>
                   <td className="px-4 py-3 font-mono text-2xs">{a.canonical_sku}</td>
                   <td className="px-4 py-3 text-content-muted">{a.product_name}</td>
-                  <td className="px-4 py-3 text-right">{writable && <button className="btn-ghost text-xs text-danger" onClick={() => delAlias(a)}>Remove</button>}</td>
+                  <td className="px-4 py-3 text-right">{writable && <button className={buttonClass('ghost', 'md', 'text-xs text-danger')} onClick={() => delAlias(a)}>Remove</button>}</td>
                 </tr>
               ))}
             </tbody>

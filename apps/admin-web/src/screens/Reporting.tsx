@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { KpiTile, PageHeader } from '@ruostack/ui';
+import { KpiTile, PageHeader, cardClass } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -33,7 +33,7 @@ function Rows({ map }: { map: Record<string, number> }) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="card p-4">
+    <div className={cardClass('p-4')}>
       <div className="mb-2 text-2xs uppercase tracking-[0.1em] text-content-faint">{title}</div>
       {children}
     </div>
@@ -60,7 +60,7 @@ export function Reporting() {
         }
       />
 
-      {!r ? <div className="card p-10 text-center text-content-muted">Loading…</div> : (
+      {!r ? <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div> : (
         <div className="space-y-5">
           <div className="grid grid-cols-4 gap-3">
             <KpiTile label="Shipping margin" value={dollars(r.shipping.margin_cents)} />

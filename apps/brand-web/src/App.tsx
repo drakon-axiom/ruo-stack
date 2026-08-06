@@ -20,6 +20,7 @@ import { Customers } from './screens/Customers.js';
 import { AddressBook } from './screens/AddressBook.js';
 import { Notifications } from './screens/Notifications.js';
 import { Team } from './screens/Team.js';
+import { cardClass } from '@ruostack/ui';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -32,7 +33,7 @@ function ComingSoon({ title }: { title: string }) {
   return (
     <>
       <h1 className="mb-1 text-2xl font-bold">{title}</h1>
-      <div className="surface mt-4 flex flex-col items-center gap-2 px-6 py-16 text-center">
+      <div className={cardClass('mt-4 flex flex-col items-center gap-2 px-6 py-16 text-center')}>
         <div className="text-lg font-semibold">Coming soon</div>
         <div className="max-w-md text-sm text-content-muted">This feature is part of the platform but not available in Phase 0.</div>
       </div>

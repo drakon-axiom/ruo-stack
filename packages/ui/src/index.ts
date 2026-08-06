@@ -7,6 +7,7 @@ export * from './icons.js';
 export { Button, type ButtonProps } from './primitives/Button.js';
 export { LinkButton, type LinkButtonProps } from './primitives/LinkButton.js';
 export { buttonClass, type ButtonVariant, type ButtonSize } from './primitives/buttonStyles.js';
+export { cardClass, chipClass, inputClass, labelClass, pillClass } from './primitives/styles.js';
 export { Card } from './primitives/Card.js';
 export { KpiTile } from './primitives/KpiTile.js';
 export { Badge, type BadgeTone } from './primitives/Badge.js';

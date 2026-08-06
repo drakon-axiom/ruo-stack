@@ -5,7 +5,7 @@ import {
   type ProvisioningAction,
   type ProvisioningState,
 } from '@ruostack/shared';
-import { Badge, Button, Card, DataTable, type BadgeTone, type Column } from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, chipClass, type BadgeTone, type Column } from '@ruostack/ui';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 
 /**
@@ -228,7 +228,7 @@ export function ProvisioningWizard() {
                         <button
                           key={a}
                           onClick={() => setChoices((c) => ({ ...c, [r.product_id]: a }))}
-                          className={`tab ${active ? 'tab-on' : ''}`}
+                          className={chipClass(active)}
                         >
                           {ACTION_LABEL[a]}
                         </button>

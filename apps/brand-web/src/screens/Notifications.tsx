@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { TYPE_ICON, relativeTime, type Notification } from '../components/NotificationBell.js';
+import { buttonClass, cardClass, chipClass } from '@ruostack/ui';
 
 /**
  * Full notifications history. The bell panel shows the most recent few; this is
@@ -56,22 +57,22 @@ export function Notifications() {
           <h1 className="mb-1 text-2xl font-bold">Notifications</h1>
           <p className="text-sm text-content-muted">Platform announcements, restocks and maintenance notices.</p>
         </div>
-        {unreadCount > 0 && <button className="btn-ghost text-xs" onClick={markAll}>Mark all read</button>}
+        {unreadCount > 0 && <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={markAll}>Mark all read</button>}
       </div>
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <div className="mb-4 flex gap-2">
-        <button className={`tab ${!unreadOnly ? 'tab-on' : ''}`} onClick={() => setUnreadOnly(false)}>All</button>
-        <button className={`tab ${unreadOnly ? 'tab-on' : ''}`} onClick={() => setUnreadOnly(true)}>
+        <button className={chipClass(!unreadOnly)} onClick={() => setUnreadOnly(false)}>All</button>
+        <button className={chipClass(unreadOnly)} onClick={() => setUnreadOnly(true)}>
           Unread{unreadCount > 0 && <span className="ml-1.5 opacity-70">{unreadCount}</span>}
         </button>
       </div>
 
       {loading ? (
-        <div className="surface p-10 text-center text-content-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : items.length === 0 ? (
-        <div className="surface p-10 text-center text-content-muted">
+        <div className={cardClass('p-10 text-center text-content-muted')}>
           {unreadOnly ? 'Nothing unread. 🎉' : 'No notifications yet.'}
         </div>
       ) : (
@@ -79,7 +80,7 @@ export function Notifications() {
           {items.map((n) => (
             <div
               key={n.id}
-              className={`surface flex items-start gap-3 p-4 ${n.read_at ? '' : 'border-accent/30'}`}
+              className={cardClass(`flex items-start gap-3 p-4 ${n.read_at ? '' : 'border-accent/30'}`)}
             >
               <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent/10 text-base" aria-hidden>
                 {TYPE_ICON[n.type]}
@@ -93,7 +94,7 @@ export function Notifications() {
                 <div className="mt-1.5 text-xs text-content-faint">{relativeTime(n.published_at)}</div>
               </div>
               {!n.read_at && (
-                <button className="btn-ghost shrink-0 text-xs" onClick={() => markRead(n)}>Mark read</button>
+                <button className={buttonClass('ghost', 'md', 'shrink-0 text-xs')} onClick={() => markRead(n)}>Mark read</button>
               )}
             </div>
           ))}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
+import { buttonClass, cardClass, inputClass } from '@ruostack/ui';
 
 export interface Address {
   id: string;
@@ -67,7 +68,7 @@ export function AddressBook() {
       <div className="mb-1 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Address Book</h1>
         {addresses && addresses.length > 0 && (
-          <button className="btn" onClick={() => setEditing('new')}>+ Add address</button>
+          <button className={buttonClass('primary', 'md')} onClick={() => setEditing('new')}>+ Add address</button>
         )}
       </div>
       <p className="mb-5 text-sm text-content-muted">
@@ -75,26 +76,26 @@ export function AddressBook() {
       </p>
 
       {!addresses ? (
-        <div className="surface p-10 text-center text-content-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : addresses.length === 0 ? (
-        <div className="surface flex flex-col items-center gap-3 px-6 py-16 text-center">
+        <div className={cardClass('flex flex-col items-center gap-3 px-6 py-16 text-center')}>
           <div className="text-lg font-semibold">No saved addresses yet</div>
           <div className="max-w-md text-sm text-content-muted">
             Add addresses you ship to often, or tick “Save this address” when placing an order.
           </div>
-          <button className="btn mt-1" onClick={() => setEditing('new')}>+ Add your first address</button>
+          <button className={buttonClass('primary', 'md', 'mt-1')} onClick={() => setEditing('new')}>+ Add your first address</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {addresses.map((a) => (
-            <div key={a.id} className="surface flex flex-col px-4 py-3">
+            <div key={a.id} className={cardClass('flex flex-col px-4 py-3')}>
               <div className="flex items-start justify-between gap-2">
                 <div>
                   {a.label && <div className="text-2xs font-semibold uppercase tracking-wide text-accent">{a.label}</div>}
                   <div className="font-medium">{a.recipient_name}</div>
                 </div>
                 <div className="flex shrink-0 gap-2 text-xs">
-                  <button className="btn-ghost" onClick={() => setEditing(a)}>Edit</button>
+                  <button className={buttonClass('ghost', 'md')} onClick={() => setEditing(a)}>Edit</button>
                   <button className="text-content-faint hover:text-danger" onClick={() => remove(a)}>Delete</button>
                 </div>
               </div>
@@ -157,26 +158,26 @@ function AddressModal({ address, onClose, onSaved }: { address: Address | null; 
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
-      <div className="surface w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+      <div className={cardClass('w-full max-w-md p-5')} onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{address ? 'Edit address' : 'Add address'}</h2>
           <button onClick={onClose} className="text-content-faint hover:text-content">✕</button>
         </div>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
         <div className="space-y-2">
-          <input className="app-input" placeholder="Label (optional, e.g. “John — home”)" value={f.label} onChange={(e) => set({ label: e.target.value })} />
-          <input className="app-input" placeholder="Recipient name" value={f.recipient_name} onChange={(e) => set({ recipient_name: e.target.value })} />
-          <input className="app-input" placeholder="Email (optional)" value={f.recipient_email} onChange={(e) => set({ recipient_email: e.target.value })} />
-          <input className="app-input" placeholder="Phone (optional)" value={f.recipient_phone} onChange={(e) => set({ recipient_phone: e.target.value })} />
-          <input className="app-input" placeholder="Address line 1" value={f.address1} onChange={(e) => set({ address1: e.target.value })} />
-          <input className="app-input" placeholder="Address line 2 (optional)" value={f.address2} onChange={(e) => set({ address2: e.target.value })} />
+          <input className={inputClass()} placeholder="Label (optional, e.g. “John — home”)" value={f.label} onChange={(e) => set({ label: e.target.value })} />
+          <input className={inputClass()} placeholder="Recipient name" value={f.recipient_name} onChange={(e) => set({ recipient_name: e.target.value })} />
+          <input className={inputClass()} placeholder="Email (optional)" value={f.recipient_email} onChange={(e) => set({ recipient_email: e.target.value })} />
+          <input className={inputClass()} placeholder="Phone (optional)" value={f.recipient_phone} onChange={(e) => set({ recipient_phone: e.target.value })} />
+          <input className={inputClass()} placeholder="Address line 1" value={f.address1} onChange={(e) => set({ address1: e.target.value })} />
+          <input className={inputClass()} placeholder="Address line 2 (optional)" value={f.address2} onChange={(e) => set({ address2: e.target.value })} />
           <div className="grid grid-cols-3 gap-2">
-            <input className="app-input" placeholder="City" value={f.city} onChange={(e) => set({ city: e.target.value })} />
-            <input className="app-input" placeholder="State" value={f.state} onChange={(e) => set({ state: e.target.value })} />
-            <input className="app-input" placeholder="ZIP" value={f.zip} onChange={(e) => set({ zip: e.target.value })} />
+            <input className={inputClass()} placeholder="City" value={f.city} onChange={(e) => set({ city: e.target.value })} />
+            <input className={inputClass()} placeholder="State" value={f.state} onChange={(e) => set({ state: e.target.value })} />
+            <input className={inputClass()} placeholder="ZIP" value={f.zip} onChange={(e) => set({ zip: e.target.value })} />
           </div>
         </div>
-        <button className="btn mt-4 w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : address ? 'Save changes' : 'Add address'}</button>
+        <button className={buttonClass('primary', 'md', 'mt-4 w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : address ? 'Save changes' : 'Add address'}</button>
       </div>
     </div>
   );

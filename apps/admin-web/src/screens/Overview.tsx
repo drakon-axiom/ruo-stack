@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { KpiTile, PageHeader } from '@ruostack/ui';
+import { KpiTile, PageHeader, cardClass, pillClass } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -21,7 +21,7 @@ export function Overview() {
     api<Overview>('/api/admin/overview').then(setD);
   }, []);
 
-  if (!d) return <div className="card p-10 text-center text-content-muted">Loading…</div>;
+  if (!d) return <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>;
 
   return (
     <>
@@ -41,7 +41,7 @@ export function Overview() {
       </div>
 
       <div className="grid grid-cols-[1fr_1fr] gap-4">
-        <div className="card p-5">
+        <div className={cardClass('p-5')}>
           <h2 className="mb-3 text-sm uppercase tracking-[0.12em] text-content-faint">Plan mix</h2>
           <div className="space-y-2 text-sm">
             {([['Starter', d.plans.starter], ['Pro', d.plans.pro], ['Volume', d.plans.volume]] as const).map(([name, n]) => (
@@ -53,14 +53,14 @@ export function Overview() {
           </div>
           <h2 className="mb-2 mt-5 text-sm uppercase tracking-[0.12em] text-content-faint">Webhook health</h2>
           <div className="flex gap-2">
-            <span className="pill border-success/40 bg-success/10 text-success">{d.webhooks.processed} processed</span>
+            <span className={pillClass('border-success/40 bg-success/10 text-success')}>{d.webhooks.processed} processed</span>
             {d.webhooks.failed > 0
-              ? <span className="pill border-danger/40 bg-danger/10 text-danger">{d.webhooks.failed} failed</span>
-              : <span className="pill border-success/40 bg-success/10 text-success">0 failed</span>}
+              ? <span className={pillClass('border-danger/40 bg-danger/10 text-danger')}>{d.webhooks.failed} failed</span>
+              : <span className={pillClass('border-success/40 bg-success/10 text-success')}>0 failed</span>}
           </div>
         </div>
 
-        <div className="card p-5">
+        <div className={cardClass('p-5')}>
           <h2 className="mb-3 text-sm uppercase tracking-[0.12em] text-content-faint">Recent activity</h2>
           {d.recent_activity.length === 0 ? (
             <p className="text-sm text-content-muted">No activity yet.</p>
@@ -68,7 +68,7 @@ export function Overview() {
             <ul className="space-y-2 text-sm">
               {d.recent_activity.map((a) => (
                 <li key={a.id} className="flex items-center justify-between">
-                  <span><span className="pill mr-2">{a.actor_type}</span><span className="font-mono text-xs text-accent-hover">{a.action}</span></span>
+                  <span><span className={pillClass('mr-2')}>{a.actor_type}</span><span className="font-mono text-xs text-accent-hover">{a.action}</span></span>
                   <span className="text-2xs text-content-faint">{new Date(a.created_at).toLocaleTimeString()}</span>
                 </li>
               ))}

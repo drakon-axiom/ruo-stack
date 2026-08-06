@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login, mfaEnroll, mfaVerify, setTokens, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Field } from '@ruostack/ui';
+import { Field, buttonClass, cardClass, inputClass } from '@ruostack/ui';
 
 type Stage = 'credentials' | 'totp' | 'enroll';
 
@@ -85,7 +85,7 @@ export function Login() {
 
   return (
     <div className="grid min-h-screen place-items-center px-4">
-      <div className="card w-full max-w-sm p-7">
+      <div className={cardClass('w-full max-w-sm p-7')}>
         <div className="mb-6 flex items-center gap-2">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-lg font-black text-white">
             R
@@ -98,12 +98,12 @@ export function Login() {
         {stage === 'credentials' && (
           <form onSubmit={submitCredentials}>
             <Field label="Email">
-              <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input className={inputClass()} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </Field>
             <Field label="Password">
-              <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <input className={inputClass()} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </Field>
-            <button className="btn mt-2 w-full" disabled={busy}>
+            <button className={buttonClass('primary', 'md', 'mt-2 w-full')} disabled={busy}>
               {busy ? '…' : 'Continue'}
             </button>
           </form>
@@ -113,9 +113,9 @@ export function Login() {
           <form onSubmit={submitTotp}>
             <p className="mb-4 text-sm text-content-muted">Enter the 6-digit code from your authenticator app.</p>
             <Field label="Authentication code">
-              <input className="input tracking-[0.4em]" inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value)} required />
+              <input className={inputClass('tracking-[0.4em]')} inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value)} required />
             </Field>
-            <button className="btn mt-2 w-full" disabled={busy}>
+            <button className={buttonClass('primary', 'md', 'mt-2 w-full')} disabled={busy}>
               {busy ? '…' : 'Verify'}
             </button>
           </form>
@@ -133,9 +133,9 @@ export function Login() {
               Open in authenticator (otpauth URI)
             </a>
             <Field label="Authentication code">
-              <input className="input tracking-[0.4em]" inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value)} required />
+              <input className={inputClass('tracking-[0.4em]')} inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value)} required />
             </Field>
-            <button className="btn mt-2 w-full" disabled={busy}>
+            <button className={buttonClass('primary', 'md', 'mt-2 w-full')} disabled={busy}>
               {busy ? '…' : 'Enable MFA & sign in'}
             </button>
           </form>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { buttonClass, cardClass, inputClass, labelClass } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -22,7 +23,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     }
   }
   return (
-    <button className="btn-ghost text-xs" onClick={copy}>{copied ? '✓ Copied' : label}</button>
+    <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={copy}>{copied ? '✓ Copied' : label}</button>
   );
 }
 
@@ -41,39 +42,39 @@ export function Referrals() {
       </p>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="surface p-4">
+        <div className={cardClass('p-4')}>
           <div className="text-3xl font-extrabold">{data ? data.invited : '—'}</div>
           <div className="text-xs text-content-muted">Brands invited</div>
         </div>
-        <div className="surface p-4">
+        <div className={cardClass('p-4')}>
           <div className="text-3xl font-extrabold">{data ? data.upgraded : '—'}</div>
           <div className="text-xs text-content-muted">Upgraded to paid</div>
         </div>
-        <div className="surface p-4">
+        <div className={cardClass('p-4')}>
           <div className="text-3xl font-extrabold text-accent">{data ? dollars(data.earned_cents) : '—'}</div>
           <div className="text-xs text-content-muted">Wallet credit earned</div>
         </div>
       </div>
 
-      <div className="surface mt-5 p-5">
+      <div className={cardClass('mt-5 p-5')}>
         <h2 className="mb-3 text-lg font-semibold">Your referral link</h2>
         <div className="mb-3">
-          <span className="label mb-1 block">Referral code</span>
+          <span className={labelClass('mb-1 block')}>Referral code</span>
           <div className="flex items-center gap-2">
-            <div className="app-input flex-1 font-mono text-accent">{data?.code ?? '…'}</div>
+            <div className={inputClass('flex-1 font-mono text-accent')}>{data?.code ?? '…'}</div>
             {data && <CopyButton value={data.code} label="Copy code" />}
           </div>
         </div>
         <div>
-          <span className="label mb-1 block">Share link</span>
+          <span className={labelClass('mb-1 block')}>Share link</span>
           <div className="flex items-center gap-2">
-            <div className="app-input flex-1 truncate text-xs">{shareLink || '…'}</div>
+            <div className={inputClass('flex-1 truncate text-xs')}>{shareLink || '…'}</div>
             {data && <CopyButton value={shareLink} label="Copy link" />}
           </div>
         </div>
       </div>
 
-      <div className="surface mt-5 p-5 text-sm text-content-muted">
+      <div className={cardClass('mt-5 p-5 text-sm text-content-muted')}>
         <h2 className="mb-2 text-lg font-semibold text-content">How it works</h2>
         <ol className="list-decimal space-y-1 pl-5">
           <li>Share your link with another brand or operator.</li>

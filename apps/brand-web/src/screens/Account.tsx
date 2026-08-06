@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
+import { buttonClass, cardClass, inputClass, labelClass, pillClass } from '@ruostack/ui';
 
 interface Me {
   profile: { id: string; full_name: string; name_last_changed_at: string | null; name_editable: boolean };
@@ -18,7 +19,7 @@ interface Me {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="surface mb-5 p-5">
+    <div className={cardClass('mb-5 p-5')}>
       <h2 className="mb-4 text-lg font-semibold">{title}</h2>
       {children}
     </div>
@@ -91,7 +92,7 @@ export function Account() {
     setErr(error?.message ?? '');
   }
 
-  if (!me) return <div className="surface p-10 text-center text-content-muted">Loading…</div>;
+  if (!me) return <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>;
 
   return (
     <>
@@ -104,38 +105,38 @@ export function Account() {
       <Section title="Profile information">
         <div className="space-y-3">
           <label className="block">
-            <span className="label mb-1 block">Full name</span>
-            <input className="app-input" value={fullName} disabled={!me.profile.name_editable} onChange={(e) => setFullName(e.target.value)} />
+            <span className={labelClass('mb-1 block')}>Full name</span>
+            <input className={inputClass()} value={fullName} disabled={!me.profile.name_editable} onChange={(e) => setFullName(e.target.value)} />
             {!me.profile.name_editable && (
               <span className="mt-1 block text-2xs text-content-faint">Name can only be changed once every 7 days.</span>
             )}
           </label>
           <label className="block">
-            <span className="label mb-1 block">Research company name</span>
-            <input className="app-input" value={brandName} onChange={(e) => setBrandName(e.target.value)} />
+            <span className={labelClass('mb-1 block')}>Research company name</span>
+            <input className={inputClass()} value={brandName} onChange={(e) => setBrandName(e.target.value)} />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="label mb-1 block">Website</span>
-              <input className="app-input" value={website} onChange={(e) => setWebsite(e.target.value)} />
+              <span className={labelClass('mb-1 block')}>Website</span>
+              <input className={inputClass()} value={website} onChange={(e) => setWebsite(e.target.value)} />
             </label>
             <label className="block">
-              <span className="label mb-1 block">Sales channel</span>
-              <input className="app-input" value={channel} onChange={(e) => setChannel(e.target.value)} />
+              <span className={labelClass('mb-1 block')}>Sales channel</span>
+              <input className={inputClass()} value={channel} onChange={(e) => setChannel(e.target.value)} />
             </label>
           </div>
-          <button className="btn" onClick={saveProfile}>Save profile</button>
+          <button className={buttonClass('primary', 'md')} onClick={saveProfile}>Save profile</button>
         </div>
       </Section>
 
       <Section title="Email">
         <p className="mb-3 text-sm text-content-muted">Changing your email sends a confirmation to the new address (Supabase Auth).</p>
-        <button className="btn-ghost" onClick={changeEmail}>Change email</button>
+        <button className={buttonClass('ghost', 'md')} onClick={changeEmail}>Change email</button>
       </Section>
 
       <Section title="Password">
         <p className="mb-3 text-sm text-content-muted">We'll email you a secure reset link.</p>
-        <button className="btn-ghost" onClick={resetPassword}>Send password reset</button>
+        <button className={buttonClass('ghost', 'md')} onClick={resetPassword}>Send password reset</button>
       </Section>
 
       <SubscriptionSection />
@@ -228,7 +229,7 @@ function SubscriptionSection() {
           <span>
             Payment failed — your plan features stay active{sub?.grace_ends_at ? ` until ${new Date(sub.grace_ends_at).toLocaleDateString()}` : ''}. Update your card to avoid interruption.
           </span>
-          <button className="btn shrink-0" disabled={busy} onClick={manage}>Update payment method</button>
+          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Update payment method</button>
         </div>
       )}
       {/* Paid-through has passed but the stored status hasn't caught up (or the
@@ -240,7 +241,7 @@ function SubscriptionSection() {
             Your membership ended {new Date(sub.current_period_end!).toLocaleDateString()}. Renew to keep your plan
             features — they'll drop back to Starter shortly.
           </span>
-          <button className="btn shrink-0" disabled={busy} onClick={manage}>Renew</button>
+          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Renew</button>
         </div>
       )}
       {ended && (
@@ -249,7 +250,7 @@ function SubscriptionSection() {
             Your membership expired and you're on the Starter plan. Your account, orders and wallet are unaffected —
             add a payment method to restore your plan pricing.
           </span>
-          <button className="btn shrink-0" disabled={busy} onClick={manage}>Restore plan</button>
+          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Restore plan</button>
         </div>
       )}
 
@@ -260,7 +261,7 @@ function SubscriptionSection() {
             <div key={p.key} className={`rounded-card border p-4 ${isCurrent ? 'border-accent bg-accent/5' : 'border-line dark:border-line'}`}>
               <div className="flex items-center justify-between">
                 <span className="text-lg font-semibold">{p.name}</span>
-                {isCurrent && <span className="pill border-accent/40 bg-accent/10 text-accent">Current</span>}
+                {isCurrent && <span className={pillClass('border-accent/40 bg-accent/10 text-accent')}>Current</span>}
               </div>
               <div className="mt-1 text-xl font-extrabold">{dollars(p.price_cents)}</div>
               <ul className="mt-3 space-y-1.5 text-xs text-content-muted">
