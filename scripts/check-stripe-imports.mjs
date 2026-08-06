@@ -5,15 +5,20 @@
  * (or require) anywhere else fails the build. Run: node scripts/check-stripe-imports.mjs
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 const ROOT = process.cwd();
-const ALLOWED_DIR = join(ROOT, 'packages', 'payments');
+// Trailing separator so a sibling like `packages/payments-v2` can't slip past a
+// bare prefix match (`startsWith(ALLOWED_DIR)`).
+const ALLOWED_PREFIX = join(ROOT, 'packages', 'payments') + sep;
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.turbo', 'coverage']);
 const CODE_EXT = /\.(?:m|c)?[jt]sx?$/;
-// Matches:  import ... from 'stripe'  |  require('stripe')  |  import('stripe')
+// Matches the module 'stripe' or any subpath 'stripe/...' via:
+//   import … from 'stripe'  |  bare import 'stripe'  |  require('stripe')  |  import('stripe')
+// The `-` guard in the char class stops false positives on packages like
+// 'stripe-mock' (only a following '/' or the closing quote is allowed).
 const STRIPE_IMPORT =
-  /(?:from\s+['"]stripe['"])|(?:require\(\s*['"]stripe['"]\s*\))|(?:import\(\s*['"]stripe['"]\s*\))/;
+  /(?:from\s+|import\s+|require\(\s*|import\(\s*)['"]stripe(?:\/[^'"]*)?['"]/;
 
 /** @param {string} dir @param {string[]} out */
 function walk(dir, out) {
@@ -31,7 +36,7 @@ walk(ROOT, files);
 
 const violations = [];
 for (const file of files) {
-  if (file.startsWith(ALLOWED_DIR)) continue;
+  if (file.startsWith(ALLOWED_PREFIX)) continue;
   const src = readFileSync(file, 'utf8');
   // Allow the guard script itself (it contains the literal string 'stripe').
   if (file === join(ROOT, 'scripts', 'check-stripe-imports.mjs')) continue;
