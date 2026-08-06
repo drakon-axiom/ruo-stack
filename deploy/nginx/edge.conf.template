@@ -1,0 +1,79 @@
+# RENDERED FILE -- do not edit in place, EXCEPT via certbot (see below).
+# Source: deploy/nginx/edge.conf.template
+# Render: deploy/nginx/render.sh <dev|prod>   (on the app box, then copy over)
+# Installs on the EDGE VPS (srv1153350) as
+#   /etc/nginx/sites-available/ruostack-edge.<env>.conf
+#
+# Terminates TLS and forwards whole hostnames to the origin box over Tailscale.
+# Holds no application files -- deploys never touch this machine.
+#
+# Compression and cache headers are deliberately set at the ORIGIN, not here,
+# so there is exactly one place to change them.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ${BRAND_HOST} -> origin :${BRAND_ORIGIN_PORT}
+# ─────────────────────────────────────────────────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${BRAND_HOST};
+
+    # certbot --nginx adds the 443 listener, cert paths, and the HTTP->HTTPS
+    # redirect here. Those edits live in this deployed file, not the template,
+    # so re-copying a fresh render drops them -- re-run certbot afterwards.
+
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+
+    access_log /var/log/nginx/${LOG_PREFIX}-edge-brand-access.log;
+    error_log  /var/log/nginx/${LOG_PREFIX}-edge-brand-error.log;
+
+    client_max_body_size 2m;
+
+    location / {
+        proxy_pass http://${ORIGIN_IP}:${BRAND_ORIGIN_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # This is the hop where $scheme is meaningful -- the origin passes this
+        # value through rather than recomputing it.
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Connection        "";
+        proxy_read_timeout 60s;
+    }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ${ADMIN_HOST} -> origin :${ADMIN_ORIGIN_PORT}
+# ─────────────────────────────────────────────────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${ADMIN_HOST};
+
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+
+    access_log /var/log/nginx/${LOG_PREFIX}-edge-admin-access.log;
+    error_log  /var/log/nginx/${LOG_PREFIX}-edge-admin-error.log;
+
+    client_max_body_size 2m;
+
+    # Operator surface -- uncomment to allowlist office/VPN IPs. Do this HERE
+    # rather than at the origin, so the block applies before the Tailscale hop.
+    # Leave it commented while PUBLIC_API_BASE_URL points at this host, or
+    # WooCommerce and ShipStation webhook delivery is blocked along with
+    # everyone else.
+    # allow 203.0.113.0/24;
+    # deny  all;
+
+    location / {
+        proxy_pass http://${ORIGIN_IP}:${ADMIN_ORIGIN_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Connection        "";
+        proxy_read_timeout 60s;
+    }
+}
