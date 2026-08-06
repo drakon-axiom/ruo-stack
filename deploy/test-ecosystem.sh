@@ -45,5 +45,35 @@ else
   ok "unknown RUOSTACK_ENV throws"
 fi
 
+echo "== deploy.sh guards =="
+
+if [[ ! -x "$ROOT/deploy/deploy.sh" ]]; then
+  bad "deploy.sh exists and is executable" "missing or not +x"
+else
+  ok "deploy.sh exists and is executable"
+
+  if "$ROOT/deploy/deploy.sh" staging >/dev/null 2>&1; then
+    bad "rejects unknown env" "exited 0"
+  else ok "rejects unknown env"; fi
+
+  if "$ROOT/deploy/deploy.sh" >/dev/null 2>&1; then
+    bad "requires an argument" "exited 0"
+  else ok "requires an argument"; fi
+
+  # The guard that matters: the two checkouts are identical except for .env, so
+  # a prod deploy fired from the dev directory would publish dev's database
+  # config to the prod hosts. It must also fail FAST, before any build.
+  if [[ "$ROOT" == */apps/dev/* ]]; then
+    start=$SECONDS
+    if "$ROOT/deploy/deploy.sh" prod >/dev/null 2>&1; then
+      bad "blocks prod from a dev checkout" "exited 0"
+    else
+      ok "blocks prod from a dev checkout"
+      (( SECONDS - start < 10 )) && ok "guard fails fast (before any build)" \
+                                 || bad "guard fails fast (before any build)" "took $((SECONDS-start))s"
+    fi
+  fi
+fi
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
