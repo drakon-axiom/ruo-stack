@@ -2,7 +2,20 @@ import { useEffect, useState } from 'react';
 import { canWrite, canResolveClaim, claimTypeLabel, type ClaimType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, Tabs, buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
+import {
+  Badge,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  PageHeader,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -37,6 +50,32 @@ const STATUS_TONE: Record<string, string> = {
   resolved: 'border-success/40 bg-success/10 text-success',
 };
 
+const COLUMNS: Column<ClaimRow>[] = [
+  { key: 'brand', header: 'Brand', priority: 'primary', cell: (c) => c.brand_name },
+  { key: 'type', header: 'Type', cell: (c) => claimTypeLabel(c.type) },
+  { key: 'recipient', header: 'Recipient', priority: 'meta', cell: (c) => c.recipient_name },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (c) => (
+      <span className={pillClass(STATUS_TONE[c.status] ?? '')}>
+        {c.status.replace(/_/g, ' ')}
+        {c.resolution ? ` \u00b7 ${c.resolution}` : ''}
+      </span>
+    ),
+  },
+  {
+    key: 'sla',
+    header: 'SLA',
+    cell: (c) =>
+      c.status === 'resolved' ? null : c.sla_overdue ? (
+        <Badge tone="danger">overdue</Badge>
+      ) : (
+        new Date(c.sla_due_at).toLocaleDateString()
+      ),
+  },
+];
+
 export function Claims() {
   const { claims: authClaims } = useAuth();
   const role = authClaims?.role;
@@ -64,26 +103,14 @@ export function Claims() {
         ]} />
       </div>
 
-      {rows.length === 0 ? <EmptyState title="Nothing here" hint="No claims in this state." /> : (
-        <div className={cardClass('overflow-hidden')}>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
-              <th className="px-4 py-3">Brand</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Recipient</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">SLA</th>
-            </tr></thead>
-            <tbody>
-              {rows.map((c) => (
-                <tr key={c.id} onClick={() => setOpenId(c.id)} className="cursor-pointer border-b border-line/60 hover:bg-surface-3">
-                  <td className="px-4 py-3 text-content">{c.brand_name}</td>
-                  <td className="px-4 py-3">{claimTypeLabel(c.type)}</td>
-                  <td className="px-4 py-3 text-content-muted">{c.recipient_name}</td>
-                  <td className="px-4 py-3"><span className={pillClass(`${STATUS_TONE[c.status] ?? ''}`)}>{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</span></td>
-                  <td className="px-4 py-3">{c.status !== 'resolved' && (c.sla_overdue ? <span className={pillClass('border-danger/40 bg-danger/10 text-danger')}>overdue</span> : <span className="text-content-muted">{new Date(c.sla_due_at).toLocaleDateString()}</span>)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Claims queue"
+        columns={COLUMNS}
+        rows={rows}
+        rowKey={(c) => c.id}
+        onRowClick={(c) => setOpenId(c.id)}
+        empty={<EmptyState title="Nothing here" hint="No claims in this state." />}
+      />
 
       {openId && <ClaimDrawer id={openId} writable={writable} canResolve={canResolve} creditOnly={creditOnly} onClose={() => setOpenId(null)} onChanged={() => { load(); }} />}
     </>

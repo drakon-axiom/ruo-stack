@@ -2,7 +2,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, labelClass, pillClass } from '@ruostack/ui';
+import {
+  Button,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  KpiTile,
+  PageHeader,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  labelClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -92,6 +107,72 @@ export function Announcements() {
     }
   }
 
+  const columns: Column<Announcement>[] = [
+    {
+      key: 'title',
+      header: 'Title',
+      priority: 'primary',
+      minWidth: 220,
+      cell: (a) => (
+        <div>
+          <button
+            className="text-left font-medium text-content transition-colors duration-fast hover:text-accent"
+            onClick={() => setEditing(a)}
+          >
+            {a.title}
+          </button>
+          <div className="mt-0.5 line-clamp-1 text-xs text-content-muted">{a.body}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'audience',
+      header: 'Audience',
+      minWidth: 130,
+      cell: (a) => (a.audience === 'all_brands' ? 'All brands' : (a.brand_name ?? 'One brand')),
+    },
+    { key: 'type', header: 'Type', minWidth: 120, cell: (a) => announcementTypeLabel(a.type) },
+    {
+      key: 'state',
+      header: 'State',
+      minWidth: 110,
+      cell: (a) => <span className={pillClass(STATE_STYLE[a.display_state])}>{a.display_state}</span>,
+    },
+    { key: 'publish', header: 'Publish', minWidth: 140, cell: (a) => fmt(a.publish_at) },
+    { key: 'expires', header: 'Expires', minWidth: 140, cell: (a) => fmt(a.expires_at) },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      minWidth: 190,
+      cell: (a) =>
+        writable ? (
+          <div className="flex justify-end gap-2">
+            {a.status === 'draft' && (
+              <Button variant="ghost" size="sm" onClick={() => setStatus(a, 'published')}>
+                Publish
+              </Button>
+            )}
+            {a.status === 'published' && (
+              <Button variant="ghost" size="sm" onClick={() => setStatus(a, 'archived')}>
+                Archive
+              </Button>
+            )}
+            {a.status === 'archived' && (
+              <Button variant="ghost" size="sm" onClick={() => setStatus(a, 'published')}>
+                Restore
+              </Button>
+            )}
+            {a.status === 'draft' && (
+              <Button variant="danger" size="sm" onClick={() => remove(a)}>
+                Delete
+              </Button>
+            )}
+          </div>
+        ) : null,
+    },
+  ];
+
   return (
     <>
       <PageHeader
@@ -133,46 +214,13 @@ export function Announcements() {
           hint={rows.length === 0 ? 'Compose one to broadcast it to every brand’s inbox.' : undefined}
         />
       ) : (
-        <div className={cardClass('overflow-x-auto')}>
-          <table className="w-full text-sm">
-            <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
-              <tr>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Audience</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">State</th>
-                <th className="px-4 py-3">Publish</th>
-                <th className="px-4 py-3">Expires</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((a) => (
-                <tr key={a.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-3">
-                    <button className="text-left font-medium text-content hover:text-accent" onClick={() => setEditing(a)}>{a.title}</button>
-                    <div className="mt-0.5 line-clamp-1 text-xs text-content-muted">{a.body}</div>
-                  </td>
-                  <td className="px-4 py-3 text-content-muted">{a.audience === 'all_brands' ? 'All brands' : (a.brand_name ?? 'One brand')}</td>
-                  <td className="px-4 py-3 text-content-muted">{announcementTypeLabel(a.type)}</td>
-                  <td className="px-4 py-3"><span className={pillClass(`${STATE_STYLE[a.display_state]}`)}>{a.display_state}</span></td>
-                  <td className="px-4 py-3 text-content-muted">{fmt(a.publish_at)}</td>
-                  <td className="px-4 py-3 text-content-muted">{fmt(a.expires_at)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {writable && (
-                      <div className="flex justify-end gap-2">
-                        {a.status === 'draft' && <button className={buttonClass('ghost', 'md')} onClick={() => setStatus(a, 'published')}>Publish</button>}
-                        {a.status === 'published' && <button className={buttonClass('ghost', 'md')} onClick={() => setStatus(a, 'archived')}>Archive</button>}
-                        {a.status === 'archived' && <button className={buttonClass('ghost', 'md')} onClick={() => setStatus(a, 'published')}>Restore</button>}
-                        {a.status === 'draft' && <button className={buttonClass('danger', 'md')} onClick={() => remove(a)}>Delete</button>}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          caption="Announcements and their publication state"
+          mode="scroll"
+          columns={columns}
+          rows={visible}
+          rowKey={(a) => a.id}
+        />
       )}
 
       {editing && (
