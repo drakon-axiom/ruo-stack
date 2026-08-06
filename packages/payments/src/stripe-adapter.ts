@@ -32,22 +32,30 @@ export class StripeAdapter implements PaymentsAdapter {
   }
 
   async createCustomer(input: { brandId: string; email?: string; name?: string }): Promise<{ customerId: string }> {
-    const c = await this.stripe.customers.create({
-      email: input.email,
-      name: input.name,
-      metadata: { brand_id: input.brandId },
-    });
+    const c = await this.stripe.customers.create(
+      {
+        email: input.email,
+        name: input.name,
+        metadata: { brand_id: input.brandId },
+      },
+      // Idempotent: a retry after a network timeout returns the same customer
+      // instead of creating a duplicate.
+      { idempotencyKey: `cus:${input.brandId}` },
+    );
     return { customerId: c.id };
   }
 
   async createSubscription(
     input: CreateSubscriptionInput,
   ): Promise<{ subscriptionId: string; status: string }> {
-    const sub = await this.stripe.subscriptions.create({
-      customer: input.customerId,
-      items: [{ price: input.priceId }],
-      metadata: input.metadata,
-    });
+    const sub = await this.stripe.subscriptions.create(
+      {
+        customer: input.customerId,
+        items: [{ price: input.priceId }],
+        metadata: input.metadata,
+      },
+      { idempotencyKey: `sub:${input.customerId}:${input.priceId}` },
+    );
     return { subscriptionId: sub.id, status: sub.status };
   }
 
@@ -59,9 +67,20 @@ export class StripeAdapter implements PaymentsAdapter {
     subscriptionId: string,
     input: Partial<CreateSubscriptionInput>,
   ): Promise<{ subscriptionId: string; status: string }> {
-    const sub = await this.stripe.subscriptions.update(subscriptionId, {
-      ...(input.priceId ? { items: [{ price: input.priceId }] } : {}),
-      ...(input.metadata ? { metadata: input.metadata } : {}),
+    const params: Stripe.SubscriptionUpdateParams = {};
+    if (input.priceId) {
+      // An items[] entry WITHOUT an `id` is ADDED, not replaced — that would
+      // leave the old plan item in place and bill both plans every cycle. Pass
+      // the existing item's id so the price is swapped in place (a plan change).
+      const current = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const existingItemId = current.items.data[0]?.id;
+      params.items = [
+        existingItemId ? { id: existingItemId, price: input.priceId } : { price: input.priceId },
+      ];
+    }
+    if (input.metadata) params.metadata = input.metadata;
+    const sub = await this.stripe.subscriptions.update(subscriptionId, params, {
+      idempotencyKey: `sub-upd:${subscriptionId}:${input.priceId ?? 'meta'}`,
     });
     return { subscriptionId: sub.id, status: sub.status };
   }
@@ -107,6 +126,10 @@ export class StripeAdapter implements PaymentsAdapter {
       ],
       payment_intent_data: {
         statement_descriptor_suffix: 'FULFILLMENT',
+        // Carry the attribution onto the PaymentIntent too — a failure event
+        // arrives on the PI (not the session), so without this its metadata is
+        // empty and the failure can't be tied back to the brand/top-up.
+        metadata: { brand_id: input.brandId, kind: 'wallet_topup' },
       },
       metadata: { brand_id: input.brandId, kind: 'wallet_topup' },
     });
@@ -132,11 +155,17 @@ export class StripeAdapter implements PaymentsAdapter {
     // ledger entry is core/Phase 1. At the processor level, a refund is only
     // issued when an actual card charge must be reversed (e.g. dispute loss).
     if (input.chargeId) {
-      await this.stripe.refunds.create({
-        charge: input.chargeId,
-        amount: input.amount,
-        metadata: { brand_id: input.brandId, reason: input.reason ?? '' },
-      });
+      await this.stripe.refunds.create(
+        {
+          charge: input.chargeId,
+          amount: input.amount,
+          metadata: { brand_id: input.brandId, reason: input.reason ?? '' },
+        },
+        // CRITICAL: without an idempotency key, a network timeout followed by an
+        // application retry issues the SAME card refund twice (money leaves
+        // twice). Key on the charge + amount so a retry is a no-op.
+        { idempotencyKey: `refund:${input.chargeId}:${input.amount}` },
+      );
     }
     // TODO(Phase 1): write the refund_credit WalletLedger entry in core.
   }
@@ -152,9 +181,16 @@ export class StripeAdapter implements PaymentsAdapter {
 function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
   const externalId = event.id;
   switch (event.type) {
-    case 'checkout.session.completed': {
+    // A wallet top-up only credits the wallet once the payment has SETTLED. Card
+    // top-ups settle synchronously — `checkout.session.completed` arrives with
+    // payment_status 'paid'. Delayed-notification methods (ACH, etc.) complete
+    // 'unpaid' and settle later via `async_payment_succeeded` (or fail via
+    // `async_payment_failed`), so gating on payment_status === 'paid' here stops
+    // an unsettled (or ultimately-failed) payment from funding fulfillment.
+    case 'checkout.session.completed':
+    case 'checkout.session.async_payment_succeeded': {
       const s = event.data.object as Stripe.Checkout.Session;
-      if (s.metadata?.kind === 'wallet_topup') {
+      if (s.metadata?.kind === 'wallet_topup' && s.payment_status === 'paid') {
         return {
           kind: 'wallet.topup_succeeded',
           externalId,
@@ -164,10 +200,29 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
           customerId: typeof s.customer === 'string' ? s.customer : undefined,
         };
       }
+      return { kind: 'unknown', externalId, rawType: `${event.type}:${s.payment_status ?? 'unknown'}` };
+    }
+    case 'checkout.session.async_payment_failed': {
+      const s = event.data.object as Stripe.Checkout.Session;
+      if (s.metadata?.kind === 'wallet_topup') {
+        return {
+          kind: 'wallet.topup_failed',
+          externalId,
+          brandId: s.metadata?.brand_id,
+          amount: s.amount_total ?? undefined,
+          customerId: typeof s.customer === 'string' ? s.customer : undefined,
+        };
+      }
       return { kind: 'unknown', externalId, rawType: event.type };
     }
     case 'payment_intent.payment_failed': {
       const pi = event.data.object as Stripe.PaymentIntent;
+      // Only a wallet-top-up PI is a top-up failure. A subscription-invoice PI
+      // (or any other) failing here must NOT be labeled a top-up failure — that
+      // mislabel is persisted on the WebhookEvent and would poison dunning/recon.
+      if (pi.metadata?.kind !== 'wallet_topup') {
+        return { kind: 'unknown', externalId, rawType: `${event.type}:${pi.metadata?.kind ?? 'other'}` };
+      }
       return {
         kind: 'wallet.topup_failed',
         externalId,

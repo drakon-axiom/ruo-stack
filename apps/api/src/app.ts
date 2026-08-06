@@ -36,8 +36,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   const cfg = loadConfig();
   const app = Fastify({
     logger: cfg.NODE_ENV !== 'test',
-    // Trust X-Forwarded-* so req.ip is correct behind a proxy (audit log).
-    trustProxy: true,
+    // Derive req.ip from X-Forwarded-For, but only trust our own proxy hop(s)
+    // (TRUST_PROXY, default 1) — NOT trust-all, which lets a client spoof req.ip
+    // and bypass the per-IP rate limit / poison the audit log.
+    trustProxy: cfg.trustProxy,
     bodyLimit: 1_048_576,
   });
 

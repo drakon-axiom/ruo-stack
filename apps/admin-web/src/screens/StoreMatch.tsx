@@ -47,7 +47,10 @@ export function StoreMatch() {
 
   async function mapSku(order: NoMatchOrder, sku: string) {
     const key = `${order.id}:${sku}`;
-    const productId = pick[key] ?? catalog[0]?.id;
+    // Require an EXPLICIT product choice. Never fall back to catalog[0]: mapping
+    // creates an alias that immediately auto-releases the blocked order for
+    // fulfillment, so a default pick would ship the wrong physical product.
+    const productId = pick[key];
     if (!productId) return;
     setErr(''); setBusy(key);
     try {
@@ -91,7 +94,7 @@ export function StoreMatch() {
                           <option value="">Select a catalog product…</option>
                           {catalog.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.canonicalSku})</option>)}
                         </select>
-                        {writable && <button className="btn" disabled={busy === key || !(pick[key] ?? catalog[0]?.id)} onClick={() => mapSku(o, sku)}>{busy === key ? '…' : 'Map'}</button>}
+                        {writable && <button className="btn" disabled={busy === key || !pick[key]} onClick={() => mapSku(o, sku)}>{busy === key ? '…' : 'Map'}</button>}
                       </div>
                     );
                   })}

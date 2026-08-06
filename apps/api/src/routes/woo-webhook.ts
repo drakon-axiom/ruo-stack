@@ -40,6 +40,11 @@ export async function wooWebhookRoutes(app: FastifyInstance): Promise<void> {
     const expected = createHmac('sha256', conn.webhookSecret).update(raw).digest('base64');
     if (!safeEqual(sig, expected)) return reply.code(401).send('bad signature');
 
+    // A disabled connection must not import (or reserve funds). Ack so WooCommerce
+    // stops retrying; the brand re-enables via reconnect. (Checked post-signature
+    // so connection state isn't observable to an unauthenticated caller.)
+    if (conn.status === 'disabled') return reply.code(200).send('store disabled');
+
     if (!topic.startsWith('order.')) return reply.code(200).send('ignored');
 
     let woo: WooOrder;

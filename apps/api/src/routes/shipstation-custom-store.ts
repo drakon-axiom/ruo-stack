@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
+import { Prisma } from '@ruostack/db';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, shipstationStatus } from '@ruostack/shared';
 import { getClients } from '../clients.js';
@@ -71,7 +72,18 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
     const start = parseSsDate(q.start_date) ?? new Date(0);
     const end = parseSsDate(q.end_date) ?? new Date(Date.now() + 86_400_000);
 
-    const where = { updatedAt: { gte: start, lte: end } };
+    // Fail closed: never export an order still blocked on a missing address,
+    // missing customer info, or an unmapped SKU — ShipStation would treat it as
+    // fulfillable and the warehouse would ship it incomplete/unaddressable.
+    // (awaiting_funds still exports, as on_hold; terminal shipped/cancelled
+    // orders still export so ShipStation can sync their final state.)
+    const where: Prisma.OrderWhereInput = {
+      updatedAt: { gte: start, lte: end },
+      NOT: {
+        blocker: { in: ['needs_address', 'needs_customer_info', 'needs_mapping'] },
+        status: { notIn: ['shipped', 'delivered', 'cancelled'] },
+      },
+    };
     const total = await prisma.order.count({ where });
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     const orders = await prisma.order.findMany({
@@ -153,20 +165,17 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
       return reply.code(200).send('ok');
     }
 
-    // Capture the wallet if funds allow. The label is already bought in ShipStation
-    // (real postage), so we ALWAYS record the shipment + tracking; if the wallet
-    // can't cover it, we ship anyway and flag awaiting_funds for collections.
     const { available } = await getWalletSummary(prisma, order.brandId);
     const reservedSelf = order.blocker === 'none' ? order.walletChargeCents : 0;
     const fundsOk = available + reservedSelf >= order.walletChargeCents;
-    if (fundsOk) await captureOrder(prisma, order);
 
-    const shipped = await prisma.$transaction(async (tx) => {
-      const o = await tx.order.update({
-        where: { id: order.id },
+    // Conditional transition: only ship an order still in a pre-ship state, so a
+    // cancel that raced in between the reads above and here isn't overwritten.
+    const gated = await prisma.$transaction(async (tx) => {
+      const g = await tx.order.updateMany({
+        where: { id: order.id, status: { in: ['ready_for_fulfillment', 'processing'] } },
         data: {
           status: 'shipped',
-          blocker: fundsOk ? 'none' : 'awaiting_funds',
           trackingNumber,
           carrier,
           ...(service ? { shippingServiceCode: order.shippingServiceCode ?? service } : {}),
@@ -174,23 +183,50 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
           shippedAt: new Date(),
         },
       });
-      await writeAudit(tx, {
-        actorType: 'system',
-        actorId: null,
-        action: AUDIT_ACTIONS.orderShipped,
-        targetType: 'order',
-        targetId: order.id,
-        after: {
-          source: 'shipstation_shipnotify',
-          tracking_number: trackingNumber,
-          carrier,
-          captured: fundsOk,
-          captured_cents: fundsOk ? o.walletChargeCents : 0,
-          label_cost_cents: labelCostCents,
-        },
-        ip: req.ip,
-      });
-      return o;
+      if (g.count === 0) return null;
+      return tx.order.findUniqueOrThrow({ where: { id: order.id } });
+    });
+
+    if (!gated) {
+      // A concurrent op moved the order. Idempotent success if it's now shipped;
+      // otherwise it was cancelled — the label is bought, but we won't resurrect a
+      // cancelled order, so tell ShipStation it's not shippable (a real exception).
+      const fresh = await prisma.order.findUnique({ where: { id: order.id } });
+      if (fresh && (fresh.status === 'shipped' || fresh.status === 'delivered')) return reply.code(200).send('ok');
+      return reply.code(409).send('order not shippable');
+    }
+
+    // Capture AFTER the ship is committed (so a cancelled order is never debited).
+    // The label is already bought, so a capture that loses the funds race must NOT
+    // 500 — we ship anyway and flag awaiting_funds for collections.
+    let captured = false;
+    if (fundsOk) {
+      try {
+        await captureOrder(prisma, gated);
+        captured = true;
+      } catch {
+        captured = false;
+      }
+    }
+    const shipped = await prisma.order.update({
+      where: { id: order.id },
+      data: { blocker: captured ? 'none' : 'awaiting_funds' },
+    });
+    await writeAudit(prisma, {
+      actorType: 'system',
+      actorId: null,
+      action: AUDIT_ACTIONS.orderShipped,
+      targetType: 'order',
+      targetId: order.id,
+      after: {
+        source: 'shipstation_shipnotify',
+        tracking_number: trackingNumber,
+        carrier,
+        captured,
+        captured_cents: captured ? shipped.walletChargeCents : 0,
+        label_cost_cents: labelCostCents,
+      },
+      ip: req.ip,
     });
 
     await onOrderShipped(shipped); // WooCommerce/Wix tracking writeback seam

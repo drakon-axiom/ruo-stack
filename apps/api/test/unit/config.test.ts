@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EnvSchema } from '../../src/config.js';
+import { EnvSchema, parseTrustProxy } from '../../src/config.js';
 
 // Critical invariant #6: the app refuses to start if a required secret is absent.
 describe('env validation', () => {
@@ -27,6 +27,32 @@ describe('env validation', () => {
 
   it('accepts a complete environment', () => {
     expect(EnvSchema.safeParse(fullEnv()).success).toBe(true);
+  });
+
+  it('defaults TRUST_PROXY to a single hop', () => {
+    const parsed = EnvSchema.safeParse(fullEnv());
+    expect(parsed.success && parsed.data.TRUST_PROXY).toBe('1');
+  });
+});
+
+// req.ip must never be client-spoofable: TRUST_PROXY is a hop count or an
+// IP/CIDR list, never the trust-all `true`.
+describe('parseTrustProxy', () => {
+  it('reads a bare integer as a hop count (number)', () => {
+    expect(parseTrustProxy('1')).toBe(1);
+    expect(parseTrustProxy(' 2 ')).toBe(2);
+    expect(parseTrustProxy('0')).toBe(0);
+  });
+
+  it('passes an IP/CIDR list through as a string', () => {
+    expect(parseTrustProxy('10.0.0.0/8')).toBe('10.0.0.0/8');
+    expect(parseTrustProxy('127.0.0.1,10.0.0.0/8')).toBe('127.0.0.1,10.0.0.0/8');
+  });
+
+  it('never yields the trust-all boolean', () => {
+    for (const v of ['1', '2', '10.0.0.0/8', 'loopback']) {
+      expect(typeof parseTrustProxy(v) === 'boolean').toBe(false);
+    }
   });
 });
 

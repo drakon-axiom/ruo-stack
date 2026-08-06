@@ -112,13 +112,35 @@ export const EnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3901),
   API_HOST: z.string().default('0.0.0.0'),
   CORS_ORIGINS: z.string().default('http://localhost:3902,http://localhost:3903'),
+  // How Fastify derives req.ip from X-Forwarded-For. NEVER trust-all: with a
+  // trust-all setting the leftmost (client-supplied) XFF entry wins, so a client
+  // can spoof req.ip — defeating the per-IP login/MFA rate limit and poisoning
+  // the append-only audit log. Set this to the number of proxy hops in front of
+  // the API (nginx alone → 1; a load balancer + nginx → 2), or a comma-separated
+  // list of trusted proxy IPs/CIDRs. Default 1 (a single nginx hop).
+  TRUST_PROXY: z.string().default('1'),
 
   // Bootstrap (seed:superadmin).
   SEED_SUPERADMIN_EMAIL: z.string().email().optional(),
   SEED_SUPERADMIN_PASSWORD: z.string().min(8).optional(),
 });
 
-export type AppConfig = z.infer<typeof EnvSchema> & { corsOrigins: string[] };
+export type AppConfig = z.infer<typeof EnvSchema> & {
+  corsOrigins: string[];
+  /** Fastify `trustProxy`: a hop count (number) or a trusted-proxy IP/CIDR list. */
+  trustProxy: number | string;
+};
+
+/**
+ * Parse TRUST_PROXY into a Fastify `trustProxy` value. A bare non-negative
+ * integer is a hop count; anything else is a trusted-proxy IP/CIDR list handed
+ * to Fastify verbatim. Never returns the trust-all `true`, which would let a
+ * client spoof req.ip via X-Forwarded-For.
+ */
+export function parseTrustProxy(raw: string): number | string {
+  const v = raw.trim();
+  return /^\d+$/.test(v) ? Number(v) : v;
+}
 
 let _config: AppConfig | undefined;
 
@@ -133,6 +155,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   _config = {
     ...parsed.data,
     corsOrigins: parsed.data.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
+    trustProxy: parseTrustProxy(parsed.data.TRUST_PROXY),
   };
   return _config;
 }

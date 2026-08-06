@@ -145,7 +145,7 @@ model Brand {
   website            String?
   salesChannel       String?            @map("sales_channel")
   subscriptionStatus SubscriptionStatus @default(none) @map("subscription_status") // convenience flag; SubscriptionState is SoT in Phase 1
-  stripeCustomerId   String?            @map("stripe_customer_id")
+  stripeCustomerId   String?            @unique @map("stripe_customer_id") // webhook tenant-lookup key — unique + indexed
   memberSince        DateTime           @default(now()) @map("member_since")
   referralCode       String             @unique @map("referral_code")
   referredBy         String?            @map("referred_by") // store only; reward logic is later
@@ -736,6 +736,10 @@ model Order {
   items OrderItem[]
   claims Claim[]
 
+  // Store-order idempotency: at most one order per (brand, source, external id).
+  // externalOrderId is NULL for manual orders — Postgres treats NULLs as distinct,
+  // so manual orders never collide; store orders (Woo/Wix) dedupe on their id.
+  @@unique([brandId, source, externalOrderId])
   @@index([brandId, status])
   @@index([status])
   @@map("order")

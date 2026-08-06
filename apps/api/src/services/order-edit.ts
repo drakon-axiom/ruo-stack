@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type OrderEdit, wholesaleFieldFor } from '@ruostack/shared';
 import { writeAudit } from '../audit.js';
 import { effectivePlan } from './subscription.js';
-import { getWalletSummary } from './wallet.js';
+import { getWalletSummary, lockBrandWallet } from './wallet.js';
 import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
 import { loadConfig } from '../config.js';
 import { BadRequest, Conflict } from '../errors.js';
@@ -81,12 +81,28 @@ export async function applyOrderEdit(
   const shipping = shipQuote.chosen.amountCents; // brand cost = carrier + pick-&-pack
   const walletCharge = wholesaleTotal + shipping;
 
-  // Funds: exclude this order's current reservation from held before comparing.
-  const { available } = await getWalletSummary(prisma, order.brandId);
-  const reservedSelf = order.blocker === 'none' ? order.walletChargeCents : 0;
-  const blocker = available + reservedSelf >= walletCharge ? 'none' : 'awaiting_funds';
+  // Whether the (post-edit, merged) address is complete.
+  const hasAddress = !!(
+    recipient.address1.trim() && recipient.city.trim() && recipient.state.trim() && recipient.zip.trim()
+  );
 
   return prisma.$transaction(async (tx) => {
+    await lockBrandWallet(tx, order.brandId);
+    // Blocker precedence (same as intake): address > unmapped SKUs > funds. An
+    // edit must NOT clear a needs_address / needs_mapping order just because funds
+    // now cover it — unmatchedSkus persist on the order until it's remapped, and
+    // the funds decision is made under the lock so it can't race another reserve.
+    let blocker: 'none' | 'needs_address' | 'needs_mapping' | 'awaiting_funds';
+    if (!hasAddress) {
+      blocker = 'needs_address';
+    } else if (order.unmatchedSkus.length > 0) {
+      blocker = 'needs_mapping';
+    } else {
+      const { available } = await getWalletSummary(tx, order.brandId);
+      const reservedSelf = order.blocker === 'none' ? order.walletChargeCents : 0;
+      blocker = available + reservedSelf >= walletCharge ? 'none' : 'awaiting_funds';
+    }
+
     await tx.orderItem.deleteMany({ where: { orderId: order.id } });
     const updated = await tx.order.update({
       where: { id: order.id },

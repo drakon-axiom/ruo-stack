@@ -7,7 +7,20 @@ import { Prisma, type PrismaClient, type WalletLedger, type WalletTxnType } from
  * row with the greatest `seq`. Writes go ONLY through here (bypassrls role).
  */
 
-export async function getBalance(db: PrismaClient, brandId: string): Promise<number> {
+/** Reads work on either the client or a transaction client. */
+type WalletDb = PrismaClient | Prisma.TransactionClient;
+
+/**
+ * Take the per-brand reservation lock inside a transaction (same key the ledger
+ * append uses). Serializes funds decisions — the available-balance read and the
+ * order write that depends on it — so two concurrent orders can't both reserve
+ * the same funds. Released at transaction end.
+ */
+export async function lockBrandWallet(tx: Prisma.TransactionClient, brandId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${brandId}), 0)`;
+}
+
+export async function getBalance(db: WalletDb, brandId: string): Promise<number> {
   const last = await db.walletLedger.findFirst({
     where: { brandId },
     orderBy: { seq: 'desc' },
@@ -17,7 +30,7 @@ export async function getBalance(db: PrismaClient, brandId: string): Promise<num
 }
 
 /** Funds reserved by open (placed-but-not-shipped) orders — an implicit hold. */
-export async function getHeld(db: PrismaClient, brandId: string): Promise<number> {
+export async function getHeld(db: WalletDb, brandId: string): Promise<number> {
   const agg = await db.order.aggregate({
     where: { brandId, status: { in: ['ready_for_fulfillment', 'processing'] }, blocker: 'none' },
     _sum: { walletChargeCents: true },
@@ -27,7 +40,7 @@ export async function getHeld(db: PrismaClient, brandId: string): Promise<number
 
 /** balance − held. Insufficient available → an order lands in awaiting_funds. */
 export async function getWalletSummary(
-  db: PrismaClient,
+  db: WalletDb,
   brandId: string,
 ): Promise<{ balance: number; held: number; available: number }> {
   const [balance, held] = await Promise.all([getBalance(db, brandId), getHeld(db, brandId)]);

@@ -38,7 +38,15 @@ export type BrandRetail = z.infer<typeof BrandRetailSchema>;
 
 /** Finance-only manual wallet adjustment (architecture §1.2; audited). */
 export const WalletAdjustSchema = z.object({
-  amount_cents: z.number().int().refine((v) => v !== 0, 'Amount cannot be zero'),
+  // Bounded like every other money field — a manual adjustment is an audited but
+  // irreversible ledger write, so a fat-finger/compromised session can't move a
+  // wallet by trillions. ±$1,000,000 per adjustment.
+  amount_cents: z
+    .number()
+    .int()
+    .min(-100_000_000)
+    .max(100_000_000)
+    .refine((v) => v !== 0, 'Amount cannot be zero'),
   reason: z.string().min(1).max(500),
 });
 export type WalletAdjust = z.infer<typeof WalletAdjustSchema>;

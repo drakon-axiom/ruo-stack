@@ -46,7 +46,11 @@ export async function persistRateQuotes(
       destState: args.dest.state,
       serviceCode: o.serviceCode,
       carrierCostCents: o.carrierCents,
-      pickpackCents: args.pricing.pickpackCents,
+      // Derive the pick-&-pack from THIS option's brand cost, not the global fee.
+      // For a normal option amountCents = carrier + pick-&-pack (so this is the
+      // fee); for the $12.99 flat fallback amountCents is all-in (carrierCents),
+      // so this is 0 — otherwise reserve = carrier + pick-&-pack double-charges it.
+      pickpackCents: o.amountCents - o.carrierCents,
       brandMarkupCents: args.pricing.markupCents,
       customerPriceCents: o.customerCents,
       boxId: args.parcel.boxId,

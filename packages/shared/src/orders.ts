@@ -63,7 +63,12 @@ export type OrderEdit = z.infer<typeof OrderEditSchema>;
 export function shipstationStatus(o: { status: string; blocker: string }): 'paid' | 'shipped' | 'cancelled' | 'on_hold' {
   if (o.status === 'cancelled') return 'cancelled';
   if (o.status === 'shipped' || o.status === 'delivered') return 'shipped';
-  if (o.blocker === 'awaiting_funds') return 'on_hold';
+  // ONLY an unblocked order is fulfillable ('paid' → Awaiting Shipment). Any
+  // blocker — awaiting_funds, or an internal blocker like needs_address /
+  // needs_customer_info / needs_mapping — maps to on_hold so the warehouse never
+  // ships an unfunded, unaddressable, or unmapped order. (The export query also
+  // withholds internally-blocked orders entirely; this is defense in depth.)
+  if (o.blocker !== 'none') return 'on_hold';
   return 'paid';
 }
 
