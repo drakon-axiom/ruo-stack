@@ -19,12 +19,12 @@ const PERIODS = [7, 30, 90] as const;
 
 function Rows({ map }: { map: Record<string, number> }) {
   const entries = Object.entries(map);
-  if (entries.length === 0) return <div className="text-muted">—</div>;
+  if (entries.length === 0) return <div className="text-content-muted">—</div>;
   return (
     <div className="space-y-1">
       {entries.map(([k, v]) => (
-        <div key={k} className="flex justify-between border-b border-line/40 py-1 text-[13px]">
-          <span className="capitalize text-muted">{k.replace(/_/g, ' ')}</span><span className="text-text">{v}</span>
+        <div key={k} className="flex justify-between border-b border-line/40 py-1 text-sm">
+          <span className="capitalize text-content-muted">{k.replace(/_/g, ' ')}</span><span className="text-content">{v}</span>
         </div>
       ))}
     </div>
@@ -34,7 +34,7 @@ function Rows({ map }: { map: Record<string, number> }) {
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="card p-4">
-      <div className="mb-2 text-[11px] uppercase tracking-[0.1em] text-faint">{title}</div>
+      <div className="mb-2 text-2xs uppercase tracking-[0.1em] text-content-faint">{title}</div>
       {children}
     </div>
   );
@@ -54,13 +54,13 @@ export function Reporting() {
         action={
           <div className="flex gap-1">
             {PERIODS.map((d) => (
-              <button key={d} onClick={() => setDays(d)} className={`rounded-pill border px-3 py-1 text-[12.5px] ${days === d ? 'border-teal bg-teal text-white' : 'border-line2 text-muted'}`}>{d}d</button>
+              <button key={d} onClick={() => setDays(d)} className={`rounded-pill border px-3 py-1 text-xs ${days === d ? 'border-accent bg-accent text-white' : 'border-line-strong text-content-muted'}`}>{d}d</button>
             ))}
           </div>
         }
       />
 
-      {!r ? <div className="card p-10 text-center text-muted">Loading…</div> : (
+      {!r ? <div className="card p-10 text-center text-content-muted">Loading…</div> : (
         <div className="space-y-5">
           <div className="grid grid-cols-4 gap-3">
             <KpiTile label="Shipping margin" value={dollars(r.shipping.margin_cents)} />
@@ -71,11 +71,11 @@ export function Reporting() {
 
           <div className="grid grid-cols-2 gap-3">
             <Card title={`Shipping economics · ${r.shipping.shipments} shipments`}>
-              <div className="space-y-1 text-[13px]">
-                <div className="flex justify-between"><span className="text-muted">Charged to brands</span><span>{dollars(r.shipping.charged_cents)}</span></div>
-                <div className="flex justify-between"><span className="text-muted">Actual label cost</span><span>{dollars(r.shipping.label_cost_cents)}</span></div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-content-muted">Charged to brands</span><span>{dollars(r.shipping.charged_cents)}</span></div>
+                <div className="flex justify-between"><span className="text-content-muted">Actual label cost</span><span>{dollars(r.shipping.label_cost_cents)}</span></div>
                 <div className="flex justify-between border-t border-line/40 pt-1 font-semibold"><span>Margin</span><span className={r.shipping.margin_cents >= 0 ? 'text-success' : 'text-danger'}>{dollars(r.shipping.margin_cents)}</span></div>
-                <div className="flex justify-between text-[12px] text-faint"><span>with label cost / manual</span><span>{r.shipping.labeled_count} / {r.shipping.unlabeled_count}</span></div>
+                <div className="flex justify-between text-xs text-content-faint"><span>with label cost / manual</span><span>{r.shipping.labeled_count} / {r.shipping.unlabeled_count}</span></div>
               </div>
             </Card>
             <Card title={`Rate source · ${r.fallback.fallback}/${r.fallback.priced} fallback`}>
@@ -86,8 +86,8 @@ export function Reporting() {
             <Card title="Subscription status (incl. dunning)"><Rows map={r.subscriptions.by_status} /></Card>
             <Card title={`Claims · ${r.claims.opened} opened · ${dollars(r.claims.credits_cents)} credited`}>
               <div className="grid grid-cols-2 gap-3">
-                <div><div className="mb-1 text-[11px] text-faint">by status</div><Rows map={r.claims.by_status} /></div>
-                <div><div className="mb-1 text-[11px] text-faint">by resolution</div><Rows map={r.claims.by_resolution} /></div>
+                <div><div className="mb-1 text-2xs text-content-faint">by status</div><Rows map={r.claims.by_status} /></div>
+                <div><div className="mb-1 text-2xs text-content-faint">by resolution</div><Rows map={r.claims.by_resolution} /></div>
               </div>
             </Card>
           </div>

@@ -64,23 +64,23 @@ export function ShippingRules() {
       {tab === 'boxes' ? (
         boxes.length === 0 ? <EmptyState title="No boxes" hint="Add a box for the rules engine." /> : (
           <div className="card overflow-hidden">
-            <table className="w-full text-[13px]">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
                 <th className="px-4 py-3">Name</th><th className="px-4 py-3">Inner L×W×H (in)</th><th className="px-4 py-3">Max wt (oz)</th><th className="px-4 py-3">Tare (oz)</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right"></th>
               </tr></thead>
               <tbody>
                 {boxes.map((b) => (
                   <tr key={b.id} className="border-b border-line/60">
-                    <td className="px-4 py-3 text-text">{b.name}</td>
-                    <td className="px-4 py-3 text-muted">{b.innerLengthIn} × {b.innerWidthIn} × {b.innerHeightIn}</td>
+                    <td className="px-4 py-3 text-content">{b.name}</td>
+                    <td className="px-4 py-3 text-content-muted">{b.innerLengthIn} × {b.innerWidthIn} × {b.innerHeightIn}</td>
                     <td className="px-4 py-3">{b.maxWeightOz}</td>
-                    <td className="px-4 py-3 text-muted">{b.tareOz}</td>
-                    <td className="px-4 py-3"><span className={`pill ${b.enabled ? 'border-success/40 bg-success/10 text-success' : 'border-line2 bg-card2 text-muted'}`}>{b.enabled ? 'enabled' : 'disabled'}</span></td>
+                    <td className="px-4 py-3 text-content-muted">{b.tareOz}</td>
+                    <td className="px-4 py-3"><span className={`pill ${b.enabled ? 'border-success/40 bg-success/10 text-success' : 'border-line-strong bg-surface-3 text-content-muted'}`}>{b.enabled ? 'enabled' : 'disabled'}</span></td>
                     <td className="px-4 py-3 text-right">
                       {writable && <span className="flex justify-end gap-1.5">
-                        <button className="btn-ghost text-[12px]" onClick={() => toggleBox(b)}>{b.enabled ? 'Disable' : 'Enable'}</button>
-                        <button className="btn-ghost text-[12px]" onClick={() => setEditBox(b)}>Edit</button>
-                        <button className="btn-ghost text-[12px] text-danger" onClick={() => delBox(b)}>Delete</button>
+                        <button className="btn-ghost text-xs" onClick={() => toggleBox(b)}>{b.enabled ? 'Disable' : 'Enable'}</button>
+                        <button className="btn-ghost text-xs" onClick={() => setEditBox(b)}>Edit</button>
+                        <button className="btn-ghost text-xs text-danger" onClick={() => delBox(b)}>Delete</button>
                       </span>}
                     </td>
                   </tr>
@@ -91,25 +91,25 @@ export function ShippingRules() {
         )
       ) : services.length === 0 ? <EmptyState title="No services" hint="Map carrier services to tiers." /> : (
         <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <th className="px-4 py-3">Tier</th><th className="px-4 py-3">Service code</th><th className="px-4 py-3">Display label</th><th className="px-4 py-3">Transit</th><th className="px-4 py-3">Max wt</th><th className="px-4 py-3">Policy</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right"></th>
             </tr></thead>
             <tbody>
               {services.map((s) => (
                 <tr key={s.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-text capitalize">{s.tier}</td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-muted">{s.carrierServiceCode}</td>
+                  <td className="px-4 py-3 text-content capitalize">{s.tier}</td>
+                  <td className="px-4 py-3 font-mono text-2xs text-content-muted">{s.carrierServiceCode}</td>
                   <td className="px-4 py-3">{s.displayLabel}</td>
-                  <td className="px-4 py-3 text-muted">{s.transitEstimate}</td>
-                  <td className="px-4 py-3 text-muted">{s.maxWeightOz}</td>
-                  <td className="px-4 py-3 text-muted">{s.selectionPolicy}</td>
-                  <td className="px-4 py-3"><span className={`pill ${s.enabled ? 'border-success/40 bg-success/10 text-success' : 'border-line2 bg-card2 text-muted'}`}>{s.enabled ? 'enabled' : 'disabled'}</span></td>
+                  <td className="px-4 py-3 text-content-muted">{s.transitEstimate}</td>
+                  <td className="px-4 py-3 text-content-muted">{s.maxWeightOz}</td>
+                  <td className="px-4 py-3 text-content-muted">{s.selectionPolicy}</td>
+                  <td className="px-4 py-3"><span className={`pill ${s.enabled ? 'border-success/40 bg-success/10 text-success' : 'border-line-strong bg-surface-3 text-content-muted'}`}>{s.enabled ? 'enabled' : 'disabled'}</span></td>
                   <td className="px-4 py-3 text-right">
                     {writable && <span className="flex justify-end gap-1.5">
-                      <button className="btn-ghost text-[12px]" onClick={() => toggleSvc(s)}>{s.enabled ? 'Disable' : 'Enable'}</button>
-                      <button className="btn-ghost text-[12px]" onClick={() => setEditSvc(s)}>Edit</button>
-                      <button className="btn-ghost text-[12px] text-danger" onClick={() => delSvc(s)}>Delete</button>
+                      <button className="btn-ghost text-xs" onClick={() => toggleSvc(s)}>{s.enabled ? 'Disable' : 'Enable'}</button>
+                      <button className="btn-ghost text-xs" onClick={() => setEditSvc(s)}>Edit</button>
+                      <button className="btn-ghost text-xs text-danger" onClick={() => delSvc(s)}>Delete</button>
                     </span>}
                   </td>
                 </tr>
@@ -149,7 +149,7 @@ function BoxDrawer({ box, onClose, onSaved }: { box: Box | null; onClose: () => 
 
   return (
     <Drawer open title={box ? 'Edit box' : 'New box'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
       <div className="grid grid-cols-3 gap-2">
         <Field label="Length (in)"><input className="input" value={f.inner_length_in} onChange={(e) => setF({ ...f, inner_length_in: e.target.value })} /></Field>
@@ -186,13 +186,13 @@ function ServiceDrawer({ svc, onClose, onSaved }: { svc: Service | null; onClose
 
   return (
     <Drawer open title={svc ? 'Edit service' : 'New service'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Tier">
         <select className="input" value={f.tier} onChange={(e) => setF({ ...f, tier: e.target.value })}>
           <option value="economy">Economy</option><option value="standard">Standard</option><option value="expedited">Expedited</option>
         </select>
       </Field>
-      <Field label="Carrier service code"><input className="input font-mono text-[12px]" placeholder="usps_ground_advantage" value={f.carrier_service_code} onChange={(e) => setF({ ...f, carrier_service_code: e.target.value })} /></Field>
+      <Field label="Carrier service code"><input className="input font-mono text-xs" placeholder="usps_ground_advantage" value={f.carrier_service_code} onChange={(e) => setF({ ...f, carrier_service_code: e.target.value })} /></Field>
       <Field label="Display label"><input className="input" placeholder="USPS Ground Advantage" value={f.display_label} onChange={(e) => setF({ ...f, display_label: e.target.value })} /></Field>
       <Field label="Transit estimate"><input className="input" placeholder="2–5 business days" value={f.transit_estimate} onChange={(e) => setF({ ...f, transit_estimate: e.target.value })} /></Field>
       <div className="grid grid-cols-3 gap-2">

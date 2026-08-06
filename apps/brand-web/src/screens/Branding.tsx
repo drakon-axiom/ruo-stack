@@ -98,31 +98,31 @@ export function Branding() {
 
   return (
     <>
-      <h1 className="mb-1 text-[23px] font-bold">Branding</h1>
-      <p className="mb-5 text-[13px] text-muted">
+      <h1 className="mb-1 text-2xl font-bold">Branding</h1>
+      <p className="mb-5 text-sm text-content-muted">
         Your logo and colors identify your brand across customer-facing touchpoints. Research use only.
       </p>
 
-      {msg && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-[13px] text-success">{msg}</div>}
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {msg && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">{msg}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Logo */}
         <div className="surface p-5">
-          <h2 className="mb-3 text-[15px] font-semibold">Logo</h2>
+          <h2 className="mb-3 text-lg font-semibold">Logo</h2>
           <div className="mb-4 flex items-center gap-4">
-            <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-lg border border-lline bg-card2 dark:border-line">
+            <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-lg border border-line bg-surface-3 dark:border-line">
               {logoUrl ? (
                 <img src={logoUrl} alt="Brand logo" className="h-full w-full object-contain" />
               ) : (
-                <span className="text-[11px] text-faint">No logo</span>
+                <span className="text-2xs text-content-faint">No logo</span>
               )}
             </div>
             <div className="flex flex-col gap-2">
               <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>
                 {logoUrl ? 'Replace logo' : 'Upload logo'}
               </button>
-              {logoUrl && <button className="btn-ghost text-[12px]" disabled={busy} onClick={removeLogo}>Remove</button>}
+              {logoUrl && <button className="btn-ghost text-xs" disabled={busy} onClick={removeLogo}>Remove</button>}
             </div>
             <input
               ref={fileRef}
@@ -132,12 +132,12 @@ export function Branding() {
               onChange={(e) => onPickLogo(e.target.files?.[0])}
             />
           </div>
-          <p className="text-[11px] text-faint">PNG, JPEG, WebP, or SVG. Up to 512 KB. Square works best.</p>
+          <p className="text-2xs text-content-faint">PNG, JPEG, WebP, or SVG. Up to 512 KB. Square works best.</p>
         </div>
 
         {/* Colors */}
         <div className="surface p-5">
-          <h2 className="mb-3 text-[15px] font-semibold">Brand colors</h2>
+          <h2 className="mb-3 text-lg font-semibold">Brand colors</h2>
           <div className="space-y-3">
             <ColorField label="Primary" value={primary} onChange={setPrimary} />
             <ColorField label="Accent" value={accent} onChange={setAccent} />
@@ -147,7 +147,7 @@ export function Branding() {
       </div>
 
       {/* Preview */}
-      <h2 className="mb-2 mt-6 text-[13px] uppercase tracking-[0.12em] text-faint">Preview</h2>
+      <h2 className="mb-2 mt-6 text-sm uppercase tracking-[0.12em] text-content-faint">Preview</h2>
       <div className="surface overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4" style={{ backgroundColor: accent }}>
           {logoUrl ? (
@@ -157,16 +157,16 @@ export function Branding() {
               {brandName.charAt(0).toUpperCase()}
             </span>
           )}
-          <span className="text-[16px] font-bold text-white">{brandName}</span>
+          <span className="text-lg font-bold text-white">{brandName}</span>
         </div>
         <div className="px-5 py-5">
-          <p className="mb-3 text-[13px] text-muted">This is how your brand header looks to customers.</p>
-          <button className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white" style={{ backgroundColor: primary }}>
+          <p className="mb-3 text-sm text-content-muted">This is how your brand header looks to customers.</p>
+          <button className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: primary }}>
             Primary button
           </button>
         </div>
       </div>
-      <p className="mt-3 text-[11px] text-faint">
+      <p className="mt-3 text-2xs text-content-faint">
         Colors are saved to your brand and used on customer-facing surfaces. The portal chrome keeps the shared theme for now.
       </p>
     </>
@@ -180,7 +180,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
         type="color"
         value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 w-12 cursor-pointer rounded border border-lline bg-transparent dark:border-line"
+        className="h-9 w-12 cursor-pointer rounded border border-line bg-transparent dark:border-line"
       />
       <div className="flex-1">
         <span className="label mb-1 block">{label}</span>

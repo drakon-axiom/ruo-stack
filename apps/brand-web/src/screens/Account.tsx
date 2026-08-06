@@ -19,7 +19,7 @@ interface Me {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="surface mb-5 p-5">
-      <h2 className="mb-4 text-[15px] font-semibold">{title}</h2>
+      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
       {children}
     </div>
   );
@@ -91,15 +91,15 @@ export function Account() {
     setErr(error?.message ?? '');
   }
 
-  if (!me) return <div className="surface p-10 text-center text-muted">Loading…</div>;
+  if (!me) return <div className="surface p-10 text-center text-content-muted">Loading…</div>;
 
   return (
     <>
-      <h1 className="mb-1 text-[23px] font-bold">Account</h1>
-      <p className="mb-6 text-[13px] text-muted">Member since {new Date(me.brand.member_since).toLocaleDateString()}.</p>
+      <h1 className="mb-1 text-2xl font-bold">Account</h1>
+      <p className="mb-6 text-sm text-content-muted">Member since {new Date(me.brand.member_since).toLocaleDateString()}.</p>
 
-      {msg && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-[13px] text-success">{msg}</div>}
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {msg && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">{msg}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <Section title="Profile information">
         <div className="space-y-3">
@@ -107,7 +107,7 @@ export function Account() {
             <span className="label mb-1 block">Full name</span>
             <input className="app-input" value={fullName} disabled={!me.profile.name_editable} onChange={(e) => setFullName(e.target.value)} />
             {!me.profile.name_editable && (
-              <span className="mt-1 block text-[11px] text-faint">Name can only be changed once every 7 days.</span>
+              <span className="mt-1 block text-2xs text-content-faint">Name can only be changed once every 7 days.</span>
             )}
           </label>
           <label className="block">
@@ -129,20 +129,20 @@ export function Account() {
       </Section>
 
       <Section title="Email">
-        <p className="mb-3 text-[13px] text-muted">Changing your email sends a confirmation to the new address (Supabase Auth).</p>
+        <p className="mb-3 text-sm text-content-muted">Changing your email sends a confirmation to the new address (Supabase Auth).</p>
         <button className="btn-ghost" onClick={changeEmail}>Change email</button>
       </Section>
 
       <Section title="Password">
-        <p className="mb-3 text-[13px] text-muted">We'll email you a secure reset link.</p>
+        <p className="mb-3 text-sm text-content-muted">We'll email you a secure reset link.</p>
         <button className="btn-ghost" onClick={resetPassword}>Send password reset</button>
       </Section>
 
       <SubscriptionSection />
 
       <Section title="Referrals">
-        <p className="text-[13px] text-muted">Your referral code:</p>
-        <div className="mt-1 font-mono text-[15px] text-teal">{me.brand.referral_code}</div>
+        <p className="text-sm text-content-muted">Your referral code:</p>
+        <div className="mt-1 font-mono text-lg text-accent">{me.brand.referral_code}</div>
       </Section>
     </>
   );
@@ -221,10 +221,10 @@ function SubscriptionSection() {
 
   return (
     <Section title="Subscription">
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       {status === 'past_due' && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-amber">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
           <span>
             Payment failed — your plan features stay active{sub?.grace_ends_at ? ` until ${new Date(sub.grace_ends_at).toLocaleDateString()}` : ''}. Update your card to avoid interruption.
           </span>
@@ -235,7 +235,7 @@ function SubscriptionSection() {
           payment simply never came). The expired banner below takes over once
           the lapse sweep flips the row; this covers the window before that. */}
       {!ended && sub?.paid_through_passed && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
           <span>
             Your membership ended {new Date(sub.current_period_end!).toLocaleDateString()}. Renew to keep your plan
             features — they'll drop back to Starter shortly.
@@ -244,7 +244,7 @@ function SubscriptionSection() {
         </div>
       )}
       {ended && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-amber">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
           <span>
             Your membership expired and you're on the Starter plan. Your account, orders and wallet are unaffected —
             add a payment method to restore your plan pricing.
@@ -257,15 +257,15 @@ function SubscriptionSection() {
         {(sub?.plans ?? []).map((p) => {
           const isCurrent = p.key === current;
           return (
-            <div key={p.key} className={`rounded-card border p-4 ${isCurrent ? 'border-teal bg-teal/5' : 'border-lline dark:border-line'}`}>
+            <div key={p.key} className={`rounded-card border p-4 ${isCurrent ? 'border-accent bg-accent/5' : 'border-line dark:border-line'}`}>
               <div className="flex items-center justify-between">
-                <span className="text-[15px] font-semibold">{p.name}</span>
-                {isCurrent && <span className="pill border-teal/40 bg-teal/10 text-teal">Current</span>}
+                <span className="text-lg font-semibold">{p.name}</span>
+                {isCurrent && <span className="pill border-accent/40 bg-accent/10 text-accent">Current</span>}
               </div>
-              <div className="mt-1 text-[20px] font-extrabold">{dollars(p.price_cents)}</div>
-              <ul className="mt-3 space-y-1.5 text-[12px] text-muted">
+              <div className="mt-1 text-xl font-extrabold">{dollars(p.price_cents)}</div>
+              <ul className="mt-3 space-y-1.5 text-xs text-content-muted">
                 {p.features.map((f) => (
-                  <li key={f} className="flex gap-1.5"><span className="text-teal">✓</span>{f}</li>
+                  <li key={f} className="flex gap-1.5"><span className="text-accent">✓</span>{f}</li>
                 ))}
               </ul>
               <button
@@ -280,7 +280,7 @@ function SubscriptionSection() {
         })}
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-[12px] text-muted">
+      <div className="mt-3 flex items-center justify-between text-xs text-content-muted">
         <span>
           {sub?.current_period_end && (
             // Past-dated first: "Renews <date>" for a date that has already gone
@@ -293,14 +293,14 @@ function SubscriptionSection() {
               </span>
             ) : status === 'active' ? (
               sub.cancel_at_period_end ? (
-                <span className="text-amber">Ends {new Date(sub.current_period_end).toLocaleDateString()} — won't renew.</span>
+                <span className="text-warning">Ends {new Date(sub.current_period_end).toLocaleDateString()} — won't renew.</span>
               ) : (
                 <>Renews {new Date(sub.current_period_end).toLocaleDateString()}.</>
               )
             ) : null
           )}
         </span>
-        {onPaid && <button className="text-teal hover:underline" onClick={manage}>Manage billing →</button>}
+        {onPaid && <button className="text-accent hover:underline" onClick={manage}>Manage billing →</button>}
       </div>
     </Section>
   );

@@ -49,14 +49,14 @@ export function AuditLog() {
       </div>
 
       {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
+        <div className="card p-10 text-center text-content-muted">Loading…</div>
       ) : entries.length === 0 ? (
         <EmptyState title="No audit entries" hint="Actions will appear here as admins and brands make changes." />
       ) : (
         <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
                 <th className="px-4 py-3">When</th>
                 <th className="px-4 py-3">Actor</th>
                 <th className="px-4 py-3">Action</th>
@@ -67,11 +67,11 @@ export function AuditLog() {
             <tbody>
               {entries.map((e) => (
                 <tr key={e.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-muted">{new Date(e.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-content-muted">{new Date(e.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3"><span className="pill">{e.actorType}</span></td>
-                  <td className="px-4 py-3 font-mono text-[12px] text-teal-bright">{e.action}</td>
-                  <td className="px-4 py-3 text-muted">{e.targetType ? `${e.targetType}:${e.targetId?.slice(0, 8)}…` : '—'}</td>
-                  <td className="px-4 py-3 text-faint">{e.ip ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-accent-hover">{e.action}</td>
+                  <td className="px-4 py-3 text-content-muted">{e.targetType ? `${e.targetType}:${e.targetId?.slice(0, 8)}…` : '—'}</td>
+                  <td className="px-4 py-3 text-content-faint">{e.ip ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

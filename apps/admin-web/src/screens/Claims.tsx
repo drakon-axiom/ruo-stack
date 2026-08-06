@@ -31,9 +31,9 @@ interface ClaimDetail extends ClaimRow {
 
 type Filter = 'open' | 'investigating' | 'carrier_filed' | 'resolved' | 'all';
 const STATUS_TONE: Record<string, string> = {
-  open: 'border-amber/40 bg-amber/10 text-amber',
-  investigating: 'border-teal/40 bg-teal/10 text-teal',
-  carrier_filed: 'border-teal/40 bg-teal/10 text-teal-bright',
+  open: 'border-warning/40 bg-warning/10 text-warning',
+  investigating: 'border-accent/40 bg-accent/10 text-accent',
+  carrier_filed: 'border-accent/40 bg-accent/10 text-accent-hover',
   resolved: 'border-success/40 bg-success/10 text-success',
 };
 
@@ -66,18 +66,18 @@ export function Claims() {
 
       {rows.length === 0 ? <EmptyState title="Nothing here" hint="No claims in this state." /> : (
         <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <th className="px-4 py-3">Brand</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Recipient</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">SLA</th>
             </tr></thead>
             <tbody>
               {rows.map((c) => (
-                <tr key={c.id} onClick={() => setOpenId(c.id)} className="cursor-pointer border-b border-line/60 hover:bg-card2">
-                  <td className="px-4 py-3 text-text">{c.brand_name}</td>
+                <tr key={c.id} onClick={() => setOpenId(c.id)} className="cursor-pointer border-b border-line/60 hover:bg-surface-3">
+                  <td className="px-4 py-3 text-content">{c.brand_name}</td>
                   <td className="px-4 py-3">{claimTypeLabel(c.type)}</td>
-                  <td className="px-4 py-3 text-muted">{c.recipient_name}</td>
+                  <td className="px-4 py-3 text-content-muted">{c.recipient_name}</td>
                   <td className="px-4 py-3"><span className={`pill ${STATUS_TONE[c.status] ?? ''}`}>{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</span></td>
-                  <td className="px-4 py-3">{c.status !== 'resolved' && (c.sla_overdue ? <span className="pill border-danger/40 bg-danger/10 text-danger">overdue</span> : <span className="text-muted">{new Date(c.sla_due_at).toLocaleDateString()}</span>)}</td>
+                  <td className="px-4 py-3">{c.status !== 'resolved' && (c.sla_overdue ? <span className="pill border-danger/40 bg-danger/10 text-danger">overdue</span> : <span className="text-content-muted">{new Date(c.sla_due_at).toLocaleDateString()}</span>)}</td>
                 </tr>
               ))}
             </tbody>
@@ -123,18 +123,18 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
 
   return (
     <Drawer open title={c ? `${claimTypeLabel(c.type)} — ${c.brand_name}` : 'Claim'} onOpenChange={(o) => { if (!o) onClose(); }}>
-      {!c ? <div className="text-muted">Loading…</div> : (
-        <div className="space-y-4 text-[13px]">
+      {!c ? <div className="text-content-muted">Loading…</div> : (
+        <div className="space-y-4 text-sm">
           {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">{err}</div>}
           <div className="flex items-center gap-2">
             <span className={`pill ${STATUS_TONE[c.status] ?? ''}`}>{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</span>
-            {c.order.trackingNumber && <span className="font-mono text-[11px] text-muted">{c.order.carrier} {c.order.trackingNumber}</span>}
+            {c.order.trackingNumber && <span className="font-mono text-2xs text-content-muted">{c.order.carrier} {c.order.trackingNumber}</span>}
           </div>
-          <div className="text-muted">{c.order.recipientName} · {c.order.city}, {c.order.state} · order value {dollars(c.order.walletChargeCents)}</div>
-          {c.description && <div className="rounded-lg border border-line bg-card2 px-3 py-2">{c.description}</div>}
-          {c.photos.length > 0 && <div className="flex flex-wrap gap-2">{c.photos.map((p, i) => <a key={i} className="text-[11px] text-teal underline" href={p} target="_blank" rel="noreferrer">photo {i + 1}</a>)}</div>}
-          {c.carrier_claim_id && <div className="text-muted">Carrier claim: <span className="font-mono">{c.carrier_claim_id}</span></div>}
-          {c.resolution && <div className="rounded-lg border border-line bg-card2 px-3 py-2">Resolved <span className="text-text">{c.resolution}</span>{c.amount_cents ? ` · ${dollars(c.amount_cents)}` : ''}{c.reason ? ` — ${c.reason}` : ''}{c.reship_order_id ? ` · reship ${c.reship_order_id.slice(0, 8)}` : ''}</div>}
+          <div className="text-content-muted">{c.order.recipientName} · {c.order.city}, {c.order.state} · order value {dollars(c.order.walletChargeCents)}</div>
+          {c.description && <div className="rounded-lg border border-line bg-surface-3 px-3 py-2">{c.description}</div>}
+          {c.photos.length > 0 && <div className="flex flex-wrap gap-2">{c.photos.map((p, i) => <a key={i} className="text-2xs text-accent underline" href={p} target="_blank" rel="noreferrer">photo {i + 1}</a>)}</div>}
+          {c.carrier_claim_id && <div className="text-content-muted">Carrier claim: <span className="font-mono">{c.carrier_claim_id}</span></div>}
+          {c.resolution && <div className="rounded-lg border border-line bg-surface-3 px-3 py-2">Resolved <span className="text-content">{c.resolution}</span>{c.amount_cents ? ` · ${dollars(c.amount_cents)}` : ''}{c.reason ? ` — ${c.reason}` : ''}{c.reship_order_id ? ` · reship ${c.reship_order_id.slice(0, 8)}` : ''}</div>}
 
           {writable && c.status !== 'resolved' && (
             <div className="flex flex-wrap gap-2">
@@ -148,7 +148,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
 
           {canResolve && c.status !== 'resolved' && (
             <div className="card space-y-2 p-3">
-              <div className="text-[11px] uppercase tracking-[0.1em] text-faint">Resolve</div>
+              <div className="text-2xs uppercase tracking-[0.1em] text-content-faint">Resolve</div>
               <Field label="Resolution">
                 <select className="input" value={res} onChange={(e) => setRes(e.target.value as typeof res)} disabled={creditOnly}>
                   {!creditOnly && <option value="reshipped">Reship</option>}
@@ -157,7 +157,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
                 </select>
               </Field>
               {res === 'credited' && <Field label="Credit amount ($)"><input className="input" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={(c.order.walletChargeCents / 100).toFixed(2)} /></Field>}
-              {res === 'reshipped' && <label className="flex items-center gap-2 text-[12px]"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Platform-comped ($0) — uncheck to charge the brand's wallet</label>}
+              {res === 'reshipped' && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Platform-comped ($0) — uncheck to charge the brand's wallet</label>}
               <Field label="Reason"><input className="input" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
               <button className="btn w-full" disabled={busy || !reason || (res === 'credited' && !amount)} onClick={resolve}>Resolve claim</button>
             </div>

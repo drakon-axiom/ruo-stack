@@ -6,16 +6,16 @@ import { signupBrand, ApiError } from '../lib/api.js';
 // Light-theme auth shell (Pepify pattern: light for auth, dark for the app).
 function AuthShell({ title, children, footer }: { title: string; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen place-items-center bg-lbg px-4">
-      <div className="w-full max-w-sm rounded-card border border-lline bg-white p-7 shadow-sm">
+    <div className="grid min-h-screen place-items-center bg-canvas px-4">
+      <div className="w-full max-w-sm rounded-card border border-line bg-white p-7 shadow-sm">
         <div className="mb-6 flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal text-[15px] font-black text-white">R</span>
-          <span className="text-[18px] font-bold text-ltext">RUOStack</span>
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-lg font-black text-white">R</span>
+          <span className="text-xl font-bold text-content">RUOStack</span>
         </div>
-        <h1 className="mb-1 text-[20px] font-bold text-ltext">{title}</h1>
-        <p className="mb-5 text-[13px] text-slate-500">Research-use-only fulfillment platform.</p>
+        <h1 className="mb-1 text-xl font-bold text-content">{title}</h1>
+        <p className="mb-5 text-sm text-slate-500">Research-use-only fulfillment platform.</p>
         {children}
-        {footer && <div className="mt-5 text-center text-[13px] text-slate-500">{footer}</div>}
+        {footer && <div className="mt-5 text-center text-sm text-slate-500">{footer}</div>}
       </div>
     </div>
   );
@@ -23,7 +23,7 @@ function AuthShell({ title, children, footer }: { title: string; children: React
 
 function Err({ msg }: { msg: string }) {
   if (!msg) return null;
-  return <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{msg}</div>;
+  return <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</div>;
 }
 
 export function Signup() {
@@ -60,23 +60,23 @@ export function Signup() {
 
   if (confirmMsg) {
     return (
-      <AuthShell title="Almost there" footer={<Link className="text-teal" to="/login">Go to sign in</Link>}>
-        <p className="text-[13px] text-slate-600">{confirmMsg}</p>
+      <AuthShell title="Almost there" footer={<Link className="text-accent" to="/login">Go to sign in</Link>}>
+        <p className="text-sm text-slate-600">{confirmMsg}</p>
       </AuthShell>
     );
   }
 
   return (
-    <AuthShell title="Create your account" footer={<>Already have one? <Link className="text-teal" to="/login">Sign in</Link></>}>
+    <AuthShell title="Create your account" footer={<>Already have one? <Link className="text-accent" to="/login">Sign in</Link></>}>
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
-        {ref && <div className="rounded-lg bg-teal/10 px-3 py-2 text-[12px] text-teal">Referral code applied: {ref}</div>}
+        {ref && <div className="rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent">Referral code applied: {ref}</div>}
         <input className="l-input" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
         <input className="l-input" placeholder="Research company name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
         <input className="l-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <input className="l-input" type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
         <button className="btn w-full" disabled={busy}>{busy ? '…' : 'Create account'}</button>
-        <p className="text-center text-[11px] text-slate-400">No card required. Research use only.</p>
+        <p className="text-center text-2xs text-slate-400">No card required. Research use only.</p>
       </form>
     </AuthShell>
   );
@@ -100,13 +100,13 @@ export function Login() {
   }
 
   return (
-    <AuthShell title="Sign in" footer={<>New here? <Link className="text-teal" to="/signup">Create an account</Link></>}>
+    <AuthShell title="Sign in" footer={<>New here? <Link className="text-accent" to="/signup">Create an account</Link></>}>
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
         <input className="l-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <input className="l-input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         <button className="btn w-full" disabled={busy}>{busy ? '…' : 'Sign in'}</button>
-        <div className="text-center"><Link className="text-[12px] text-slate-500 hover:text-teal" to="/forgot">Forgot password?</Link></div>
+        <div className="text-center"><Link className="text-xs text-slate-500 hover:text-accent" to="/forgot">Forgot password?</Link></div>
       </form>
     </AuthShell>
   );
@@ -128,9 +128,9 @@ export function Forgot() {
   }
 
   return (
-    <AuthShell title="Reset password" footer={<Link className="text-teal" to="/login">Back to sign in</Link>}>
+    <AuthShell title="Reset password" footer={<Link className="text-accent" to="/login">Back to sign in</Link>}>
       {sent ? (
-        <p className="text-[13px] text-slate-600">If an account exists for {email}, a reset link is on its way.</p>
+        <p className="text-sm text-slate-600">If an account exists for {email}, a reset link is on its way.</p>
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <Err msg={err} />
@@ -159,7 +159,7 @@ export function Reset() {
   }
 
   return (
-    <AuthShell title="Choose a new password" footer={<Link className="text-teal" to="/login">Back to sign in</Link>}>
+    <AuthShell title="Choose a new password" footer={<Link className="text-accent" to="/login">Back to sign in</Link>}>
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
         <input className="l-input" type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />

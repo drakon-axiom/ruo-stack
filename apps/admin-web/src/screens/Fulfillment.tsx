@@ -22,11 +22,11 @@ interface Order {
 }
 
 const TONE: Record<string, string> = {
-  amber: 'border-amber/40 bg-amber/10 text-amber',
-  slate: 'border-line2 bg-card2 text-muted',
-  teal: 'border-teal/40 bg-teal/10 text-teal',
+  amber: 'border-warning/40 bg-warning/10 text-warning',
+  slate: 'border-line-strong bg-surface-3 text-content-muted',
+  teal: 'border-accent/40 bg-accent/10 text-accent',
   success: 'border-success/40 bg-success/10 text-success',
-  muted: 'border-line2 bg-card2 text-muted',
+  muted: 'border-line-strong bg-surface-3 text-content-muted',
 };
 
 function FulfillmentBadge({ order }: { order: { status: string; blocker: string; exported_at: string | null } }) {
@@ -93,14 +93,14 @@ export function Fulfillment() {
       </div>
 
       {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
+        <div className="card p-10 text-center text-content-muted">Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState title="Nothing here" hint="No orders in this state." />
       ) : (
         <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
                 <th className="px-4 py-3">Brand</th>
                 <th className="px-4 py-3">Ship to</th>
                 <th className="px-4 py-3">Items</th>
@@ -112,16 +112,16 @@ export function Fulfillment() {
             <tbody>
               {visible.map((o) => (
                 <tr key={o.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-text">{o.brand_name}</td>
-                  <td className="px-4 py-3 text-muted">{o.recipient.name} · {o.recipient.city}, {o.recipient.state} {o.recipient.zip}</td>
+                  <td className="px-4 py-3 text-content">{o.brand_name}</td>
+                  <td className="px-4 py-3 text-content-muted">{o.recipient.name} · {o.recipient.city}, {o.recipient.state} {o.recipient.zip}</td>
                   <td className="px-4 py-3">{o.item_count}</td>
                   <td className="px-4 py-3">{dollars(o.wallet_charge_cents)}</td>
                   <td className="px-4 py-3"><FulfillmentBadge order={o} /></td>
                   <td className="px-4 py-3 text-right">
                     {writable && isPreShip(o) && (
                       <div className="flex items-center justify-end gap-1.5">
-                        <button className="btn-ghost text-[12px]" onClick={() => setEditing(o)}>Edit</button>
-                        <button className="btn-ghost text-[12px]" disabled={busyId === o.id} onClick={() => resend(o.id)} title="Re-queue for ShipStation's next export pull">
+                        <button className="btn-ghost text-xs" onClick={() => setEditing(o)}>Edit</button>
+                        <button className="btn-ghost text-xs" disabled={busyId === o.id} onClick={() => resend(o.id)} title="Re-queue for ShipStation's next export pull">
                           {busyId === o.id ? '…' : o.exported_at ? 'Re-send' : 'Send'}
                         </button>
                         <button className="btn" onClick={() => setShipping(o)} title="Manually mark shipped (failsafe)">Mark shipped</button>
@@ -131,7 +131,7 @@ export function Fulfillment() {
                       <button className="btn-ghost" onClick={() => deliver(o.id)}>Mark delivered</button>
                     )}
                     {o.status === 'shipped' && o.tracking_number && (
-                      <div className="mt-1 font-mono text-[11px] text-teal-bright">{o.carrier} {o.tracking_number}</div>
+                      <div className="mt-1 font-mono text-2xs text-accent-hover">{o.carrier} {o.tracking_number}</div>
                     )}
                   </td>
                 </tr>
@@ -169,9 +169,9 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
       <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-        <h2 className="mb-1 text-[16px] font-semibold text-text">Mark shipped (manual)</h2>
-        <p className="mb-4 text-[12px] text-muted">{order.brand_name} → {order.recipient.name}. Captures {dollars(order.wallet_charge_cents)} from the brand's wallet. Use only when ShipStation's shipnotify didn't arrive.</p>
-        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+        <h2 className="mb-1 text-lg font-semibold text-content">Mark shipped (manual)</h2>
+        <p className="mb-4 text-xs text-content-muted">{order.brand_name} → {order.recipient.name}. Captures {dollars(order.wallet_charge_cents)} from the brand's wallet. Use only when ShipStation's shipnotify didn't arrive.</p>
+        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
         <Field label="Carrier">
           <select className="input" value={carrier} onChange={(e) => setCarrier(e.target.value)}>
             <option>USPS</option><option>UPS</option><option>FedEx</option>
@@ -264,28 +264,28 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
       }
     >
       {!detail ? (
-        <div className="p-6 text-center text-muted">Loading…</div>
+        <div className="p-6 text-center text-content-muted">Loading…</div>
       ) : (
         <div className="space-y-4">
-          {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+          {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
           {detail.exported_at && (
-            <div className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[12px] text-amber">
+            <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
               Already at ShipStation. Saving updates the record but won't push to the shipping platform — use <span className="font-medium">Re-send</span> afterward to re-queue it.
             </div>
           )}
           {detail.box_name && (
-            <div className="rounded-lg border border-line bg-card2 px-3 py-2 text-[12px] text-muted">
-              Package: <span className="text-text">{detail.box_name}</span>
+            <div className="rounded-lg border border-line bg-surface-3 px-3 py-2 text-xs text-content-muted">
+              Package: <span className="text-content">{detail.box_name}</span>
               {detail.box_dims && <> · {detail.box_dims.l}×{detail.box_dims.w}×{detail.box_dims.h} in</>}
               {detail.billable_weight_oz != null && <> · {detail.billable_weight_oz} oz billable</>}
-              <span className="text-faint"> (re-derived on save)</span>
+              <span className="text-content-faint"> (re-derived on save)</span>
             </div>
           )}
 
           <div>
             <div className="mb-2 flex items-center justify-between">
               <span className="label">Products</span>
-              <button className="text-[12px] text-teal" onClick={addLine}>+ Add product</button>
+              <button className="text-xs text-accent" onClick={addLine}>+ Add product</button>
             </div>
             {lines.map((l, i) => (
               <div key={i} className="mb-2 flex items-center gap-2">
@@ -293,7 +293,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
                   {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <input className="input w-16" type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
-                <button className="text-faint hover:text-danger" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>✕</button>
+                <button className="text-content-faint hover:text-danger" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>✕</button>
               </div>
             ))}
           </div>

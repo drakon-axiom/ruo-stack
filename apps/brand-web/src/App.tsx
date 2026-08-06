@@ -23,7 +23,7 @@ import { Team } from './screens/Team.js';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
-  if (loading) return <div className="grid min-h-screen place-items-center bg-bg text-muted">Loading…</div>;
+  if (loading) return <div className="grid min-h-screen place-items-center bg-canvas text-content-muted">Loading…</div>;
   if (!session) return <Navigate to="/login" replace />;
   return <Shell>{children}</Shell>;
 }
@@ -31,10 +31,10 @@ function Protected({ children }: { children: React.ReactNode }) {
 function ComingSoon({ title }: { title: string }) {
   return (
     <>
-      <h1 className="mb-1 text-[23px] font-bold">{title}</h1>
+      <h1 className="mb-1 text-2xl font-bold">{title}</h1>
       <div className="surface mt-4 flex flex-col items-center gap-2 px-6 py-16 text-center">
-        <div className="text-[15px] font-semibold">Coming soon</div>
-        <div className="max-w-md text-[13px] text-muted">This feature is part of the platform but not available in Phase 0.</div>
+        <div className="text-lg font-semibold">Coming soon</div>
+        <div className="max-w-md text-sm text-content-muted">This feature is part of the platform but not available in Phase 0.</div>
       </div>
     </>
   );

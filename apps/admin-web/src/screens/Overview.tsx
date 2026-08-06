@@ -21,7 +21,7 @@ export function Overview() {
     api<Overview>('/api/admin/overview').then(setD);
   }, []);
 
-  if (!d) return <div className="card p-10 text-center text-muted">Loading…</div>;
+  if (!d) return <div className="card p-10 text-center text-content-muted">Loading…</div>;
 
   return (
     <>
@@ -36,22 +36,22 @@ export function Overview() {
       <div className="mb-4 grid grid-cols-4 gap-3">
         <KpiTile label="Ready to ship" value={d.orders.ready} />
         <KpiTile label="Shipped" value={d.orders.shipped} />
-        <KpiTile label="Action required" value={<span className={d.orders.action_required ? 'text-amber' : ''}>{d.orders.action_required}</span>} />
+        <KpiTile label="Action required" value={<span className={d.orders.action_required ? 'text-warning' : ''}>{d.orders.action_required}</span>} />
         <KpiTile label="Published SKUs" value={d.catalog.published} />
       </div>
 
       <div className="grid grid-cols-[1fr_1fr] gap-4">
         <div className="card p-5">
-          <h2 className="mb-3 text-[13px] uppercase tracking-[0.12em] text-faint">Plan mix</h2>
-          <div className="space-y-2 text-[13px]">
+          <h2 className="mb-3 text-sm uppercase tracking-[0.12em] text-content-faint">Plan mix</h2>
+          <div className="space-y-2 text-sm">
             {([['Starter', d.plans.starter], ['Pro', d.plans.pro], ['Volume', d.plans.volume]] as const).map(([name, n]) => (
               <div key={name} className="flex items-center justify-between">
-                <span className="text-muted">{name}</span>
-                <span className="font-semibold text-text">{n}</span>
+                <span className="text-content-muted">{name}</span>
+                <span className="font-semibold text-content">{n}</span>
               </div>
             ))}
           </div>
-          <h2 className="mb-2 mt-5 text-[13px] uppercase tracking-[0.12em] text-faint">Webhook health</h2>
+          <h2 className="mb-2 mt-5 text-sm uppercase tracking-[0.12em] text-content-faint">Webhook health</h2>
           <div className="flex gap-2">
             <span className="pill border-success/40 bg-success/10 text-success">{d.webhooks.processed} processed</span>
             {d.webhooks.failed > 0
@@ -61,15 +61,15 @@ export function Overview() {
         </div>
 
         <div className="card p-5">
-          <h2 className="mb-3 text-[13px] uppercase tracking-[0.12em] text-faint">Recent activity</h2>
+          <h2 className="mb-3 text-sm uppercase tracking-[0.12em] text-content-faint">Recent activity</h2>
           {d.recent_activity.length === 0 ? (
-            <p className="text-[13px] text-muted">No activity yet.</p>
+            <p className="text-sm text-content-muted">No activity yet.</p>
           ) : (
-            <ul className="space-y-2 text-[13px]">
+            <ul className="space-y-2 text-sm">
               {d.recent_activity.map((a) => (
                 <li key={a.id} className="flex items-center justify-between">
-                  <span><span className="pill mr-2">{a.actor_type}</span><span className="font-mono text-[12px] text-teal-bright">{a.action}</span></span>
-                  <span className="text-[11px] text-faint">{new Date(a.created_at).toLocaleTimeString()}</span>
+                  <span><span className="pill mr-2">{a.actor_type}</span><span className="font-mono text-xs text-accent-hover">{a.action}</span></span>
+                  <span className="text-2xs text-content-faint">{new Date(a.created_at).toLocaleTimeString()}</span>
                 </li>
               ))}
             </ul>

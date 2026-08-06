@@ -118,45 +118,45 @@ export function NotificationBell() {
         onClick={toggle}
         aria-label={unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'}
         aria-expanded={open}
-        className="btn-ghost relative text-[13px]"
+        className="btn-ghost relative text-sm"
       >
         <span aria-hidden>🔔</span>
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-teal px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-accent px-1 text-2xs font-bold text-white">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-[340px] overflow-hidden rounded-xl border border-lline bg-white shadow-2xl dark:border-line dark:bg-bg2">
-          <div className="flex items-center justify-between border-b border-lline px-3.5 py-2.5 dark:border-line">
-            <span className="text-[13px] font-semibold">Notifications</span>
-            {unread > 0 && <button className="text-[11.5px] text-teal hover:underline" onClick={markAll}>Mark all read</button>}
+        <div className="absolute right-0 z-40 mt-2 w-[340px] overflow-hidden rounded-xl border border-line bg-white shadow-2xl dark:border-line dark:bg-surface-1">
+          <div className="flex items-center justify-between border-b border-line px-3.5 py-2.5 dark:border-line">
+            <span className="text-sm font-semibold">Notifications</span>
+            {unread > 0 && <button className="text-xs text-accent hover:underline" onClick={markAll}>Mark all read</button>}
           </div>
 
           <div className="max-h-[360px] overflow-y-auto">
             {loading ? (
-              <div className="px-3.5 py-8 text-center text-[12.5px] text-muted">Loading…</div>
+              <div className="px-3.5 py-8 text-center text-xs text-content-muted">Loading…</div>
             ) : items.length === 0 ? (
-              <div className="px-3.5 py-8 text-center text-[12.5px] text-muted">Nothing yet.</div>
+              <div className="px-3.5 py-8 text-center text-xs text-content-muted">Nothing yet.</div>
             ) : (
               items.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => openItem(n)}
-                  className={`flex w-full items-start gap-2.5 border-b border-lline/60 px-3.5 py-2.5 text-left last:border-0 hover:bg-slate-50 dark:border-line/60 dark:hover:bg-card ${
-                    n.read_at ? '' : 'bg-teal/[0.06]'
+                  className={`flex w-full items-start gap-2.5 border-b border-line/60 px-3.5 py-2.5 text-left last:border-0 hover:bg-slate-50 dark:border-line/60 dark:hover:bg-surface-1 ${
+                    n.read_at ? '' : 'bg-accent/[0.06]'
                   }`}
                 >
-                  <span className="mt-0.5 text-[13px]" aria-hidden>{TYPE_ICON[n.type]}</span>
+                  <span className="mt-0.5 text-sm" aria-hidden>{TYPE_ICON[n.type]}</span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
-                      {!n.read_at && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal" aria-hidden />}
-                      <span className={`truncate text-[13px] ${n.read_at ? 'text-slate-600 dark:text-muted' : 'font-semibold'}`}>{n.title}</span>
+                      {!n.read_at && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
+                      <span className={`truncate text-sm ${n.read_at ? 'text-slate-600 dark:text-content-muted' : 'font-semibold'}`}>{n.title}</span>
                     </span>
-                    <span className="mt-0.5 line-clamp-2 block text-[12px] text-muted">{n.body}</span>
-                    <span className="mt-0.5 block text-[11px] text-faint">{relativeTime(n.published_at)}</span>
+                    <span className="mt-0.5 line-clamp-2 block text-xs text-content-muted">{n.body}</span>
+                    <span className="mt-0.5 block text-2xs text-content-faint">{relativeTime(n.published_at)}</span>
                   </span>
                 </button>
               ))
@@ -164,7 +164,7 @@ export function NotificationBell() {
           </div>
 
           <button
-            className="w-full border-t border-lline px-3.5 py-2.5 text-[12.5px] text-teal hover:bg-slate-50 dark:border-line dark:hover:bg-card"
+            className="w-full border-t border-line px-3.5 py-2.5 text-xs text-accent hover:bg-slate-50 dark:border-line dark:hover:bg-surface-1"
             onClick={() => { setOpen(false); navigate('/app/notifications'); }}
           >
             View all

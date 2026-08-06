@@ -123,7 +123,7 @@ export function Catalog() {
       </div>
 
       {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
+        <div className="card p-10 text-center text-content-muted">Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState
           title="No products"
@@ -132,9 +132,9 @@ export function Catalog() {
         />
       ) : (
         <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
                 <th className="px-4 py-3">SKU</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Wholesale (S / P / V)</th>
@@ -148,16 +148,16 @@ export function Catalog() {
                 <tr
                   key={p.id}
                   onClick={() => setEditing(p)}
-                  className="cursor-pointer border-b border-line/60 hover:bg-card2"
+                  className="cursor-pointer border-b border-line/60 hover:bg-surface-3"
                 >
-                  <td className="px-4 py-3 font-mono text-[12px] text-teal-bright">{p.canonicalSku}</td>
-                  <td className="px-4 py-3 text-text">{p.name}</td>
-                  <td className="px-4 py-3 text-[12px] text-muted">
+                  <td className="px-4 py-3 font-mono text-xs text-accent-hover">{p.canonicalSku}</td>
+                  <td className="px-4 py-3 text-content">{p.name}</td>
+                  <td className="px-4 py-3 text-xs text-content-muted">
                     {dollars(p.wholesaleStarter)} / {dollars(p.wholesalePro)} / {dollars(p.wholesaleVolume)}
                   </td>
                   <td className="px-4 py-3 text-success">{dollars(p.suggestedRetail)}</td>
                   <td className="px-4 py-3"><StatusPill value={p.status} /></td>
-                  <td className="px-4 py-3 text-muted">{p.isPublished ? '🔒 yes' : 'draft'}</td>
+                  <td className="px-4 py-3 text-content-muted">{p.isPublished ? '🔒 yes' : 'draft'}</td>
                 </tr>
               ))}
             </tbody>
@@ -340,7 +340,7 @@ function EditDrawer({
                     Archive
                   </button>
                 )}
-                <span className="text-[11px] text-faint">
+                <span className="text-2xs text-content-faint">
                   {canDelete
                     ? 'Draft — can be deleted outright'
                     : status === 'out_of_stock'
@@ -353,7 +353,7 @@ function EditDrawer({
         )
       }
     >
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Canonical SKU">
         <input
           className="input disabled:opacity-50"
@@ -362,12 +362,12 @@ function EditDrawer({
           title={product.isPublished ? 'SKU is locked once the product is published (immutable)' : ''}
           onChange={(e) => setSku(e.target.value)}
         />
-        {product.isPublished && <span className="mt-1 block text-[11px] text-faint">Locked — immutable after publish.</span>}
+        {product.isPublished && <span className="mt-1 block text-2xs text-content-faint">Locked — immutable after publish.</span>}
       </Field>
       <Field label="Name">
         <input className="input" value={name} disabled={!writable} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <div className="mb-1 mt-1 text-[11px] uppercase tracking-[0.1em] text-faint">Wholesale cost by plan ($)</div>
+      <div className="mb-1 mt-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Wholesale cost by plan ($)</div>
       <div className="grid grid-cols-3 gap-3">
         <Field label="Starter">
           <input className="input" value={costS} disabled={!writable} onChange={(e) => setCostS(e.target.value)} />
@@ -449,7 +449,7 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         </button>
       }
     >
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Canonical SKU">
         <input className="input" value={sku} onChange={(e) => setSku(e.target.value)} />
       </Field>
@@ -459,7 +459,7 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       <Field label="Compound">
         <input className="input" value={compound} onChange={(e) => setCompound(e.target.value)} />
       </Field>
-      <div className="mb-1 text-[11px] uppercase tracking-[0.1em] text-faint">Wholesale cost by plan ($)</div>
+      <div className="mb-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Wholesale cost by plan ($)</div>
       <div className="grid grid-cols-3 gap-3">
         <Field label="Starter">
           <input className="input" value={costS} onChange={(e) => setCostS(e.target.value)} />
@@ -474,7 +474,7 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       <Field label="Suggested retail ($)">
         <input className="input" value={retail} onChange={(e) => setRetail(e.target.value)} />
       </Field>
-      <p className="text-[11px] text-faint">SKU is editable until you publish. Publishing locks it permanently.</p>
+      <p className="text-2xs text-content-faint">SKU is editable until you publish. Publishing locks it permanently.</p>
     </Drawer>
   );
 }

@@ -63,15 +63,15 @@ export function AdminUsers() {
         subtitle="Create admins, grant roles, and suspend access. Every action is audited."
         action={<button className="btn" onClick={() => setCreating(true)}>+ Create admin</button>}
       />
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
+        <div className="card p-10 text-center text-content-muted">Loading…</div>
       ) : (
         <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
@@ -83,11 +83,11 @@ export function AdminUsers() {
             <tbody>
               {admins.map((a) => (
                 <tr key={a.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-text">{a.full_name}</td>
-                  <td className="px-4 py-3 text-muted">{a.email}</td>
+                  <td className="px-4 py-3 text-content">{a.full_name}</td>
+                  <td className="px-4 py-3 text-content-muted">{a.email}</td>
                   <td className="px-4 py-3">
                     <select
-                      className="rounded-lg border border-line bg-card2 px-2 py-1 text-[12px]"
+                      className="rounded-lg border border-line bg-surface-3 px-2 py-1 text-xs"
                       value={a.role}
                       onChange={(e) => changeRole(a.id, e.target.value as AdminRole)}
                     >
@@ -96,7 +96,7 @@ export function AdminUsers() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-3 text-muted">{a.mfa_enabled ? '✓' : '—'}</td>
+                  <td className="px-4 py-3 text-content-muted">{a.mfa_enabled ? '✓' : '—'}</td>
                   <td className="px-4 py-3"><StatusPill value={a.status} /></td>
                   <td className="px-4 py-3 text-right">
                     {a.status === 'active' ? (
@@ -148,7 +148,7 @@ function CreateAdmin({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         {busy ? '…' : 'Create + send invite'}
       </button>
     }>
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Full name">
         <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </Field>
@@ -160,7 +160,7 @@ function CreateAdmin({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
           {ADMIN_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
       </Field>
-      <p className="text-[11px] text-faint">A temporary password is emailed (console adapter in dev). They enroll TOTP on first login.</p>
+      <p className="text-2xs text-content-faint">A temporary password is emailed (console adapter in dev). They enroll TOTP on first login.</p>
     </Drawer>
   );
 }

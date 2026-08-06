@@ -23,11 +23,11 @@ interface Brand { id: string; brand_name: string }
 type Tab = 'all' | 'draft' | 'scheduled' | 'live' | 'expired' | 'archived';
 
 const STATE_STYLE: Record<Announcement['display_state'], string> = {
-  draft: 'border-white/15 bg-white/5 text-muted',
-  scheduled: 'border-amber/40 bg-amber/10 text-amber',
+  draft: 'border-white/15 bg-white/5 text-content-muted',
+  scheduled: 'border-warning/40 bg-warning/10 text-warning',
   live: 'border-success/40 bg-success/10 text-success',
-  expired: 'border-white/15 bg-white/5 text-faint',
-  archived: 'border-white/15 bg-white/5 text-faint',
+  expired: 'border-white/15 bg-white/5 text-content-faint',
+  archived: 'border-white/15 bg-white/5 text-content-faint',
 };
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
@@ -107,7 +107,7 @@ export function Announcements() {
         <KpiTile label="Total" value={rows.length} />
       </div>
 
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs<Tab>
@@ -126,7 +126,7 @@ export function Announcements() {
       </div>
 
       {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
+        <div className="card p-10 text-center text-content-muted">Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState
           title={rows.length === 0 ? 'No announcements yet' : 'Nothing matches that filter'}
@@ -134,8 +134,8 @@ export function Announcements() {
         />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+          <table className="w-full text-sm">
+            <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <tr>
                 <th className="px-4 py-3">Title</th>
                 <th className="px-4 py-3">Audience</th>
@@ -150,14 +150,14 @@ export function Announcements() {
               {visible.map((a) => (
                 <tr key={a.id} className="border-b border-line/60 last:border-0">
                   <td className="px-4 py-3">
-                    <button className="text-left font-medium text-text hover:text-teal" onClick={() => setEditing(a)}>{a.title}</button>
-                    <div className="mt-0.5 line-clamp-1 text-[12px] text-muted">{a.body}</div>
+                    <button className="text-left font-medium text-content hover:text-accent" onClick={() => setEditing(a)}>{a.title}</button>
+                    <div className="mt-0.5 line-clamp-1 text-xs text-content-muted">{a.body}</div>
                   </td>
-                  <td className="px-4 py-3 text-muted">{a.audience === 'all_brands' ? 'All brands' : (a.brand_name ?? 'One brand')}</td>
-                  <td className="px-4 py-3 text-muted">{announcementTypeLabel(a.type)}</td>
+                  <td className="px-4 py-3 text-content-muted">{a.audience === 'all_brands' ? 'All brands' : (a.brand_name ?? 'One brand')}</td>
+                  <td className="px-4 py-3 text-content-muted">{announcementTypeLabel(a.type)}</td>
                   <td className="px-4 py-3"><span className={`pill ${STATE_STYLE[a.display_state]}`}>{a.display_state}</span></td>
-                  <td className="px-4 py-3 text-muted">{fmt(a.publish_at)}</td>
-                  <td className="px-4 py-3 text-muted">{fmt(a.expires_at)}</td>
+                  <td className="px-4 py-3 text-content-muted">{fmt(a.publish_at)}</td>
+                  <td className="px-4 py-3 text-content-muted">{fmt(a.expires_at)}</td>
                   <td className="px-4 py-3 text-right">
                     {writable && (
                       <div className="flex justify-end gap-2">
@@ -258,7 +258,7 @@ function Compose({
         </div>
       }
     >
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <Field label="Audience">
         <select className="input" value={audience} onChange={(e) => setAudience(e.target.value as 'all_brands' | 'single_brand')}>
@@ -297,15 +297,15 @@ function Compose({
       {/* §1.3: "preview as it appears in the brand Notifications inbox" */}
       <div className="mt-4">
         <div className="label mb-1.5">Preview — as the brand sees it</div>
-        <div className="rounded-xl border border-line bg-bg p-3">
+        <div className="rounded-xl border border-line bg-canvas p-3">
           <div className="flex items-start gap-2.5">
-            <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-teal/15 text-[13px]">
+            <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent/15 text-sm">
               {type === 'restock' ? '📦' : type === 'maintenance' ? '🛠' : '📣'}
             </span>
             <div className="min-w-0">
-              <div className="text-[13.5px] font-semibold text-text">{title || 'Untitled announcement'}</div>
-              <div className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-muted">{body || 'Body text appears here.'}</div>
-              <div className="mt-1 text-[11px] text-faint">
+              <div className="text-sm font-semibold text-content">{title || 'Untitled announcement'}</div>
+              <div className="mt-0.5 whitespace-pre-wrap text-xs text-content-muted">{body || 'Body text appears here.'}</div>
+              <div className="mt-1 text-2xs text-content-faint">
                 {scheduled ? `Scheduled for ${new Date(publishAt).toLocaleString()}` : 'Just now'}
               </div>
             </div>

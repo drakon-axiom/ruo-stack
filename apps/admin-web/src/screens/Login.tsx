@@ -87,13 +87,13 @@ export function Login() {
     <div className="grid min-h-screen place-items-center px-4">
       <div className="card w-full max-w-sm p-7">
         <div className="mb-6 flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal text-[15px] font-black text-white">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-lg font-black text-white">
             R
           </span>
-          <span className="text-[18px] font-bold text-text">RUOStack Admin</span>
+          <span className="text-xl font-bold text-content">RUOStack Admin</span>
         </div>
 
-        {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+        {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
         {stage === 'credentials' && (
           <form onSubmit={submitCredentials}>
@@ -111,7 +111,7 @@ export function Login() {
 
         {stage === 'totp' && (
           <form onSubmit={submitTotp}>
-            <p className="mb-4 text-[13px] text-muted">Enter the 6-digit code from your authenticator app.</p>
+            <p className="mb-4 text-sm text-content-muted">Enter the 6-digit code from your authenticator app.</p>
             <Field label="Authentication code">
               <input className="input tracking-[0.4em]" inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value)} required />
             </Field>
@@ -123,13 +123,13 @@ export function Login() {
 
         {stage === 'enroll' && (
           <form onSubmit={submitEnroll}>
-            <p className="mb-3 text-[13px] text-muted">
+            <p className="mb-3 text-sm text-content-muted">
               Set up MFA. Add this secret to your authenticator app, then enter the current code to finish.
             </p>
-            <div className="mb-3 break-all rounded-lg border border-line bg-card2 px-3 py-2 font-mono text-[12px] text-teal-bright">
+            <div className="mb-3 break-all rounded-lg border border-line bg-surface-3 px-3 py-2 font-mono text-xs text-accent-hover">
               {enrollSecret}
             </div>
-            <a className="mb-3 block text-[12px] text-teal underline" href={otpauthUri}>
+            <a className="mb-3 block text-xs text-accent underline" href={otpauthUri}>
               Open in authenticator (otpauth URI)
             </a>
             <Field label="Authentication code">

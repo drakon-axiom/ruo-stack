@@ -65,21 +65,21 @@ export function AddressBook() {
   return (
     <>
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="text-[23px] font-bold">Address Book</h1>
+        <h1 className="text-2xl font-bold">Address Book</h1>
         {addresses && addresses.length > 0 && (
           <button className="btn" onClick={() => setEditing('new')}>+ Add address</button>
         )}
       </div>
-      <p className="mb-5 text-[13px] text-muted">
+      <p className="mb-5 text-sm text-content-muted">
         Saved ship-to addresses. Pick one on the order form to fill the recipient details instantly.
       </p>
 
       {!addresses ? (
-        <div className="surface p-10 text-center text-muted">Loading…</div>
+        <div className="surface p-10 text-center text-content-muted">Loading…</div>
       ) : addresses.length === 0 ? (
         <div className="surface flex flex-col items-center gap-3 px-6 py-16 text-center">
-          <div className="text-[15px] font-semibold">No saved addresses yet</div>
-          <div className="max-w-md text-[13px] text-muted">
+          <div className="text-lg font-semibold">No saved addresses yet</div>
+          <div className="max-w-md text-sm text-content-muted">
             Add addresses you ship to often, or tick “Save this address” when placing an order.
           </div>
           <button className="btn mt-1" onClick={() => setEditing('new')}>+ Add your first address</button>
@@ -90,20 +90,20 @@ export function AddressBook() {
             <div key={a.id} className="surface flex flex-col px-4 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  {a.label && <div className="text-[11px] font-semibold uppercase tracking-wide text-teal">{a.label}</div>}
+                  {a.label && <div className="text-2xs font-semibold uppercase tracking-wide text-accent">{a.label}</div>}
                   <div className="font-medium">{a.recipient_name}</div>
                 </div>
-                <div className="flex shrink-0 gap-2 text-[12px]">
+                <div className="flex shrink-0 gap-2 text-xs">
                   <button className="btn-ghost" onClick={() => setEditing(a)}>Edit</button>
-                  <button className="text-faint hover:text-danger" onClick={() => remove(a)}>Delete</button>
+                  <button className="text-content-faint hover:text-danger" onClick={() => remove(a)}>Delete</button>
                 </div>
               </div>
-              <div className="mt-1 text-[12.5px] text-muted">
+              <div className="mt-1 text-xs text-content-muted">
                 {a.address1}{a.address2 ? `, ${a.address2}` : ''}<br />
                 {a.city}, {a.state} {a.zip}{a.country !== 'US' ? ` · ${a.country}` : ''}
               </div>
               {(a.recipient_email || a.recipient_phone) && (
-                <div className="mt-1 text-[11.5px] text-faint">
+                <div className="mt-1 text-xs text-content-faint">
                   {[a.recipient_email, a.recipient_phone].filter(Boolean).join(' · ')}
                 </div>
               )}
@@ -159,10 +159,10 @@ function AddressModal({ address, onClose, onSaved }: { address: Address | null; 
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
       <div className="surface w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[16px] font-semibold">{address ? 'Edit address' : 'Add address'}</h2>
-          <button onClick={onClose} className="text-faint hover:text-text">✕</button>
+          <h2 className="text-lg font-semibold">{address ? 'Edit address' : 'Add address'}</h2>
+          <button onClick={onClose} className="text-content-faint hover:text-content">✕</button>
         </div>
-        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
         <div className="space-y-2">
           <input className="app-input" placeholder="Label (optional, e.g. “John — home”)" value={f.label} onChange={(e) => set({ label: e.target.value })} />
           <input className="app-input" placeholder="Recipient name" value={f.recipient_name} onChange={(e) => set({ recipient_name: e.target.value })} />

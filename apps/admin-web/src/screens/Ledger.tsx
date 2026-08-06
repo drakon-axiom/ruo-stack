@@ -179,23 +179,23 @@ export function Ledger() {
         <KpiTile label="Uncaptured drift" value={uncaptured.length} />
       </div>
 
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
-      {notice && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-[13px] text-success">{notice}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
+      {notice && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">{notice}</div>}
 
       {/* ── Drift: the actionable face of the reconciliation worker ────────── */}
       {drift.length > 0 && (
         <div className="card mb-5 p-4">
-          <div className="mb-2 text-[14px] font-semibold">Reconciliation drift</div>
+          <div className="mb-2 text-base font-semibold">Reconciliation drift</div>
           <div className="space-y-2">
             {drift.map((d) => (
-              <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-[13px]">
+              <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <span className={`pill mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-amber/40 bg-amber/10 text-amber'}`}>
+                  <span className={`pill mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-warning/40 bg-warning/10 text-warning'}`}>
                     {d.kind === 'shipped_not_captured' ? 'not captured' : 'stale export'}
                   </span>
-                  <span className="text-text">{d.brand_name}</span>
-                  <span className="ml-2 text-muted">{d.detail}</span>
-                  {d.at && <span className="ml-2 text-faint">{day(d.at)}</span>}
+                  <span className="text-content">{d.brand_name}</span>
+                  <span className="ml-2 text-content-muted">{d.detail}</span>
+                  {d.at && <span className="ml-2 text-content-faint">{day(d.at)}</span>}
                 </div>
                 {d.kind === 'shipped_not_captured' ? (
                   canHeal ? (
@@ -203,11 +203,11 @@ export function Ledger() {
                       {healing === d.order_id ? '…' : 'Re-run capture'}
                     </button>
                   ) : (
-                    <span className="text-[12px] text-faint">finance only</span>
+                    <span className="text-xs text-content-faint">finance only</span>
                   )
                 ) : (
                   // The heal for a stale export is a re-queue, which lives with ops.
-                  <span className="text-[12px] text-faint">re-send from Fulfillment Queue</span>
+                  <span className="text-xs text-content-faint">re-send from Fulfillment Queue</span>
                 )}
               </div>
             ))}
@@ -231,8 +231,8 @@ export function Ledger() {
       {/* ── Per-brand period summary ──────────────────────────────────────── */}
       {summary && summary.brands.length > 0 && (
         <div className="card mb-5 overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+          <table className="w-full text-sm">
+            <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <tr>
                 <th className="px-4 py-3">Brand</th>
                 <th className="px-4 py-3 text-right">Opening</th>
@@ -247,7 +247,7 @@ export function Ledger() {
               {summary.brands.map((b) => (
                 <tr key={b.brandId} className="border-b border-line/60 last:border-0">
                   <td className="px-4 py-2.5">{b.brandName}</td>
-                  <td className="px-4 py-2.5 text-right text-muted">{money(b.openingBalance)}</td>
+                  <td className="px-4 py-2.5 text-right text-content-muted">{money(b.openingBalance)}</td>
                   <td className="px-4 py-2.5 text-right">{money(b.byType.deposit ?? 0)}</td>
                   <td className="px-4 py-2.5 text-right">{money(b.byType.capture ?? 0)}</td>
                   <td className="px-4 py-2.5 text-right">{money((b.byType.refund_credit ?? 0) + (b.byType.referral_credit ?? 0))}</td>
@@ -262,13 +262,13 @@ export function Ledger() {
 
       {/* ── Entries ───────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
+        <div className="card p-10 text-center text-content-muted">Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState title="No wallet movement in this period" hint="Widen the date range or clear the filters." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+          <table className="w-full text-sm">
+            <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Brand</th>
@@ -281,12 +281,12 @@ export function Ledger() {
             <tbody>
               {visible.map((e) => (
                 <tr key={e.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-2.5 text-muted">{day(e.createdAt)}</td>
+                  <td className="px-4 py-2.5 text-content-muted">{day(e.createdAt)}</td>
                   <td className="px-4 py-2.5">{e.brandName}</td>
                   <td className="px-4 py-2.5">{TYPE_LABEL[e.type]}</td>
-                  <td className="px-4 py-2.5 max-w-[280px] truncate text-muted" title={e.reason ?? ''}>{e.reason ?? '—'}</td>
+                  <td className="px-4 py-2.5 max-w-[280px] truncate text-content-muted" title={e.reason ?? ''}>{e.reason ?? '—'}</td>
                   <td className={`px-4 py-2.5 text-right ${e.amount < 0 ? 'text-danger' : 'text-success'}`}>{money(e.amount)}</td>
-                  <td className="px-4 py-2.5 text-right text-muted">{money(e.balanceAfter)}</td>
+                  <td className="px-4 py-2.5 text-right text-content-muted">{money(e.balanceAfter)}</td>
                 </tr>
               ))}
             </tbody>

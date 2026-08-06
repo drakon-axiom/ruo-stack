@@ -72,24 +72,24 @@ export function StoreMatch() {
       <div className="mb-3">
         <Tabs<Tab> active={tab} onChange={setTab} tabs={[{ key: 'no_match', label: 'No-Match', count: orders.length }, { key: 'aliases', label: 'Aliases', count: aliases.length }]} />
       </div>
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       {tab === 'no_match' ? (
         orders.length === 0 ? <EmptyState title="All clear" hint="No unmatched store orders." /> : (
           <div className="space-y-3">
             {orders.map((o) => (
               <div key={o.id} className="card p-4">
-                <div className="mb-2 flex items-center justify-between text-[13px]">
-                  <div><span className="text-text">{o.brand_name}</span> · {o.recipient.name} · {o.recipient.city}, {o.recipient.state}</div>
-                  <div className="font-mono text-[11px] text-faint">{o.external_order_id}</div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <div><span className="text-content">{o.brand_name}</span> · {o.recipient.name} · {o.recipient.city}, {o.recipient.state}</div>
+                  <div className="font-mono text-2xs text-content-faint">{o.external_order_id}</div>
                 </div>
                 <div className="space-y-2">
                   {o.unmatched_skus.map((sku) => {
                     const key = `${o.id}:${sku}`;
                     return (
-                      <div key={sku} className="flex items-center gap-2 text-[13px]">
-                        <span className="rounded-pill border border-amber/40 bg-amber/10 px-2 py-0.5 font-mono text-[11px] text-amber">{sku}</span>
-                        <span className="text-faint">→</span>
+                      <div key={sku} className="flex items-center gap-2 text-sm">
+                        <span className="rounded-pill border border-warning/40 bg-warning/10 px-2 py-0.5 font-mono text-2xs text-warning">{sku}</span>
+                        <span className="text-content-faint">→</span>
                         <select className="input flex-1" value={pick[key] ?? ''} onChange={(e) => setPick({ ...pick, [key]: e.target.value })}>
                           <option value="">Select a catalog product…</option>
                           {catalog.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.canonicalSku})</option>)}
@@ -105,18 +105,18 @@ export function StoreMatch() {
         )
       ) : aliases.length === 0 ? <EmptyState title="No aliases" hint="Aliases you create here will appear in this list." /> : (
         <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint">
               <th className="px-4 py-3">Brand</th><th className="px-4 py-3">Store SKU</th><th className="px-4 py-3">→ Canonical</th><th className="px-4 py-3">Product</th><th className="px-4 py-3 text-right"></th>
             </tr></thead>
             <tbody>
               {aliases.map((a) => (
                 <tr key={a.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-text">{a.brand_name}</td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-muted">{a.woo_sku}</td>
-                  <td className="px-4 py-3 font-mono text-[11px]">{a.canonical_sku}</td>
-                  <td className="px-4 py-3 text-muted">{a.product_name}</td>
-                  <td className="px-4 py-3 text-right">{writable && <button className="btn-ghost text-[12px] text-danger" onClick={() => delAlias(a)}>Remove</button>}</td>
+                  <td className="px-4 py-3 text-content">{a.brand_name}</td>
+                  <td className="px-4 py-3 font-mono text-2xs text-content-muted">{a.woo_sku}</td>
+                  <td className="px-4 py-3 font-mono text-2xs">{a.canonical_sku}</td>
+                  <td className="px-4 py-3 text-content-muted">{a.product_name}</td>
+                  <td className="px-4 py-3 text-right">{writable && <button className="btn-ghost text-xs text-danger" onClick={() => delAlias(a)}>Remove</button>}</td>
                 </tr>
               ))}
             </tbody>
