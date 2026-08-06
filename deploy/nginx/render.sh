@@ -68,6 +68,14 @@ fi
 echo "render: wrote $ORIGIN_OUT"
 echo "render: wrote $EDGE_OUT"
 
+# The edge config serves every hostname it renders, so the recovery command must
+# name every one of them. Omitting the marketing hosts when LANDING=1 would leave
+# ruostack.com HTTP-only after a re-render.
+CERTBOT_HOSTS="-d $BRAND_HOST -d $ADMIN_HOST"
+if [[ "${LANDING:-0}" == "1" ]]; then
+  CERTBOT_HOSTS+=" -d $LANDING_HOST -d www.$LANDING_HOST"
+fi
+
 # certbot --nginx edits the DEPLOYED edge config on the VPS, not this template,
 # so every fresh render is HTTP-only. render.sh cannot detect an existing
 # certificate (wrong machine), so this warning is unconditional.
@@ -76,7 +84,7 @@ cat >&2 <<WARN
 render: NOTE -- edge.$ENV_NAME.conf is HTTP-only by construction.
   If certificates already exist on the VPS, copying this file over drops the
   443 blocks until you re-run:
-    sudo certbot --nginx -d $BRAND_HOST -d $ADMIN_HOST
+    sudo certbot --nginx $CERTBOT_HOSTS
   certbot reuses the existing certificate (no re-issue, no rate-limit cost)
   and re-adds the TLS blocks and the HTTP->HTTPS redirect.
 WARN

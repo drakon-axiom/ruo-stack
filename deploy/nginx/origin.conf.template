@@ -67,10 +67,12 @@ server {
     # deploy stays invisible behind a stale index.html.
     location /assets/ {
         try_files $uri =404;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
+        # One directive only. The `expires` directive emits a Cache-Control of
+        # its own, so pairing it with an add_header shipped two conflicting
+        # Cache-Control headers on every asset.
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
-    location = /index.html { add_header Cache-Control "no-store"; }
+    location = /index.html { add_header Cache-Control "no-store" always; }
 
     location / { try_files $uri $uri/ /index.html; }
 }
@@ -121,12 +123,26 @@ server {
     location /auth/     { proxy_pass http://${API_UPSTREAM}; }   # admin login / refresh / mfa
     location = /healthz { proxy_pass http://${API_UPSTREAM}; }
 
+    # The three security headers below are REPEATED from the server block on
+    # purpose -- do not "de-duplicate" them. nginx's add_header does not inherit
+    # into a location that declares any add_header of its own, so the
+    # Cache-Control lines here would otherwise cancel all three. `location /`
+    # falls back to /index.html by internal redirect, which re-matches
+    # `= /index.html`, so without these the admin SPA shell would ship with no
+    # clickjacking protection at all.
     location /assets/ {
         try_files $uri =404;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
+        add_header Cache-Control          "public, max-age=31536000, immutable" always;
+        add_header X-Frame-Options        DENY         always;
+        add_header X-Content-Type-Options nosniff      always;
+        add_header Referrer-Policy        same-origin  always;
     }
-    location = /index.html { add_header Cache-Control "no-store"; }
+    location = /index.html {
+        add_header Cache-Control          "no-store"   always;
+        add_header X-Frame-Options        DENY         always;
+        add_header X-Content-Type-Options nosniff      always;
+        add_header Referrer-Policy        same-origin  always;
+    }
 
     location / { try_files $uri $uri/ /index.html; }
 }

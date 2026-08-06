@@ -34,7 +34,12 @@ server {
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # $remote_addr, NOT $proxy_add_x_forwarded_for: this is the public trust
+        # boundary. Appending would let a client send its own X-Forwarded-For and
+        # own the leftmost entry, which is exactly what the API's trustProxy:true
+        # (apps/api/src/app.ts:40) resolves $req.ip to -- spoofing audit-log IPs
+        # and the rate-limit key on admin login. Overwrite instead.
+        proxy_set_header   X-Forwarded-For   $remote_addr;
         # This is the hop where $scheme is meaningful -- the origin passes this
         # value through rather than recomputing it.
         proxy_set_header   X-Forwarded-Proto $scheme;
@@ -71,7 +76,8 @@ server {
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # Overwrite, never append -- see the brand block above.
+        proxy_set_header   X-Forwarded-For   $remote_addr;
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_set_header   Connection        "";
         proxy_read_timeout 60s;

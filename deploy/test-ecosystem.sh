@@ -3,7 +3,10 @@
 # Run: deploy/test-ecosystem.sh
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# `pwd -P` to match deploy.sh exactly. With a plain `pwd` a symlinked checkout
+# yields a different ROOT than the one deploy.sh computes for itself, and the
+# */apps/dev/* branch of the guard test below would silently never run.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 PASS=0; FAIL=0
 ok()  { printf '  ok   %s\n' "$1"; PASS=$((PASS+1)); }
 bad() { printf '  FAIL %s\n     %s\n' "$1" "${2:-}"; FAIL=$((FAIL+1)); }
@@ -68,19 +71,32 @@ else
   # non-zero (and quickly) on a box where deploy/nginx/env.prod is missing, so
   # both a specific exit code AND the guard's own refusal message are required
   # -- only actually hitting the guard can produce both.
-  if [[ "$ROOT" == */apps/dev/* ]]; then
+  #
+  # This block is conditional on where the checkout lives, so track whether it
+  # ran: a ROOT that matches neither prefix would skip the single most important
+  # test and still report "0 failed".
+  guard_ran=0
+  wrong_env=""
+  if [[ "$ROOT" == */apps/dev/*  ]]; then wrong_env=prod; guard_ran=1; fi
+  if [[ "$ROOT" == */apps/prod/* ]]; then wrong_env=dev;  guard_ran=1; fi
+
+  if [[ "$guard_ran" -eq 1 ]]; then
+    ok "checkout-mismatch guard was exercised"
     start=$SECONDS
-    stderr="$("$ROOT/deploy/deploy.sh" prod 2>&1 >/dev/null)"
+    stderr="$("$ROOT/deploy/deploy.sh" "$wrong_env" 2>&1 >/dev/null)"
     status=$?
     if [[ "$status" -eq 1 && "$stderr" == *refusing* ]]; then
-      ok "blocks prod from a dev checkout"
+      ok "blocks $wrong_env from a $( [[ $wrong_env == prod ]] && echo dev || echo prod ) checkout"
       # Exit code + message together are the proof it hit the guard; the
       # timing alone would also be satisfied by any other fast failure.
       (( SECONDS - start < 10 )) && ok "guard fails fast (before any build)" \
                                  || bad "guard fails fast (before any build)" "took $((SECONDS-start))s"
     else
-      bad "blocks prod from a dev checkout" "exit $status, stderr: $stderr"
+      bad "blocks $wrong_env from the opposite checkout" "exit $status, stderr: $stderr"
     fi
+  else
+    bad "checkout-mismatch guard was exercised" \
+        "ROOT '$ROOT' is under neither /apps/dev/ nor /apps/prod/ -- guard untested"
   fi
 fi
 

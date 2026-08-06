@@ -29,10 +29,14 @@ esac
 
 [[ -f "$ROOT/.env" ]] || { echo "deploy: no .env in $ROOT" >&2; exit 1; }
 
-set -a
+# Deliberately NOT `set -a`: env.<env> defines API_PORT and API_HOST, which are
+# real config keys read by apps/api/src/config.ts. Exporting them would leak
+# them into pnpm -> vite -> node for every build step below. Sourcing without
+# auto-export leaves them as ordinary shell variables -- readable here, invisible
+# to children. Anything a child genuinely needs is passed inline at its call site
+# (VITE_API_BASE_URL, RUOSTACK_ENV).
 # shellcheck source=/dev/null
 source "$ENV_FILE"
-set +a
 
 # set -u catches unset but NOT empty. An empty *_ROOT would make the rsync
 # target "/", so require both to be non-empty and under /var/www before any

@@ -170,7 +170,10 @@ owns them, so there is one place to change them.
 Per site, listening on `${ORIGIN_IP}:<port>` — bound to the Tailscale interface
 specifically, so these ports are not exposed on the public interface:
 
-- `allow ${EDGE_IP}; allow 127.0.0.1; deny all;` — only the edge may connect.
+- `allow ${EDGE_IP}; allow ${ORIGIN_IP}; allow 127.0.0.1; deny all;` — only the edge
+  may connect. `${ORIGIN_IP}` is in the list because a self-check from this box to
+  its own Tailscale address arrives with *that* address as the source, not
+  `127.0.0.1`; without it the runbook's own origin-verification `curl` gets a 403.
 - Serves the SPA from its webroot; `try_files $uri $uri/ /index.html`.
 - Proxies `/api/` and `/healthz` to `127.0.0.1:${API_PORT}`; the admin site also
   proxies `/auth/`.
@@ -312,7 +315,8 @@ No unit tests — this is deployment configuration. Verification is by observati
 - A deep link such as `https://$BRAND_HOST/orders` returns 200 with the SPA shell,
   proving the `try_files` fallback rather than a 404.
 - `curl -sI https://$BRAND_HOST/assets/<hashed>.js` shows
-  `Cache-Control: public, immutable`; `/index.html` shows `no-store`.
+  `Cache-Control: public, max-age=31536000, immutable` (exactly one such header);
+  `/index.html` shows `no-store`.
 - An API audit-log entry records the real client IP, not a Tailscale address — proving
   the forwarded chain survives both hops against `trustProxy`.
 - The API reports the request as HTTPS despite the plaintext origin hop, proving the

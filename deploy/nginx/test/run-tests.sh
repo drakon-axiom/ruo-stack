@@ -16,6 +16,18 @@ assert_contains() { # <file> <literal> <description>
 assert_absent() { # <file> <literal> <description>
   if grep -qF -- "$2" "$1" 2>/dev/null; then bad "$3" "unexpectedly present: $2"; else ok "$3"; fi
 }
+# Count-based, so deleting the directive from ONE server block of a multi-block
+# render still fails. `grep -c` prints 0 and exits 1 on no match; this script
+# runs without `set -e`, so the assignment captures "0" cleanly -- do not add
+# `|| echo 0`, it would append a second line and break the comparison.
+assert_count() { # <file> <literal> <expected-count> <description>
+  local n; n=$(grep -cF -- "$2" "$1" 2>/dev/null)
+  [[ "$n" -eq "$3" ]] && ok "$4" || bad "$4" "found $n of '$2', want $3"
+}
+assert_count_min() { # <file> <literal> <minimum> <description>
+  local n; n=$(grep -cF -- "$2" "$1" 2>/dev/null)
+  [[ "$n" -ge "$3" ]] && ok "$4" || bad "$4" "found $n of '$2', want >= $3"
+}
 
 echo "== renderer =="
 
@@ -56,9 +68,9 @@ for f in "$O_DEV" "$E_DEV" "$O_PRD" "$E_PRD"; do
 done
 
 for f in "$O_DEV" "$E_DEV"; do
-  assert_contains "$f" '$remote_addr'               "\$remote_addr survives in $(basename "$f")"
-  assert_contains "$f" '$proxy_add_x_forwarded_for' "\$proxy_add_x_forwarded_for survives in $(basename "$f")"
+  assert_contains "$f" '$remote_addr' "\$remote_addr survives in $(basename "$f")"
 done
+assert_contains "$O_DEV" '$proxy_add_x_forwarded_for' "\$proxy_add_x_forwarded_for survives in origin.dev.conf"
 assert_contains "$O_DEV" 'try_files $uri $uri/ /index.html' "\$uri survives in origin.dev.conf"
 
 echo "== edge -> origin routing =="
@@ -79,9 +91,18 @@ echo "== origin =="
 assert_contains "$O_DEV" "listen 100.99.76.119:8901;" "origin binds the tailscale iface, not 0.0.0.0"
 assert_contains "$O_DEV" "server 127.0.0.1:3901;"     "dev origin API upstream is loopback"
 assert_contains "$O_PRD" "server 127.0.0.1:3911;"     "prod origin API upstream is loopback"
-assert_contains "$O_DEV" "allow 100.99.76.10;"        "origin allows the edge"
-assert_contains "$O_DEV" "allow 100.99.76.119;"       "origin allows self (runbook curl)"
-assert_contains "$O_DEV" "deny  all;"                 "origin denies everyone else"
+# Counted, not just "present": dev has two guarded blocks (brand + admin) and
+# prod has three (brand + admin + landing). A single-match assertion would stay
+# green with `deny all` deleted from the prod landing block, leaving a marketing
+# origin port open to every Tailscale peer.
+assert_count "$O_DEV" "allow 100.99.76.10;"  2 "dev origin allows the edge in both blocks"
+assert_count "$O_DEV" "allow 100.99.76.119;" 2 "dev origin allows self in both blocks"
+assert_count "$O_DEV" "allow 127.0.0.1;"     2 "dev origin allows loopback in both blocks"
+assert_count "$O_DEV" "deny  all;"           2 "dev origin denies everyone else in both blocks"
+assert_count "$O_PRD" "allow 100.99.76.10;"  3 "prod origin allows the edge in all three blocks"
+assert_count "$O_PRD" "allow 100.99.76.119;" 3 "prod origin allows self in all three blocks"
+assert_count "$O_PRD" "allow 127.0.0.1;"     3 "prod origin allows loopback in all three blocks"
+assert_count "$O_PRD" "deny  all;"           3 "prod origin denies everyone else in all three blocks"
 
 # Upstream names must differ, or both origin configs cannot be enabled at once.
 assert_contains "$O_DEV" "upstream ruostack_api_dev"  "dev upstream name"
@@ -98,7 +119,36 @@ if grep -E 'X-Forwarded-Proto[[:space:]]+\$scheme' "$O_DEV" >/dev/null 2>&1; the
 else
   ok "origin does not derive X-Forwarded-Proto from \$scheme"
 fi
-assert_contains "$O_DEV" '$ruostack_forwarded_proto' "origin uses the passthrough map variable"
+# Counted per proxying block. The prod landing block is static-only (no
+# proxy_pass), so prod has the same two proxying blocks as dev, not three.
+assert_count "$O_DEV" 'X-Forwarded-Proto $ruostack_forwarded_proto;' 2 \
+  "dev origin uses the passthrough map variable in both proxying blocks"
+assert_count "$O_PRD" 'X-Forwarded-Proto $ruostack_forwarded_proto;' 2 \
+  "prod origin uses the passthrough map variable in both proxying blocks"
+if grep -E 'X-Forwarded-Proto[[:space:]]+\$scheme' "$O_PRD" >/dev/null 2>&1; then
+  bad "prod origin does not derive X-Forwarded-Proto from \$scheme" "found \$scheme"
+else
+  ok "prod origin does not derive X-Forwarded-Proto from \$scheme"
+fi
+
+echo "== X-Forwarded-For trust boundary =="
+
+# The edge is public-facing. $proxy_add_x_forwarded_for APPENDS to whatever the
+# client sent, so a request carrying its own X-Forwarded-For would own the
+# LEFTMOST entry -- which is what the API's trustProxy:true (apps/api/src/app.ts:40)
+# resolves req.ip to, and req.ip keys both the audit log and @fastify/rate-limit
+# (including the max:10 admin-login limit). The edge must OVERWRITE.
+for f in "$E_DEV" "$E_PRD"; do
+  assert_contains "$f" 'X-Forwarded-For   $remote_addr' \
+    "edge overwrites X-Forwarded-For with \$remote_addr in $(basename "$f")"
+  assert_absent   "$f" 'X-Forwarded-For   $proxy_add_x_forwarded_for' \
+    "edge never appends client-supplied X-Forwarded-For in $(basename "$f")"
+done
+# The origin legitimately trusts the edge and appends to the chain it established.
+for f in "$O_DEV" "$O_PRD"; do
+  assert_count "$f" 'X-Forwarded-For   $proxy_add_x_forwarded_for;' 2 \
+    "origin appends to the edge's chain in both proxying blocks of $(basename "$f")"
+done
 
 # The map is http-context: a per-environment copy would be a duplicate.
 for f in "$O_DEV" "$O_PRD"; do
@@ -121,6 +171,31 @@ echo "== admin-only surface =="
 a=$(grep -c 'location /auth/' "$O_DEV")
 [[ "$a" -eq 1 ]] && ok "/auth/ proxied exactly once (admin site only)" \
                  || bad "/auth/ proxied exactly once (admin site only)" "found $a"
+
+echo "== admin security headers survive per-location add_header =="
+
+# nginx's add_header does NOT inherit into a location that declares its own, and
+# both /assets/ and = /index.html declare Cache-Control. So the three admin
+# headers must be repeated inside each -- server level + 2 locations = 3.
+# `location /` falls back to /index.html by internal redirect, which re-matches
+# `= /index.html`; at fewer than 3 the admin SPA shell ships unprotected.
+for f in "$O_DEV" "$O_PRD"; do
+  assert_count_min "$f" "X-Frame-Options"        3 "X-Frame-Options repeated into admin locations in $(basename "$f")"
+  assert_count_min "$f" "X-Content-Type-Options" 3 "X-Content-Type-Options repeated into admin locations in $(basename "$f")"
+  assert_count_min "$f" "Referrer-Policy"        3 "Referrer-Policy repeated into admin locations in $(basename "$f")"
+done
+
+echo "== asset caching =="
+
+# One Cache-Control per location: `expires 1y` emits its own, so pairing it with
+# an add_header shipped two conflicting headers.
+for f in "$O_DEV" "$O_PRD"; do
+  assert_count  "$f" 'Cache-Control          "public, max-age=31536000, immutable"' 1 \
+    "admin assets carry one immutable Cache-Control in $(basename "$f")"
+  assert_count  "$f" 'Cache-Control "public, max-age=31536000, immutable"' 1 \
+    "brand assets carry one immutable Cache-Control in $(basename "$f")"
+  assert_absent "$f" "expires 1y" "no \`expires\` duplicating Cache-Control in $(basename "$f")"
+done
 
 echo "== landing is prod-only =="
 
