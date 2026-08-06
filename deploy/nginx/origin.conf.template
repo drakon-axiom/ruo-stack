@@ -1,0 +1,125 @@
+# RENDERED FILE -- do not edit in place.
+# Source: deploy/nginx/origin.conf.template
+# Render: deploy/nginx/render.sh <dev|prod>
+# Installs on the ORIGIN box (acgserver02) as
+#   /etc/nginx/sites-available/ruostack-origin.<env>.conf
+#
+# Serves the built SPAs and proxies /api to the loopback-bound API. Reachable
+# only from the edge VPS over Tailscale. Requires the $ruostack_forwarded_proto
+# map from origin-shared.conf, installed once into conf.d/.
+
+upstream ${API_UPSTREAM} {
+    server 127.0.0.1:${API_PORT};
+    keepalive 32;
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer portal origin -- ${BRAND_HOST} (brand-web + brand API + webhooks)
+# ─────────────────────────────────────────────────────────────────────────────
+server {
+    # Bound to the Tailscale interface specifically, so this port is never
+    # exposed on the public interface.
+    listen ${ORIGIN_IP}:${BRAND_ORIGIN_PORT};
+    server_name ${BRAND_HOST};
+
+    # Only the edge may connect. 127.0.0.1 stays open for local curl checks.
+    allow ${EDGE_IP};
+    allow 127.0.0.1;
+    deny  all;
+
+    root ${BRAND_ROOT};
+    index index.html;
+
+    access_log /var/log/nginx/${LOG_PREFIX}-brand-access.log;
+    error_log  /var/log/nginx/${LOG_PREFIX}-brand-error.log;
+
+    # Base64 logo upload is ~1 MB; this leaves headroom.
+    client_max_body_size 2m;
+
+    gzip             on;
+    gzip_min_length  1024;
+    gzip_proxied     any;
+    gzip_vary        on;
+    gzip_types       text/plain text/css application/json application/javascript
+                     text/xml application/xml image/svg+xml;
+
+    # The API runs trustProxy:true (apps/api/src/app.ts:40). X-Forwarded-Proto
+    # comes from the map, NOT $scheme -- TLS terminated at the edge, so $scheme
+    # is "http" here and using it would mark every request insecure.
+    proxy_http_version 1.1;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $ruostack_forwarded_proto;
+    proxy_set_header   Connection        "";
+    proxy_read_timeout 60s;
+
+    # Brand API + WooCommerce/ShipStation webhooks. Bodies pass through
+    # unmodified, which /api/payments/webhook needs for Stripe signature
+    # verification -- do not add any body-rewriting directive here.
+    location /api/      { proxy_pass http://${API_UPSTREAM}; }
+    location = /healthz { proxy_pass http://${API_UPSTREAM}; }
+
+    # Hashed assets are immutable; the HTML shell must never be cached, or a
+    # deploy stays invisible behind a stale index.html.
+    location /assets/ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    location = /index.html { add_header Cache-Control "no-store"; }
+
+    location / { try_files $uri $uri/ /index.html; }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin portal origin -- ${ADMIN_HOST} (admin-web + admin API + admin auth)
+# ─────────────────────────────────────────────────────────────────────────────
+server {
+    listen ${ORIGIN_IP}:${ADMIN_ORIGIN_PORT};
+    server_name ${ADMIN_HOST};
+
+    allow ${EDGE_IP};
+    allow 127.0.0.1;
+    deny  all;
+
+    root ${ADMIN_ROOT};
+    index index.html;
+
+    access_log /var/log/nginx/${LOG_PREFIX}-admin-access.log;
+    error_log  /var/log/nginx/${LOG_PREFIX}-admin-error.log;
+
+    client_max_body_size 2m;
+
+    gzip             on;
+    gzip_min_length  1024;
+    gzip_proxied     any;
+    gzip_vary        on;
+    gzip_types       text/plain text/css application/json application/javascript
+                     text/xml application/xml image/svg+xml;
+
+    add_header X-Frame-Options        DENY         always;
+    add_header X-Content-Type-Options nosniff      always;
+    add_header Referrer-Policy        same-origin  always;
+
+    proxy_http_version 1.1;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $ruostack_forwarded_proto;
+    proxy_set_header   Connection        "";
+    proxy_read_timeout 60s;
+
+    location /api/      { proxy_pass http://${API_UPSTREAM}; }
+    location /auth/     { proxy_pass http://${API_UPSTREAM}; }   # admin login / refresh / mfa
+    location = /healthz { proxy_pass http://${API_UPSTREAM}; }
+
+    location /assets/ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    location = /index.html { add_header Cache-Control "no-store"; }
+
+    location / { try_files $uri $uri/ /index.html; }
+}
