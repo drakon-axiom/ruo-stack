@@ -32,22 +32,30 @@ export class StripeAdapter implements PaymentsAdapter {
   }
 
   async createCustomer(input: { brandId: string; email?: string; name?: string }): Promise<{ customerId: string }> {
-    const c = await this.stripe.customers.create({
-      email: input.email,
-      name: input.name,
-      metadata: { brand_id: input.brandId },
-    });
+    const c = await this.stripe.customers.create(
+      {
+        email: input.email,
+        name: input.name,
+        metadata: { brand_id: input.brandId },
+      },
+      // Idempotent: a retry after a network timeout returns the same customer
+      // instead of creating a duplicate.
+      { idempotencyKey: `cus:${input.brandId}` },
+    );
     return { customerId: c.id };
   }
 
   async createSubscription(
     input: CreateSubscriptionInput,
   ): Promise<{ subscriptionId: string; status: string }> {
-    const sub = await this.stripe.subscriptions.create({
-      customer: input.customerId,
-      items: [{ price: input.priceId }],
-      metadata: input.metadata,
-    });
+    const sub = await this.stripe.subscriptions.create(
+      {
+        customer: input.customerId,
+        items: [{ price: input.priceId }],
+        metadata: input.metadata,
+      },
+      { idempotencyKey: `sub:${input.customerId}:${input.priceId}` },
+    );
     return { subscriptionId: sub.id, status: sub.status };
   }
 
@@ -71,7 +79,9 @@ export class StripeAdapter implements PaymentsAdapter {
       ];
     }
     if (input.metadata) params.metadata = input.metadata;
-    const sub = await this.stripe.subscriptions.update(subscriptionId, params);
+    const sub = await this.stripe.subscriptions.update(subscriptionId, params, {
+      idempotencyKey: `sub-upd:${subscriptionId}:${input.priceId ?? 'meta'}`,
+    });
     return { subscriptionId: sub.id, status: sub.status };
   }
 
@@ -116,6 +126,10 @@ export class StripeAdapter implements PaymentsAdapter {
       ],
       payment_intent_data: {
         statement_descriptor_suffix: 'FULFILLMENT',
+        // Carry the attribution onto the PaymentIntent too — a failure event
+        // arrives on the PI (not the session), so without this its metadata is
+        // empty and the failure can't be tied back to the brand/top-up.
+        metadata: { brand_id: input.brandId, kind: 'wallet_topup' },
       },
       metadata: { brand_id: input.brandId, kind: 'wallet_topup' },
     });
@@ -141,11 +155,17 @@ export class StripeAdapter implements PaymentsAdapter {
     // ledger entry is core/Phase 1. At the processor level, a refund is only
     // issued when an actual card charge must be reversed (e.g. dispute loss).
     if (input.chargeId) {
-      await this.stripe.refunds.create({
-        charge: input.chargeId,
-        amount: input.amount,
-        metadata: { brand_id: input.brandId, reason: input.reason ?? '' },
-      });
+      await this.stripe.refunds.create(
+        {
+          charge: input.chargeId,
+          amount: input.amount,
+          metadata: { brand_id: input.brandId, reason: input.reason ?? '' },
+        },
+        // CRITICAL: without an idempotency key, a network timeout followed by an
+        // application retry issues the SAME card refund twice (money leaves
+        // twice). Key on the charge + amount so a retry is a no-op.
+        { idempotencyKey: `refund:${input.chargeId}:${input.amount}` },
+      );
     }
     // TODO(Phase 1): write the refund_credit WalletLedger entry in core.
   }
@@ -197,6 +217,12 @@ function mapStripeEvent(event: Stripe.Event): NormalizedEvent {
     }
     case 'payment_intent.payment_failed': {
       const pi = event.data.object as Stripe.PaymentIntent;
+      // Only a wallet-top-up PI is a top-up failure. A subscription-invoice PI
+      // (or any other) failing here must NOT be labeled a top-up failure — that
+      // mislabel is persisted on the WebhookEvent and would poison dunning/recon.
+      if (pi.metadata?.kind !== 'wallet_topup') {
+        return { kind: 'unknown', externalId, rawType: `${event.type}:${pi.metadata?.kind ?? 'other'}` };
+      }
       return {
         kind: 'wallet.topup_failed',
         externalId,

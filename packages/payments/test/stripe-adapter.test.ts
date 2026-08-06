@@ -70,6 +70,24 @@ describe('StripeAdapter.verifyAndParseWebhook', () => {
     const { raw, sig } = signed({ id: 'evt_x', type: 'invoice.created', data: { object: {} } });
     expect(adapter.verifyAndParseWebhook(raw, sig)).toMatchObject({ kind: 'unknown', rawType: 'invoice.created' });
   });
+
+  it('maps a wallet-topup PI failure to topup_failed', () => {
+    const { raw, sig } = signed({
+      id: 'evt_pi_fail',
+      type: 'payment_intent.payment_failed',
+      data: { object: { metadata: { kind: 'wallet_topup', brand_id: 'brand-9' }, amount: 5000 } },
+    });
+    expect(adapter.verifyAndParseWebhook(raw, sig)).toMatchObject({ kind: 'wallet.topup_failed', brandId: 'brand-9' });
+  });
+
+  it('does NOT label a non-topup PI failure (e.g. a subscription invoice) as a topup failure', () => {
+    const { raw, sig } = signed({
+      id: 'evt_pi_sub',
+      type: 'payment_intent.payment_failed',
+      data: { object: { metadata: { kind: 'membership' }, amount: 4900 } },
+    });
+    expect(adapter.verifyAndParseWebhook(raw, sig)).toMatchObject({ kind: 'unknown' });
+  });
 });
 
 describe('StripeAdapter.updateSubscription', () => {
