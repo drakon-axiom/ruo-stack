@@ -69,9 +69,14 @@ All four ports verified free on `acgserver02` as of 2026-08-05.
    (`apps/brand-web/src/lib/api.ts:9`, `apps/admin-web/src/lib/api.ts:7`). Dev and prod
    need different values, and both write to `apps/*/dist/`.
 
-3. **The API trusts proxy headers.** `apps/api/src/app.ts:40` sets `trustProxy: true`.
-   With two proxy hops, both must maintain the forwarded chain or audit logging and
-   rate limiting attribute every request to a proxy.
+3. **The API derives `req.ip` from a scoped proxy trust.** `apps/api/src/app.ts` sets
+   `trustProxy: cfg.trustProxy`, parsed from the `TRUST_PROXY` env var (added on `main`
+   in `f51f1dc`). Two things follow. The edge must **overwrite** `X-Forwarded-For` with
+   `$remote_addr` rather than appending — it is the public trust boundary, and appending
+   would let a client inject leading entries. The origin then appends with
+   `$proxy_add_x_forwarded_for`, because it legitimately trusts the edge. And because
+   there are two hops, `TRUST_PROXY` must be `2`; its default of `1` yields the edge's
+   own address as `req.ip`.
 
 4. **`X-Forwarded-Proto` cannot be derived from `$scheme` at the origin.** TLS
    terminates at the edge; the origin hop is plain HTTP over Tailscale, so `$scheme` is
@@ -275,9 +280,17 @@ Read by the API and by the SPA builds; neither nginx nor PM2 can supply them:
 | `API_PORT` | `3901` | `3911` |
 | `CORS_ORIGINS` | `https://app.dev.ruostack.io,https://backend.dev.ruostack.io` | `https://app.ruostack.io,https://backend.ruostack.io` |
 | `PUBLIC_API_BASE_URL` | `https://backend.dev.ruostack.io` | `https://backend.ruostack.io` |
+| `TRUST_PROXY` | `2` | `2` |
 
 Setting `API_HOST=127.0.0.1` ends the current Tailscale-IP access at
 `100.99.76.119:3901/3902/3903`; the hostnames replace it.
+
+`TRUST_PROXY` is a hop count and **defaults to `1`, which is wrong here**. This
+topology has two nginx hops, so the API sees `X-Forwarded-For: <client>, <edge>`;
+with the default, `req.ip` becomes the edge's Tailscale address for every request,
+poisoning the audit log and collapsing every per-IP rate limit into one bucket. A
+fixed count is sound only because the edge overwrites `X-Forwarded-For` with
+`$remote_addr` (constraint 3 below), making the chain length deterministic.
 
 `CORS_ORIGINS` is belt-and-braces — same-origin proxying means the browser sends no
 cross-origin requests — but it must be correct so a misconfigured proxy fails closed

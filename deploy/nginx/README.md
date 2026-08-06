@@ -112,10 +112,25 @@ API_HOST=127.0.0.1
 API_PORT=3901
 CORS_ORIGINS=https://app.dev.ruostack.io,https://backend.dev.ruostack.io
 PUBLIC_API_BASE_URL=https://backend.dev.ruostack.io
+TRUST_PROXY=2
 ```
 
 Setting `API_HOST=127.0.0.1` ends Tailscale-IP access at
 `100.99.76.119:3901/3902/3903`; the hostnames replace it.
+
+**`TRUST_PROXY=2` is required and the default is wrong for this topology.** It is
+a hop count, and it defaults to `1` (a single nginx hop). This deployment has
+**two** — edge nginx, then origin nginx — so the chain reaching the API is
+`X-Forwarded-For: <client>, <edge>` over a loopback socket. With the default of
+`1`, `req.ip` resolves to the edge's Tailscale address (`100.99.76.10`) for every
+request: the audit log records the proxy instead of the caller, and the per-IP
+rate limits (including admin login) collapse into a single shared bucket.
+
+A fixed hop count is only safe because the edge sets `X-Forwarded-For $remote_addr`,
+overwriting anything the client sent. That makes the chain length deterministic. If
+you ever change the edge back to `$proxy_add_x_forwarded_for`, a client could pad
+the header and shift the hop position — set `TRUST_PROXY` to an explicit IP/CIDR
+list instead of a count.
 
 `PUBLIC_API_BASE_URL` is where WooCommerce and ShipStation webhooks register.
 Both portal hosts proxy `/api`, so either works; the admin host is used so the
@@ -189,6 +204,7 @@ API_HOST=127.0.0.1
 API_PORT=3911
 CORS_ORIGINS=https://app.ruostack.io,https://backend.ruostack.io
 PUBLIC_API_BASE_URL=https://backend.ruostack.io
+TRUST_PROXY=2
 ```
 
 **Render and install (origin).** `render.sh prod` appends the landing blocks
@@ -294,7 +310,8 @@ hop; if it does not, `X-Forwarded-Proto` passthrough is broken.
 |---|---|
 | nginx won't start: `duplicate "map" directive` | `origin-shared.conf` content leaked into a rendered config, or it is installed twice. |
 | API sees every request as insecure | Origin is setting `X-Forwarded-Proto` from `$scheme`. It must use `$ruostack_forwarded_proto`. |
-| Audit log shows a Tailscale IP | A hop dropped `X-Forwarded-For`. The edge must set it from `$remote_addr`, the origin from `$proxy_add_x_forwarded_for`. |
+| Audit log shows `100.99.76.10` (the edge) for every request | `TRUST_PROXY` is at its default of `1`. This topology has two nginx hops — set `TRUST_PROXY=2`. Per-IP rate limits are also collapsed into one bucket while this is wrong. |
+| Audit log shows some other Tailscale IP | A hop dropped `X-Forwarded-For`. The edge must set it from `$remote_addr`, the origin from `$proxy_add_x_forwarded_for`. |
 | Audit log or rate limit shows a client-controlled IP | The edge is using `$proxy_add_x_forwarded_for`, which appends to the client's own header. It must use `$remote_addr`. |
 | nginx fails to start after reboot: `bind() to 100.99.76.119:<port> failed (99: Cannot assign requested address)` | The systemd drop-in is missing (setup step 2a) or `tailscaled` is not up. Check `systemctl status tailscaled` and `ls /etc/systemd/system/nginx.service.d/`. |
 | `ruostack.com` returns 404 | `/var/www/ruostack.com/html` is missing or empty. Nothing creates or populates it — `deploy/deploy.sh` publishes brand and admin only, and the marketing content is out of scope for this repo. |
