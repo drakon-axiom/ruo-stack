@@ -1,0 +1,28 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Marketing site origin -- ${LANDING_HOST}. Production only; appended by
+# render.sh when the env file sets LANDING=1. Static content only, no API.
+# The site content itself is out of scope for this repo.
+# ─────────────────────────────────────────────────────────────────────────────
+server {
+    listen ${ORIGIN_IP}:${LANDING_ORIGIN_PORT};
+    server_name ${LANDING_HOST} www.${LANDING_HOST};
+
+    allow ${EDGE_IP};
+    allow 127.0.0.1;
+    deny  all;
+
+    root ${LANDING_ROOT};
+    index index.html;
+
+    access_log /var/log/nginx/${LOG_PREFIX}-landing-access.log;
+    error_log  /var/log/nginx/${LOG_PREFIX}-landing-error.log;
+
+    gzip             on;
+    gzip_min_length  1024;
+    gzip_vary        on;
+    gzip_types       text/plain text/css application/json application/javascript
+                     text/xml application/xml image/svg+xml;
+
+    # Plain static site -- 404 rather than an SPA fallback.
+    location / { try_files $uri $uri/ =404; }
+}
