@@ -119,11 +119,14 @@ prod runs.
 ```
 deploy/nginx/edge.conf.template        # VPS: TLS + proxy to origin over Tailscale
 deploy/nginx/origin.conf.template      # this box: SPA static + /api to loopback
-deploy/nginx/landing.conf.template     # ruostack.com origin block, prod-only
+deploy/nginx/landing.origin.conf.template   # ruostack.com static block, prod-only
+deploy/nginx/landing.edge.conf.template     # ruostack.com public host, prod-only
+deploy/nginx/origin-shared.conf        # the X-Forwarded-Proto map; installed once
 deploy/nginx/env.dev, env.prod         # substitution values
 deploy/nginx/render.sh <dev|prod>      # -> out/edge.<env>.conf, out/origin.<env>.conf
 deploy/nginx/test/                     # renderer assertions + nginx -t harness
 deploy/nginx/README.md                 # install, TLS, re-render, troubleshooting
+deploy/systemd/nginx-tailscale-ordering.conf  # orders nginx after tailscaled
 ```
 
 `render.sh` sources the chosen env file and pipes each template through `envsubst`,
@@ -145,9 +148,10 @@ The API upstream is named per environment (`ruostack_api_dev` / `ruostack_api_pr
 both origin configs can be enabled simultaneously without a name collision.
 
 The `ruostack.com` block is prod-only, and `envsubst` has no conditionals — so it lives
-in a separate `landing.conf.template` appended by `render.sh` when the env file sets
-`LANDING=1`. It is an origin site with its own port, keeping the VPS a pure proxy. Its
-content is out of scope.
+in separate `landing.origin.conf.template` and `landing.edge.conf.template` files,
+appended by `render.sh` to the respective outputs when the env file sets `LANDING=1`. It
+needs a block on each machine because it is an origin site with its own port, which
+keeps the VPS a pure proxy. Its content is out of scope.
 
 ### Edge behaviour (VPS)
 
