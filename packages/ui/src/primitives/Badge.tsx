@@ -15,14 +15,19 @@ const TONE: Record<BadgeTone, string> = {
 export function Badge({
   tone = 'neutral',
   className,
+  title,
   children,
 }: {
   tone?: BadgeTone;
   className?: string;
+  /** Native tooltip. Supplementary only — never put meaning here that is not
+   *  also available from the badge text, since it is unreachable by touch. */
+  title?: string;
   children: ReactNode;
 }) {
   return (
     <span
+      title={title}
       className={cn(
         'inline-flex items-center gap-1 rounded-pill border px-2.5 py-0.5 text-xs font-medium',
         TONE[tone],

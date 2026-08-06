@@ -5,6 +5,7 @@ import {
   type ProvisioningAction,
   type ProvisioningState,
 } from '@ruostack/shared';
+import { Badge, Button, Card, DataTable, type BadgeTone, type Column } from '@ruostack/ui';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 
 /**
@@ -41,11 +42,11 @@ interface Outcome {
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
-const STATE_STYLE: Record<ProvisioningState, string> = {
-  new: 'border-accent/40 bg-accent/10 text-accent',
-  managed: 'border-success/40 bg-success/10 text-success',
-  drifted: 'border-warning/40 bg-warning/10 text-warning',
-  conflict: 'border-danger/40 bg-danger/10 text-danger',
+const STATE_TONE: Record<ProvisioningState, BadgeTone> = {
+  new: 'accent',
+  managed: 'success',
+  drifted: 'warning',
+  conflict: 'danger',
 };
 
 const ACTION_LABEL: Record<ProvisioningAction, string> = {
@@ -153,7 +154,7 @@ export function ProvisioningWizard() {
   const needsAttention = rows.filter((r) => r.state === 'conflict' || r.state === 'drifted').length;
 
   return (
-    <div className="surface mt-4 space-y-4 p-6">
+    <Card className="mt-4 space-y-4 p-6">
       <div>
         <div className="text-lg font-semibold">Add products to your store</div>
         <p className="mt-1 text-xs text-content-muted">
@@ -185,12 +186,12 @@ export function ProvisioningWizard() {
             ))}
           </div>
           <div className="flex gap-2">
-            <button className="btn" disabled={sel.size === 0 || !!busy} onClick={runPreflight}>
+            <Button disabled={sel.size === 0 || !!busy} onClick={runPreflight}>
               {busy === 'preflight' ? 'Checking your store…' : `Check ${sel.size || ''} product${sel.size === 1 ? '' : 's'}`}
-            </button>
-            <button className="btn-ghost" disabled={!!busy} onClick={csv}>
+            </Button>
+            <Button variant="ghost" disabled={!!busy} onClick={csv}>
               {busy === 'csv' ? '…' : sel.size ? 'Download CSV (selected)' : 'Download CSV (all)'}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -208,7 +209,7 @@ export function ProvisioningWizard() {
             {rows.map((r) => (
               <div key={r.product_id} className="rounded-lg border border-line p-3 dark:border-line">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`pill ${STATE_STYLE[r.state]}`}>{provisioningStateLabel(r.state)}</span>
+                  <Badge tone={STATE_TONE[r.state]}>{provisioningStateLabel(r.state)}</Badge>
                   <span className="text-sm font-medium">{r.name}</span>
                   <span className="font-mono text-2xs text-content-faint">{r.canonical_sku}</span>
                 </div>
@@ -239,8 +240,8 @@ export function ProvisioningWizard() {
             ))}
           </div>
           <div className="flex gap-2">
-            <button className="btn-ghost" onClick={restart} disabled={!!busy}>Back</button>
-            <button className="btn" onClick={() => setStep(3)} disabled={!!busy}>Review</button>
+            <Button variant="ghost" onClick={restart} disabled={!!busy}>Back</Button>
+            <Button onClick={() => setStep(3)} disabled={!!busy}>Review</Button>
           </div>
         </>
       )}
@@ -269,10 +270,10 @@ export function ProvisioningWizard() {
             never overwritten.
           </p>
           <div className="flex gap-2">
-            <button className="btn-ghost" onClick={() => setStep(2)} disabled={!!busy}>Back</button>
-            <button className="btn" onClick={runCommit} disabled={!!busy || !willWrite}>
+            <Button variant="ghost" onClick={() => setStep(2)} disabled={!!busy}>Back</Button>
+            <Button onClick={runCommit} disabled={!!busy || !willWrite}>
               {busy === 'commit' ? 'Applying…' : 'Confirm & apply'}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -294,10 +295,10 @@ export function ProvisioningWizard() {
           {outcomes.some((o) => o.result === 'created') && (
             <p className="text-xs text-content-muted">New products are drafts in WooCommerce — publish them there when you’re ready.</p>
           )}
-          <button className="btn-ghost" onClick={restart}>Add more products</button>
+          <Button variant="ghost" onClick={restart}>Add more products</Button>
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -329,57 +330,74 @@ function Steps({ step }: { step: Step }) {
   );
 }
 
+interface ManagedRow {
+  product_id: string;
+  name: string;
+  canonical_sku: string;
+  provisioned_sku: string;
+  woo_product_id: number;
+  adopted: boolean;
+  aliased: boolean;
+  last_pushed_at: string;
+}
+
+// scroll mode, not cards: this is a SKU-match grid and the store SKU has to stay
+// visually beside the product it maps to.
+const MANAGED_COLUMNS: Column<ManagedRow>[] = [
+  { key: 'name', header: 'Product', priority: 'primary', minWidth: 180, cell: (r) => r.name },
+  {
+    key: 'sku',
+    header: 'SKU in store',
+    mono: true,
+    minWidth: 160,
+    cell: (r) => r.provisioned_sku,
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    minWidth: 120,
+    cell: (r) =>
+      r.aliased ? (
+        <Badge title={`Kept under your SKU; orders still match ${r.canonical_sku}.`}>your SKU</Badge>
+      ) : r.adopted ? (
+        <Badge>adopted</Badge>
+      ) : (
+        <Badge tone="success">managed</Badge>
+      ),
+  },
+  {
+    key: 'pushed',
+    header: 'Last push',
+    minWidth: 120,
+    cell: (r) => new Date(r.last_pushed_at).toLocaleDateString(),
+  },
+];
+
 /** The persistent "managed products" table — what we look after, and any drift. */
 export function ManagedProducts() {
-  const [rows, setRows] = useState<
-    { product_id: string; name: string; canonical_sku: string; provisioned_sku: string; woo_product_id: number; adopted: boolean; aliased: boolean; last_pushed_at: string }[]
-  >([]);
+  const [rows, setRows] = useState<ManagedRow[]>([]);
 
   useEffect(() => {
-    api<{ managed: typeof rows }>('/api/brand/store/provisioning/status').then((r) => setRows(r.managed)).catch(() => undefined);
+    api<{ managed: ManagedRow[] }>('/api/brand/store/provisioning/status')
+      .then((r) => setRows(r.managed))
+      .catch(() => undefined);
   }, []);
 
   if (rows.length === 0) return null;
 
   return (
-    <div className="surface mt-4 p-6">
+    <Card className="mt-4 p-6">
       <div className="text-lg font-semibold">Managed products</div>
       <p className="mt-1 text-xs text-content-muted">Products RUOStack maintains in your store.</p>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="border-b border-line text-left text-2xs uppercase tracking-wide text-content-faint dark:border-line">
-            <tr>
-              <th className="py-2 pr-3">Product</th>
-              <th className="py-2 pr-3">SKU in store</th>
-              <th className="py-2 pr-3">Status</th>
-              <th className="py-2">Last push</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.product_id} className="border-b border-line/60 last:border-0 dark:border-line/60">
-                <td className="py-2 pr-3">{r.name}</td>
-                <td className="py-2 pr-3 font-mono text-2xs">{r.provisioned_sku}</td>
-                <td className="py-2 pr-3">
-                  {r.aliased ? (
-                    <span
-                      className="pill border-white/15 bg-white/5 text-content-muted"
-                      title={`Kept under your SKU; orders still match ${r.canonical_sku}.`}
-                    >
-                      your SKU
-                    </span>
-                  ) : r.adopted ? (
-                    <span className="pill border-white/15 bg-white/5 text-content-muted">adopted</span>
-                  ) : (
-                    <span className="pill border-success/40 bg-success/10 text-success">managed</span>
-                  )}
-                </td>
-                <td className="py-2 text-content-muted">{new Date(r.last_pushed_at).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-3">
+        <DataTable
+          caption="Products RUOStack maintains in your store"
+          mode="scroll"
+          columns={MANAGED_COLUMNS}
+          rows={rows}
+          rowKey={(r) => r.product_id}
+        />
       </div>
-    </div>
+    </Card>
   );
 }
