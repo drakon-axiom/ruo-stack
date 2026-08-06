@@ -28,5 +28,9 @@ export { DataTable, type Column, type DataTableProps } from './data/DataTable.js
 export { Tabs, type TabDef } from './data/Tabs.js';
 export { Toolbar } from './data/Toolbar.js';
 export { PageHeader, type Crumb } from './nav/PageHeader.js';
+export { AppShell, type AppShellProps } from './nav/AppShell.js';
+export { Sidebar, type NavItem, type NavGroup } from './nav/Sidebar.js';
+export { BottomTabs } from './nav/BottomTabs.js';
+export { CommandPalette } from './nav/CommandPalette.js';
 export { InlineAlert } from './feedback/InlineAlert.js';
 export { Toaster, toast } from './feedback/Toaster.js';
