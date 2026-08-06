@@ -207,6 +207,14 @@ export async function importWooOrder(
     throw err;
   }
 
-  await prisma.brandStoreConnection.update({ where: { id: connection.id }, data: { lastOrderAt: new Date(), status: 'active', lastError: null } });
+  await prisma.brandStoreConnection.update({
+    where: { id: connection.id },
+    data: {
+      lastOrderAt: new Date(),
+      // Clear a transient error on a successful import, but NEVER resurrect a
+      // connection an admin deliberately disabled.
+      ...(connection.status === 'error' ? { status: 'active', lastError: null } : {}),
+    },
+  });
   return { created: true, orderId: order.id, blocker, matched: lines.length, unmatched };
 }
