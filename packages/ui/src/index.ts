@@ -17,3 +17,9 @@ export { Textarea, type TextareaProps } from './primitives/Textarea.js';
 export { Select, type SelectOption } from './primitives/Select.js';
 export { Checkbox } from './primitives/Checkbox.js';
 export { Switch } from './primitives/Switch.js';
+
+export { Dialog } from './overlays/Dialog.js';
+export { Drawer } from './overlays/Drawer.js';
+export { DropdownMenu, type MenuItem } from './overlays/DropdownMenu.js';
+export { Popover } from './overlays/Popover.js';
+export { Tooltip, TooltipProvider } from './overlays/Tooltip.js';
