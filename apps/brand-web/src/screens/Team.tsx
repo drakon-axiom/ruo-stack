@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { brandRoleLabel, type BrandMemberRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
+import { buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
 
 /**
  * Team (architecture §3.1). Invites are LINK-based: we mint a Supabase action
@@ -61,49 +62,49 @@ export function Team() {
     <>
       <div className="mb-5 flex items-end justify-between">
         <div>
-          <h1 className="mb-1 text-[23px] font-bold">Team</h1>
-          <p className="text-[13px] text-muted">
+          <h1 className="mb-1 text-2xl font-bold">Team</h1>
+          <p className="text-sm text-content-muted">
             Staff can run orders, tracking, claims and customers, and browse the catalog. Only an owner can set pricing —
             retail prices and shipping markup — add products to your store, or touch billing, the wallet, your store
             connection, branding or the team.
           </p>
         </div>
-        {isOwner && <button className="btn" onClick={() => setInviting(true)}>Invite someone</button>}
+        {isOwner && <button className={buttonClass('primary', 'md')} onClick={() => setInviting(true)}>Invite someone</button>}
       </div>
 
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       {link && <InviteLink email={link.email} url={link.url} onClose={() => setLink(null)} />}
 
       {loading ? (
-        <div className="surface p-10 text-center text-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : (
-        <div className="surface divide-y divide-lline dark:divide-line">
+        <div className={cardClass('divide-y divide-lline dark:divide-line')}>
           {members.map((m) => (
             <div key={m.user_id} className="flex flex-wrap items-center gap-3 p-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[14px] font-medium">{m.full_name ?? m.email ?? 'Unknown'}</span>
-                  {m.is_you && <span className="pill border-white/15 bg-white/5 text-muted">you</span>}
-                  <span className={`pill ${m.role === 'owner' ? 'border-teal/40 bg-teal/10 text-teal' : 'border-white/15 bg-white/5 text-muted'}`}>
+                  <span className="text-base font-medium">{m.full_name ?? m.email ?? 'Unknown'}</span>
+                  {m.is_you && <span className={pillClass('border-line bg-surface-3 text-content-muted')}>you</span>}
+                  <span className={pillClass(`${m.role === 'owner' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-line bg-surface-3 text-content-muted'}`)}>
                     {brandRoleLabel(m.role)}
                   </span>
                   {m.status === 'suspended' ? (
-                    <span className="pill border-danger/40 bg-danger/10 text-danger">access revoked</span>
+                    <span className={pillClass('border-danger/40 bg-danger/10 text-danger')}>access revoked</span>
                   ) : m.pending ? (
-                    <span className="pill border-amber/40 bg-amber/10 text-amber">pending — hasn’t signed in</span>
+                    <span className={pillClass('border-warning/40 bg-warning/10 text-warning')}>pending — hasn’t signed in</span>
                   ) : null}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-muted">{m.email}</div>
+                <div className="mt-0.5 text-xs text-content-muted">{m.email}</div>
               </div>
 
               {isOwner && !m.is_you && (
                 <div className="flex flex-wrap gap-2">
                   {m.pending && m.status !== 'suspended' && (
-                    <button className="btn-ghost text-[12px]" onClick={() => resend(m)}>Get link</button>
+                    <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={() => resend(m)}>Get link</button>
                   )}
                   {m.status === 'suspended' ? (
                     <button
-                      className="btn-ghost text-[12px]"
+                      className={buttonClass('ghost', 'md', 'text-xs')}
                       onClick={() => act(() => api(`/api/brand/members/${m.user_id}/reactivate`, { method: 'POST' }))}
                     >
                       Restore access
@@ -111,7 +112,7 @@ export function Team() {
                   ) : (
                     <>
                       <button
-                        className="btn-ghost text-[12px]"
+                        className={buttonClass('ghost', 'md', 'text-xs')}
                         onClick={() =>
                           act(() =>
                             api(`/api/brand/members/${m.user_id}`, {
@@ -124,7 +125,7 @@ export function Team() {
                         Make {m.role === 'owner' ? 'staff' : 'owner'}
                       </button>
                       <button
-                        className="btn-ghost text-[12px] text-danger"
+                        className={buttonClass('ghost', 'md', 'text-xs text-danger')}
                         onClick={() => {
                           if (confirm(`Revoke access for ${m.full_name ?? m.email}? They lose access immediately.`)) {
                             void act(() => api(`/api/brand/members/${m.user_id}`, { method: 'DELETE' }));
@@ -176,33 +177,33 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/50 p-4" onClick={onClose}>
-      <div className="surface w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 text-[15px] font-semibold">Invite a team member</div>
-        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      <div className={cardClass('w-full max-w-md p-5')} onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 text-lg font-semibold">Invite a team member</div>
+        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
         <label className="mb-3 block">
-          <span className="mb-1 block text-[12px] text-muted">Full name</span>
-          <input className="app-input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <span className="mb-1 block text-xs text-content-muted">Full name</span>
+          <input className={inputClass()} value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-[12px] text-muted">Email</span>
-          <input className="app-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <span className="mb-1 block text-xs text-content-muted">Email</span>
+          <input className={inputClass()} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="mb-4 block">
-          <span className="mb-1 block text-[12px] text-muted">Role</span>
-          <select className="app-input" value={role} onChange={(e) => setRole(e.target.value as BrandMemberRole)}>
+          <span className="mb-1 block text-xs text-content-muted">Role</span>
+          <select className={inputClass()} value={role} onChange={(e) => setRole(e.target.value as BrandMemberRole)}>
             <option value="staff">Staff — orders, tracking, claims, customers (no pricing)</option>
             <option value="owner">Owner — full access including billing and the wallet</option>
           </select>
         </label>
 
-        <p className="mb-4 text-[12px] text-muted">
+        <p className="mb-4 text-xs text-content-muted">
           We’ll generate a sign-up link for you to send them. It sets their password and activates their access.
         </p>
 
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn flex-1" onClick={submit} disabled={busy || !email || !fullName}>
+          <button className={buttonClass('ghost', 'md', 'flex-1')} onClick={onClose} disabled={busy}>Cancel</button>
+          <button className={buttonClass('primary', 'md', 'flex-1')} onClick={submit} disabled={busy || !email || !fullName}>
             {busy ? '…' : 'Create invite'}
           </button>
         </div>
@@ -225,16 +226,16 @@ function InviteLink({ email, url, onClose }: { email: string; url: string; onClo
   }
 
   return (
-    <div className="surface mb-4 border-teal/40 p-4">
-      <div className="mb-1 text-[14px] font-semibold">Send this link to {email || 'your new team member'}</div>
-      <p className="mb-3 text-[12.5px] text-muted">
+    <div className={cardClass('mb-4 border-accent/40 p-4')}>
+      <div className="mb-1 text-base font-semibold">Send this link to {email || 'your new team member'}</div>
+      <p className="mb-3 text-xs text-content-muted">
         It lets them set a password and sign in. Treat it like a password — anyone with the link can claim the account.
         You can generate a fresh one at any time.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <input className="app-input flex-1 font-mono text-[11.5px]" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
-        <button className="btn" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
-        <button className="btn-ghost" onClick={onClose}>Done</button>
+        <input className={inputClass('flex-1 font-mono text-xs')} readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
+        <button className={buttonClass('primary', 'md')} onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+        <button className={buttonClass('ghost', 'md')} onClick={onClose}>Done</button>
       </div>
     </div>
   );

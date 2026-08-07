@@ -1,41 +1,16 @@
+/* Theme values, fonts and base styles all come from @ruostack/ui.
+ *
+ * The legacy `@layer components` block (.btn/.card/.surface/.input/.pill/…)
+ * was deleted here rather than in the final task: those rules used @apply with
+ * the old colour names (bg-teal, bg-card, border-line2, text-ltext), and the
+ * shared preset replaces the theme wholesale, so they are a hard build error
+ * the moment the preset lands. Screens still referencing those class names
+ * render unstyled until migrated — the accepted cost of shipping without a
+ * compatibility shim. */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import '@ruostack/ui/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-body {
-  @apply font-sans antialiased;
-  margin: 0;
-}
-
-@layer components {
-  .btn {
-    @apply inline-flex items-center justify-center rounded-pill bg-teal px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-teal-bright disabled:opacity-50;
-  }
-  .btn-ghost {
-    @apply inline-flex items-center justify-center rounded-pill border border-line2 bg-transparent px-4 py-2 text-[13px] font-semibold text-muted transition hover:text-text;
-  }
-  /* dark app surfaces */
-  .card {
-    @apply rounded-card border border-line bg-card;
-  }
-  .input {
-    @apply w-full rounded-[10px] border border-line bg-card px-3 py-2 text-[13px] text-text placeholder:text-faint outline-none focus:border-teal;
-  }
-  /* light auth surfaces */
-  .l-input {
-    @apply w-full rounded-[10px] border border-lline bg-white px-3 py-2 text-[14px] text-ltext outline-none focus:border-teal;
-  }
-  /* themed in-app surfaces (light/dark toggle on <html class="dark">) */
-  .surface {
-    @apply rounded-card border border-lline bg-white dark:border-line dark:bg-card;
-  }
-  .app-input {
-    @apply w-full rounded-[10px] border border-lline bg-white px-3 py-2 text-[13px] text-ltext placeholder:text-slate-400 outline-none focus:border-teal dark:border-line dark:bg-card dark:text-text dark:placeholder:text-faint;
-  }
-  .label {
-    @apply text-[11px] uppercase tracking-[0.1em] text-faint;
-  }
-  .pill {
-    @apply inline-flex items-center rounded-pill border border-line2 bg-card2 px-2.5 py-0.5 text-[12px] text-muted;
-  }
-}

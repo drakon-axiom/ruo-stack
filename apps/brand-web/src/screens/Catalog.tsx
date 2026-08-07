@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DataTable, EmptyState, PageHeader, StatusPill, type Column } from '@ruostack/ui';
 import { api } from '../lib/api.js';
 
 interface Product {
@@ -14,8 +15,11 @@ interface Product {
 }
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
-const margin = (cost: number, retail: number) => (retail > 0 ? `${Math.round(((retail - cost) / retail) * 100)}%` : '—');
+const margin = (cost: number, retail: number) =>
+  retail > 0 ? `${Math.round(((retail - cost) / retail) * 100)}%` : '—';
 const PLAN_LABEL: Record<string, string> = { starter: 'Starter', pro: 'Pro', volume: 'Volume' };
+
+const productLabel = (p: Product) => `${p.name}${p.dose ? ` · ${p.dose}${p.unit ?? ''}` : ''}`;
 
 // Brand price sheet. Wholesale is the brand's tier rate; retail is the brand's
 // own price (editable here), defaulting to the operator's suggestion.
@@ -23,92 +27,96 @@ export function Catalog() {
   const [products, setProducts] = useState<Product[]>([]);
   const [plan, setPlan] = useState('starter');
   const [loading, setLoading] = useState(true);
+  // Retail edits live here rather than inside a row component so the margin
+  // column can recompute from the in-progress value, as it did before.
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
 
   function load() {
     api<{ plan: string; products: Product[] }>('/api/brand/catalog').then((r) => {
       setProducts(r.products);
       setPlan(r.plan);
+      setDraft(Object.fromEntries(r.products.map((p) => [p.id, (p.retail_cents / 100).toFixed(2)])));
       setLoading(false);
     });
   }
   useEffect(load, []);
 
-  async function saveRetail(id: string, dollarsStr: string) {
-    const cents = Math.round(parseFloat(dollarsStr || '0') * 100);
+  async function commit(p: Product) {
+    const val = draft[p.id] ?? '';
+    if (val === (p.retail_cents / 100).toFixed(2)) return; // unchanged
+    const cents = Math.round(parseFloat(val || '0') * 100);
     if (!Number.isFinite(cents) || cents < 0) return;
-    await api(`/api/brand/catalog/${id}/retail`, { method: 'PATCH', body: { retail_cents: cents } });
+    setSaving(p.id);
+    await api(`/api/brand/catalog/${p.id}/retail`, { method: 'PATCH', body: { retail_cents: cents } });
+    setSaving(null);
     load();
   }
 
-  return (
-    <>
-      <h1 className="mb-1 text-[23px] font-bold">Research Peptides</h1>
-      <p className="mb-5 text-[13px] text-muted">
-        Wholesale shown at your <span className="text-teal">{PLAN_LABEL[plan]}</span> rate. Set your own retail and keep the spread. Research use only.
-      </p>
-
-      {loading ? (
-        <div className="surface p-10 text-center text-muted">Loading…</div>
-      ) : products.length === 0 ? (
-        <div className="surface p-10 text-center text-muted">No published products yet.</div>
-      ) : (
-        <div className="surface overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-lline text-left text-[11px] uppercase tracking-wide text-faint dark:border-line">
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Your cost</th>
-                <th className="px-4 py-3">Your retail</th>
-                <th className="px-4 py-3">Margin</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <RetailRow key={p.id} product={p} onSave={saveRetail} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className="mt-3 text-[11px] text-faint">Tip: edit a retail price and press Enter or click away to save. Defaults to the suggested retail.</p>
-    </>
-  );
-}
-
-function RetailRow({ product: p, onSave }: { product: Product; onSave: (id: string, v: string) => void }) {
-  const [val, setVal] = useState((p.retail_cents / 100).toFixed(2));
-  const [saving, setSaving] = useState(false);
-
-  async function commit() {
-    const target = (p.retail_cents / 100).toFixed(2);
-    if (val === target) return; // unchanged
-    setSaving(true);
-    await onSave(p.id, val);
-    setSaving(false);
-  }
-
-  return (
-    <tr className="border-b border-lline/60 dark:border-line/60">
-      <td className="px-4 py-3 font-medium">{p.name}{p.dose ? ` · ${p.dose}${p.unit ?? ''}` : ''}</td>
-      <td className="px-4 py-3">{dollars(p.wholesale_cents)}</td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1">
-          <span className="text-faint">$</span>
+  const columns: Column<Product>[] = [
+    { key: 'name', header: 'Product', priority: 'primary', cell: productLabel },
+    {
+      key: 'cost',
+      header: 'Your cost',
+      align: 'right',
+      mono: true,
+      cell: (p) => dollars(p.wholesale_cents),
+    },
+    {
+      key: 'retail',
+      header: 'Your retail',
+      cell: (p) => (
+        <div className="flex items-center justify-end gap-1 md:justify-start">
+          <span className="text-content-faint">$</span>
           <input
-            className="w-20 rounded-md border border-lline bg-transparent px-2 py-1 text-[13px] text-success outline-none focus:border-teal dark:border-line"
+            aria-label={`Retail price for ${productLabel(p)}`}
+            className="w-20 rounded-md border border-line bg-transparent px-2 py-1 text-sm font-mono tabular-nums text-success transition-colors duration-fast focus:border-accent"
             inputMode="decimal"
-            value={val}
-            disabled={saving}
-            onChange={(e) => setVal(e.target.value)}
-            onBlur={commit}
+            value={draft[p.id] ?? ''}
+            disabled={saving === p.id}
+            onChange={(e) => setDraft({ ...draft, [p.id]: e.target.value })}
+            onBlur={() => commit(p)}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
-          {!p.retail_is_custom && <span className="text-[10px] text-faint">suggested</span>}
+          {!p.retail_is_custom && <span className="text-2xs text-content-faint">suggested</span>}
         </div>
-      </td>
-      <td className="px-4 py-3">{margin(p.wholesale_cents, Math.round(parseFloat(val || '0') * 100))}</td>
-      <td className="px-4 py-3"><span className="pill">{p.status.replace(/_/g, ' ')}</span></td>
-    </tr>
+      ),
+    },
+    {
+      key: 'margin',
+      header: 'Margin',
+      align: 'right',
+      mono: true,
+      cell: (p) => margin(p.wholesale_cents, Math.round(parseFloat(draft[p.id] || '0') * 100)),
+    },
+    { key: 'status', header: 'Status', cell: (p) => <StatusPill value={p.status} /> },
+  ];
+
+  return (
+    <>
+      <PageHeader title="Research Peptides" />
+      <p className="-mt-3 mb-5 text-sm text-content-muted">
+        Wholesale shown at your <span className="text-accent">{PLAN_LABEL[plan]}</span> rate. Set your
+        own retail and keep the spread. Research use only.
+      </p>
+
+      <DataTable
+        caption="Your product price sheet"
+        columns={columns}
+        rows={products}
+        rowKey={(p) => p.id}
+        loading={loading}
+        empty={
+          <EmptyState
+            title="No published products yet"
+            hint="Products appear here once the operator publishes them."
+          />
+        }
+      />
+
+      <p className="mt-3 text-2xs text-content-faint">
+        Tip: edit a retail price and press Enter or click away to save. Defaults to the suggested retail.
+      </p>
+    </>
   );
 }

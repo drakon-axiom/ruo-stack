@@ -1,23 +1,25 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Button,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Input,
+  KpiTile,
+  LinkButton,
+  PageHeader,
+  Package,
+  Search,
+  Select,
+  Toolbar,
+  type Column,
+} from '@ruostack/ui';
 import { api } from '../lib/api.js';
+import { FulfillmentBadge } from '../lib/fulfillment.js';
 import type { ShipTo } from './Orders.js';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
-
-const TONE: Record<string, string> = {
-  amber: 'border-amber/40 bg-amber/10 text-amber',
-  slate: 'border-lline bg-card2 text-muted dark:border-line2',
-  teal: 'border-teal/40 bg-teal/10 text-teal',
-  success: 'border-success/40 bg-success/10 text-success',
-  muted: 'border-line2 bg-card2 text-muted',
-};
-
-function FulfillmentBadge({ order }: { order: { status: string; blocker: string; exported_at: string | null } }) {
-  const meta = FULFILLMENT_META[fulfillmentState(order)];
-  return <span className={`pill ${TONE[meta.tone]}`} title={meta.label}>{meta.icon} {meta.label}</span>;
-}
 
 interface OrderRow {
   id: string;
@@ -55,9 +57,17 @@ interface Totals {
   spend_cents: number;
 }
 
-const fmtDate = (s: string) => new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDate = (s: string) =>
+  new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 type SortKey = 'recent' | 'orders' | 'spend' | 'name';
+
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: 'recent', label: 'Most recent' },
+  { value: 'orders', label: 'Most orders' },
+  { value: 'spend', label: 'Highest spend' },
+  { value: 'name', label: 'Name (A–Z)' },
+];
 
 // Customers — a read-only CRM view derived from the brand's own orders (no
 // Customer table). Recipients are grouped by email (name+zip fallback); "spend"
@@ -67,7 +77,7 @@ export function Customers() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<SortKey>('recent');
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<Customer | null>(null);
   const navigate = useNavigate();
 
   // Hand the recipient to the manual-order drawer. Nothing is written here — the
@@ -109,153 +119,179 @@ export function Customers() {
     return sorted;
   }, [customers, q, sort]);
 
+  const columns: Column<Customer>[] = [
+    { key: 'name', header: 'Customer', priority: 'primary', cell: (c) => c.name },
+    {
+      key: 'email',
+      header: 'Email',
+      priority: 'meta',
+      cell: (c) => c.email ?? 'No email on file',
+    },
+    { key: 'location', header: 'Location', cell: (c) => `${c.city}, ${c.state}` },
+    { key: 'orders', header: 'Orders', align: 'right', mono: true, cell: (c) => c.orders },
+    {
+      key: 'spend',
+      header: 'Spend',
+      align: 'right',
+      mono: true,
+      cell: (c) => dollars(c.spend_cents),
+    },
+    { key: 'last', header: 'Last order', cell: (c) => fmtDate(c.last_order) },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (c) => (
+        <FulfillmentBadge
+          order={{ status: c.last_status, blocker: c.last_blocker, exported_at: c.last_exported_at }}
+        />
+      ),
+    },
+  ];
+
+  const noMatches = customers !== null && customers.length > 0 && rows.length === 0;
+
   return (
     <>
-      <h1 className="mb-1 text-[23px] font-bold">Customers</h1>
-      <p className="mb-5 text-[13px] text-muted">
-        Your customer list, built automatically from your orders. Spend shown is fulfillment cost — what you paid to
-        ship each order.
-      </p>
+      <PageHeader
+        title="Customers"
+        subtitle="Your customer list, built automatically from your orders. Spend shown is fulfillment cost — what you paid to ship each order."
+      />
 
-      {!customers ? (
-        <div className="surface p-10 text-center text-muted">Loading…</div>
-      ) : customers.length === 0 ? (
-        <div className="surface flex flex-col items-center gap-2 px-6 py-16 text-center">
-          <div className="text-[15px] font-semibold">No customers yet</div>
-          <div className="max-w-md text-[13px] text-muted">
-            Once you fulfill an order, its recipient shows up here. <Link className="text-teal" to="/app/orders">Create an order</Link> to get started.
-          </div>
-        </div>
-      ) : (
+      {customers !== null && customers.length > 0 && (
         <>
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="surface px-4 py-3">
-              <div className="label">Customers</div>
-              <div className="text-[22px] font-bold">{totals?.customers ?? 0}</div>
-            </div>
-            <div className="surface px-4 py-3">
-              <div className="label">Orders</div>
-              <div className="text-[22px] font-bold">{totals?.orders ?? 0}</div>
-            </div>
-            <div className="surface px-4 py-3">
-              <div className="label">Fulfillment spend</div>
-              <div className="text-[22px] font-bold text-teal">{dollars(totals?.spend_cents ?? 0)}</div>
-            </div>
+          <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <KpiTile label="Customers" value={totals?.customers ?? 0} />
+            <KpiTile label="Orders" value={totals?.orders ?? 0} />
+            <KpiTile label="Fulfillment spend" value={dollars(totals?.spend_cents ?? 0)} tone="accent" />
           </div>
 
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <input
-              className="app-input max-w-[280px]"
-              placeholder="Search name, email, or location…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            <div className="flex items-center gap-2 text-[12px]">
-              <span className="text-faint">Sort</span>
-              <select className="app-input py-1.5 text-[12px]" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-                <option value="recent">Most recent</option>
-                <option value="orders">Most orders</option>
-                <option value="spend">Highest spend</option>
-                <option value="name">Name (A–Z)</option>
-              </select>
+          <Toolbar>
+            <div className="relative w-full max-w-[280px]">
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-faint"
+              />
+              <Input
+                className="pl-9"
+                placeholder="Search name, email, or location…"
+                aria-label="Search customers"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
             </div>
-          </div>
-
-          <div className="surface overflow-hidden">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="border-b border-lline text-left text-[11px] uppercase tracking-wide text-faint dark:border-line">
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Location</th>
-                  <th className="px-4 py-3 text-right">Orders</th>
-                  <th className="px-4 py-3 text-right">Spend</th>
-                  <th className="px-4 py-3">Last order</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted">No customers match “{q}”.</td>
-                  </tr>
-                ) : (
-                  rows.map((c) => {
-                    const isOpen = open === c.key;
-                    const st = c.ship_to;
-                    return (
-                      <Fragment key={c.key}>
-                        <tr
-                          className="cursor-pointer border-b border-lline/60 hover:bg-slate-50 dark:border-line/60 dark:hover:bg-card"
-                          onClick={() => setOpen(isOpen ? null : c.key)}
-                        >
-                          <td className="px-4 py-3">
-                            <div className="font-medium">{c.name}</div>
-                            <div className="text-[11.5px] text-faint">{c.email ?? 'No email on file'}</div>
-                          </td>
-                          <td className="px-4 py-3 text-muted">{c.city}, {c.state}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{c.orders}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{dollars(c.spend_cents)}</td>
-                          <td className="px-4 py-3 text-muted">{fmtDate(c.last_order)}</td>
-                          <td className="px-4 py-3">
-                            <FulfillmentBadge order={{ status: c.last_status, blocker: c.last_blocker, exported_at: c.last_exported_at }} />
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr className="border-b border-lline/60 bg-slate-50/60 dark:border-line/60 dark:bg-card/40">
-                            <td colSpan={6} className="px-4 py-3">
-                              <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
-                                <div className="flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-muted">
-                                  {c.phone && <span>📞 {c.phone}</span>}
-                                  <span>First order {fmtDate(c.first_order)}</span>
-                                  <span>{c.orders} order{c.orders === 1 ? '' : 's'} total</span>
-                                </div>
-                                {st ? (
-                                  <button className="btn text-[12px]" onClick={() => shipAgain(c)}>📦 Ship again</button>
-                                ) : (
-                                  <span className="text-[11.5px] text-faint">No complete address on file — can’t reship</span>
-                                )}
-                              </div>
-                              {st && (
-                                // Spelled out so "again" is never ambiguous: this is the
-                                // address from their most recent order that had one.
-                                <div className="mb-3 text-[11.5px] text-faint">
-                                  Ships to {st.address1}{st.address2 ? `, ${st.address2}` : ''}, {st.city} {st.state} {st.zip}
-                                </div>
-                              )}
-                              <table className="w-full text-[12.5px]">
-                                <thead>
-                                  <tr className="text-left text-[10.5px] uppercase tracking-wide text-faint">
-                                    <th className="py-1.5 pr-4">Date</th>
-                                    <th className="py-1.5 pr-4">Charge</th>
-                                    <th className="py-1.5 pr-4">Tracking</th>
-                                    <th className="py-1.5">Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {c.order_list.map((o) => (
-                                    <tr key={o.id} className="border-t border-lline/40 dark:border-line/40">
-                                      <td className="py-1.5 pr-4 text-muted">{fmtDate(o.created_at)}</td>
-                                      <td className="py-1.5 pr-4 tabular-nums">{dollars(o.wallet_charge_cents)}</td>
-                                      <td className="py-1.5 pr-4 text-muted">{o.tracking_number ?? '—'}</td>
-                                      <td className="py-1.5">
-                                        <FulfillmentBadge order={{ status: o.status, blocker: o.blocker, exported_at: o.exported_at }} />
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-content-faint">Sort</span>
+              <Select
+                className="w-40"
+                value={sort}
+                onValueChange={(v) => setSort(v as SortKey)}
+                options={SORTS}
+              />
+            </div>
+          </Toolbar>
         </>
       )}
+
+      <DataTable
+        caption="Customers derived from your orders"
+        columns={columns}
+        rows={rows}
+        rowKey={(c) => c.key}
+        loading={customers === null}
+        onRowClick={setOpen}
+        empty={
+          noMatches ? (
+            <EmptyState title={`No customers match “${q}”`} hint="Try a different search term." />
+          ) : (
+            <EmptyState
+              title="No customers yet"
+              hint="Once you fulfill an order, its recipient shows up here."
+              action={<LinkButton to="/app/orders">Create an order</LinkButton>}
+            />
+          )
+        }
+      />
+
+      <Drawer
+        open={open !== null}
+        onOpenChange={(o) => {
+          if (!o) setOpen(null);
+        }}
+        title={open?.name ?? 'Customer'}
+        footer={
+          open?.ship_to ? (
+            <Button className="w-full" icon={Package} onClick={() => shipAgain(open)}>
+              Ship again
+            </Button>
+          ) : (
+            <p className="text-center text-xs text-content-faint">
+              No complete address on file — can't reship
+            </p>
+          )
+        }
+      >
+        {open && (
+          <div className="space-y-4">
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-content-faint">Email</dt>
+                <dd>{open.email ?? '—'}</dd>
+              </div>
+              {open.phone && (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-content-faint">Phone</dt>
+                  <dd>{open.phone}</dd>
+                </div>
+              )}
+              <div className="flex justify-between gap-3">
+                <dt className="text-content-faint">Location</dt>
+                <dd>
+                  {open.city}, {open.state}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-content-faint">First order</dt>
+                <dd>{fmtDate(open.first_order)}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-content-faint">Total orders</dt>
+                <dd className="tabular-nums">{open.orders}</dd>
+              </div>
+            </dl>
+
+            {open.ship_to && (
+              // Spelled out so "again" is never ambiguous: this is the address
+              // from their most recent order that had one.
+              <p className="text-xs text-content-faint">
+                Ships to {open.ship_to.address1}
+                {open.ship_to.address2 ? `, ${open.ship_to.address2}` : ''}, {open.ship_to.city}{' '}
+                {open.ship_to.state} {open.ship_to.zip}
+              </p>
+            )}
+
+            <div>
+              <h3 className="mb-2 text-2xs uppercase tracking-[0.1em] text-content-faint">
+                Order history
+              </h3>
+              <div className="space-y-2">
+                {open.order_list.map((o) => (
+                  <div
+                    key={o.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line-subtle px-3 py-2 text-xs"
+                  >
+                    <span className="text-content-muted">{fmtDate(o.created_at)}</span>
+                    <span className="font-mono tabular-nums">{dollars(o.wallet_charge_cents)}</span>
+                    <span className="font-mono text-content-muted">{o.tracking_number ?? '—'}</span>
+                    <FulfillmentBadge
+                      order={{ status: o.status, blocker: o.blocker, exported_at: o.exported_at }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Drawer>
     </>
   );
 }

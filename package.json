@@ -19,9 +19,12 @@
     "seed:superadmin": "pnpm --filter @ruostack/api seed:superadmin",
     "test": "pnpm -r test",
     "lint:stripe-guard": "node scripts/check-stripe-imports.mjs",
+    "lint:contrast": "node scripts/check-contrast.mjs",
+    "lint:legacy-classes": "node scripts/check-legacy-classes.mjs",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "typescript": "^5.6.3"
   }
 }

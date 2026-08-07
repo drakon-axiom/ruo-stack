@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FLAT_FALLBACK } from '@ruostack/shared';
+import {
+  Card,
+  Checkbox,
+  DataTable,
+  EmptyState,
+  Field,
+  InlineAlert,
+  Input,
+  PageHeader,
+  Select,
+  cn,
+  type Column,
+} from '@ruostack/ui';
 import { api } from '../lib/api.js';
 
 const dollars = (c: number) => `${c < 0 ? '-' : ''}$${(Math.abs(c) / 100).toFixed(2)}`;
@@ -14,8 +27,23 @@ interface Product {
   wholesale_cents: number;
   retail_cents: number;
 }
-interface PlanRow { key: string; name: string; price_cents: number }
-interface Sub { current_plan: string; plans: PlanRow[] }
+interface PlanRow {
+  key: string;
+  name: string;
+  price_cents: number;
+}
+interface Sub {
+  current_plan: string;
+  plans: PlanRow[];
+}
+
+interface Projection {
+  volume: number;
+  walletLoad: number;
+  gross: number;
+  net: number;
+  isBreakEven: boolean;
+}
 
 // Per-order + projected economics. Pure client-side: cost = wholesale (+ shipping if
 // you absorb it); revenue = your retail (+ shipping if you bill the customer for it).
@@ -26,6 +54,7 @@ export function Profit() {
   const [retail, setRetail] = useState(''); // dollars string, editable
   const [inclShip, setInclShip] = useState(true); // shipping is part of my cost
   const [chargeShip, setChargeShip] = useState(true); // I bill the customer for shipping
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api<{ products: Product[] }>('/api/brand/catalog').then((r) => {
@@ -34,6 +63,7 @@ export function Profit() {
         setSelected(r.products[0].id);
         setRetail((r.products[0].retail_cents / 100).toFixed(2));
       }
+      setLoading(false);
     });
     api<Sub>('/api/brand/subscription').then(setSub);
   }, []);
@@ -55,10 +85,11 @@ export function Profit() {
   if (!product) {
     return (
       <>
-        <h1 className="mb-1 text-[23px] font-bold">Profit Calculator</h1>
-        <div className="surface mt-4 p-10 text-center text-muted">
-          {products.length === 0 ? 'No published products to model yet.' : 'Loading…'}
-        </div>
+        <PageHeader title="Profit Calculator" />
+        <EmptyState
+          title={loading ? 'Loading…' : 'No published products to model yet'}
+          hint={loading ? undefined : 'Products appear here once the operator publishes them.'}
+        />
       </>
     );
   }
@@ -73,113 +104,175 @@ export function Profit() {
   // First volume tier in the table that clears the membership (for row highlight).
   const breakEvenTier = VOLUMES.find((v) => profitPerOrder * v - membershipMonthly >= 0) ?? null;
 
+  const rows: Projection[] = VOLUMES.map((v) => {
+    const gross = profitPerOrder * v;
+    return {
+      volume: v,
+      walletLoad: (wholesale + SHIP) * v, // what you must keep funded
+      gross,
+      net: gross - membershipMonthly,
+      isBreakEven: v === breakEvenTier,
+    };
+  });
+
+  const columns: Column<Projection>[] = [
+    {
+      key: 'volume',
+      header: 'Orders / mo',
+      priority: 'primary',
+      cell: (r) => (
+        <span className="tabular-nums">
+          {r.volume}
+          {r.isBreakEven && (
+            <span className="ml-2 text-2xs uppercase text-accent">break-even</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'wallet',
+      header: 'Wallet load',
+      align: 'right',
+      mono: true,
+      cell: (r) => dollars(r.walletLoad),
+    },
+    { key: 'gross', header: 'Gross profit', align: 'right', mono: true, cell: (r) => dollars(r.gross) },
+    {
+      key: 'membership',
+      header: 'Membership',
+      align: 'right',
+      mono: true,
+      cell: () => (membershipMonthly ? `-${dollars(membershipMonthly)}` : '—'),
+    },
+    {
+      key: 'net',
+      header: 'Net profit',
+      align: 'right',
+      mono: true,
+      cell: (r) => (
+        <span className={cn('font-semibold', r.net >= 0 ? 'text-success' : 'text-danger')}>
+          {dollars(r.net)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <>
-      <h1 className="mb-1 text-[23px] font-bold">Profit Calculator</h1>
-      <p className="mb-5 text-[13px] text-muted">
-        Model your margin per order and project monthly profit by volume. Fulfillment is a flat {dollars(SHIP)} ({FLAT_FALLBACK.carrier} Ground Advantage).
-      </p>
+      <PageHeader
+        title="Profit Calculator"
+        subtitle={`Model your margin per order and project monthly profit by volume. Fulfillment is a flat ${dollars(SHIP)} (${FLAT_FALLBACK.carrier} Ground Advantage).`}
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Inputs */}
-        <div className="surface p-5">
-          <span className="label mb-1 block">Product</span>
-          <select className="app-input mb-3" value={selected} onChange={(e) => pick(e.target.value)}>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}{p.dose ? ` · ${p.dose}${p.unit ?? ''}` : ''}</option>
-            ))}
-          </select>
+        <Card className="p-5">
+          <Field label="Product" htmlFor="p-product">
+            <Select
+              id="p-product"
+              value={selected}
+              onValueChange={pick}
+              options={products.map((p) => ({
+                value: p.id,
+                label: `${p.name}${p.dose ? ` · ${p.dose}${p.unit ?? ''}` : ''}`,
+              }))}
+            />
+          </Field>
 
-          <div className="mb-3 grid grid-cols-2 gap-3">
-            <div>
-              <span className="label mb-1 block">Your cost (wholesale)</span>
-              <div className="app-input bg-card2 text-muted">{dollars(wholesale)}</div>
-            </div>
-            <div>
-              <span className="label mb-1 block">Your retail price</span>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Your cost (wholesale)">
+              <div className="min-h-11 rounded-[10px] border border-line bg-surface-3 px-3 py-2 font-mono text-sm tabular-nums text-content-muted md:min-h-0">
+                {dollars(wholesale)}
+              </div>
+            </Field>
+            <Field label="Your retail price" htmlFor="p-retail">
               <div className="flex items-center gap-1">
-                <span className="text-faint">$</span>
-                <input
-                  className="app-input"
+                <span className="text-content-faint">$</span>
+                <Input
+                  id="p-retail"
                   inputMode="decimal"
                   value={retail}
                   onChange={(e) => setRetail(e.target.value)}
                 />
               </div>
-            </div>
+            </Field>
           </div>
 
-          <label className="mb-2 flex items-center gap-2 text-[13px]">
-            <input type="checkbox" checked={inclShip} onChange={(e) => setInclShip(e.target.checked)} />
-            <span>Include shipping in my cost ({dollars(SHIP)})</span>
-          </label>
-          <label className="flex items-center gap-2 text-[13px]">
-            <input type="checkbox" checked={chargeShip} onChange={(e) => setChargeShip(e.target.checked)} />
-            <span>Charge the customer for shipping ({dollars(SHIP)})</span>
-          </label>
-        </div>
+          <div className="space-y-2">
+            <Checkbox
+              checked={inclShip}
+              onCheckedChange={setInclShip}
+              label={`Include shipping in my cost (${dollars(SHIP)})`}
+            />
+            <Checkbox
+              checked={chargeShip}
+              onCheckedChange={setChargeShip}
+              label={`Charge the customer for shipping (${dollars(SHIP)})`}
+            />
+          </div>
+        </Card>
 
         {/* Per-order summary */}
-        <div className="surface p-5">
-          <h2 className="mb-3 text-[15px] font-semibold">Per order</h2>
-          <div className="space-y-1.5 text-[13px]">
-            <div className="flex justify-between text-muted"><span>Revenue</span><span>{dollars(revenuePerOrder)}</span></div>
-            <div className="flex justify-between text-muted"><span>Cost</span><span>{dollars(costPerOrder)}</span></div>
-            <div className="my-2 border-t border-lline dark:border-line" />
-            <div className="flex justify-between text-[15px] font-semibold">
-              <span>Profit</span>
-              <span className={profitPerOrder >= 0 ? 'text-success' : 'text-danger'}>{dollars(profitPerOrder)}</span>
+        <Card className="p-5">
+          <h2 className="mb-3 text-lg font-semibold">Per order</h2>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between text-content-muted">
+              <span>Revenue</span>
+              <span className="font-mono tabular-nums">{dollars(revenuePerOrder)}</span>
             </div>
-            <div className="flex justify-between text-muted"><span>Margin</span><span>{marginPct}%</span></div>
+            <div className="flex justify-between text-content-muted">
+              <span>Cost</span>
+              <span className="font-mono tabular-nums">{dollars(costPerOrder)}</span>
+            </div>
+            <div className="my-2 border-t border-line-subtle" />
+            <div className="flex justify-between text-lg font-semibold">
+              <span>Profit</span>
+              <span
+                className={cn(
+                  'font-mono tabular-nums',
+                  profitPerOrder >= 0 ? 'text-success' : 'text-danger',
+                )}
+              >
+                {dollars(profitPerOrder)}
+              </span>
+            </div>
+            <div className="flex justify-between text-content-muted">
+              <span>Margin</span>
+              <span className="font-mono tabular-nums">{marginPct}%</span>
+            </div>
           </div>
+
           {profitPerOrder <= 0 ? (
-            <div className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[12px] text-amber">
-              This product loses money at the current retail price. Raise your retail or charge for shipping.
+            <div className="mt-3">
+              <InlineAlert tone="warning">
+                This product loses money at the current retail price. Raise your retail or charge for
+                shipping.
+              </InlineAlert>
             </div>
           ) : breakEvenUnits !== null && membershipMonthly > 0 ? (
-            <div className="mt-3 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-[12px] text-teal">
-              ~{breakEvenUnits} order{breakEvenUnits > 1 ? 's' : ''}/month covers your {dollars(membershipMonthly)} membership.
+            <div className="mt-3">
+              <InlineAlert tone="accent">
+                ~{breakEvenUnits} order{breakEvenUnits > 1 ? 's' : ''}/month covers your{' '}
+                {dollars(membershipMonthly)} membership.
+              </InlineAlert>
             </div>
           ) : null}
-        </div>
+        </Card>
       </div>
 
-      {/* Projections by volume */}
-      <h2 className="mb-2 mt-6 text-[13px] uppercase tracking-[0.12em] text-faint">Monthly projection</h2>
-      <div className="surface overflow-hidden">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="border-b border-lline text-left text-[11px] uppercase tracking-wide text-faint dark:border-line">
-              <th className="px-4 py-3">Orders / mo</th>
-              <th className="px-4 py-3">Wallet load</th>
-              <th className="px-4 py-3">Gross profit</th>
-              <th className="px-4 py-3">Membership</th>
-              <th className="px-4 py-3 text-right">Net profit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {VOLUMES.map((v) => {
-              const walletLoad = (wholesale + SHIP) * v; // what you must keep funded
-              const gross = profitPerOrder * v;
-              const net = gross - membershipMonthly;
-              return (
-                <tr
-                  key={v}
-                  className={`border-b border-lline/60 dark:border-line/60 ${v === breakEvenTier ? 'bg-teal/5' : ''}`}
-                >
-                  <td className="px-4 py-3 font-medium">{v}{v === breakEvenTier ? <span className="ml-2 text-[10px] uppercase text-teal">break-even</span> : ''}</td>
-                  <td className="px-4 py-3 text-muted">{dollars(walletLoad)}</td>
-                  <td className="px-4 py-3">{dollars(gross)}</td>
-                  <td className="px-4 py-3 text-muted">{membershipMonthly ? `-${dollars(membershipMonthly)}` : '—'}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${net >= 0 ? 'text-success' : 'text-danger'}`}>{dollars(net)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-3 text-[11px] text-faint">
-        Wallet load is the prepaid balance to keep on hand (wholesale + fulfillment per order). Net profit subtracts your monthly membership. Research use only.
+      <h2 className="mb-2 mt-6 text-2xs uppercase tracking-[0.12em] text-content-faint">
+        Monthly projection
+      </h2>
+      <DataTable
+        caption="Projected monthly profit by order volume"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => String(r.volume)}
+      />
+
+      <p className="mt-3 text-2xs text-content-faint">
+        Wallet load is the prepaid balance to keep on hand (wholesale + fulfillment per order). Net
+        profit subtracts your monthly membership. Research use only.
       </p>
     </>
   );

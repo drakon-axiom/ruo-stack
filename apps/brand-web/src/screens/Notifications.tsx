@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { TYPE_ICON, relativeTime, type Notification } from '../components/NotificationBell.js';
+import { buttonClass, cardClass, chipClass } from '@ruostack/ui';
 
 /**
  * Full notifications history. The bell panel shows the most recent few; this is
@@ -53,25 +54,25 @@ export function Notifications() {
     <>
       <div className="mb-5 flex items-end justify-between">
         <div>
-          <h1 className="mb-1 text-[23px] font-bold">Notifications</h1>
-          <p className="text-[13px] text-muted">Platform announcements, restocks and maintenance notices.</p>
+          <h1 className="mb-1 text-2xl font-bold">Notifications</h1>
+          <p className="text-sm text-content-muted">Platform announcements, restocks and maintenance notices.</p>
         </div>
-        {unreadCount > 0 && <button className="btn-ghost text-[12px]" onClick={markAll}>Mark all read</button>}
+        {unreadCount > 0 && <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={markAll}>Mark all read</button>}
       </div>
 
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <div className="mb-4 flex gap-2">
-        <button className={`tab ${!unreadOnly ? 'tab-on' : ''}`} onClick={() => setUnreadOnly(false)}>All</button>
-        <button className={`tab ${unreadOnly ? 'tab-on' : ''}`} onClick={() => setUnreadOnly(true)}>
+        <button className={chipClass(!unreadOnly)} onClick={() => setUnreadOnly(false)}>All</button>
+        <button className={chipClass(unreadOnly)} onClick={() => setUnreadOnly(true)}>
           Unread{unreadCount > 0 && <span className="ml-1.5 opacity-70">{unreadCount}</span>}
         </button>
       </div>
 
       {loading ? (
-        <div className="surface p-10 text-center text-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : items.length === 0 ? (
-        <div className="surface p-10 text-center text-muted">
+        <div className={cardClass('p-10 text-center text-content-muted')}>
           {unreadOnly ? 'Nothing unread. 🎉' : 'No notifications yet.'}
         </div>
       ) : (
@@ -79,21 +80,21 @@ export function Notifications() {
           {items.map((n) => (
             <div
               key={n.id}
-              className={`surface flex items-start gap-3 p-4 ${n.read_at ? '' : 'border-teal/30'}`}
+              className={cardClass(`flex items-start gap-3 p-4 ${n.read_at ? '' : 'border-accent/30'}`)}
             >
-              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal/10 text-[14px]" aria-hidden>
+              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent/10 text-base" aria-hidden>
                 {TYPE_ICON[n.type]}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  {!n.read_at && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal" aria-hidden />}
-                  <span className={`text-[14px] ${n.read_at ? '' : 'font-semibold'}`}>{n.title}</span>
+                  {!n.read_at && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
+                  <span className={`text-base ${n.read_at ? '' : 'font-semibold'}`}>{n.title}</span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted">{n.body}</p>
-                <div className="mt-1.5 text-[11.5px] text-faint">{relativeTime(n.published_at)}</div>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-content-muted">{n.body}</p>
+                <div className="mt-1.5 text-xs text-content-faint">{relativeTime(n.published_at)}</div>
               </div>
               {!n.read_at && (
-                <button className="btn-ghost shrink-0 text-[11.5px]" onClick={() => markRead(n)}>Mark read</button>
+                <button className={buttonClass('ghost', 'md', 'shrink-0 text-xs')} onClick={() => markRead(n)}>Mark read</button>
               )}
             </div>
           ))}

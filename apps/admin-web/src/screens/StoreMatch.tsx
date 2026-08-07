@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, PageHeader, Tabs } from '../components/ui.js';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  InlineAlert,
+  PageHeader,
+  Select,
+  Tabs,
+  cardClass,
+  type Column,
+} from '@ruostack/ui';
 
 interface NoMatchOrder {
   id: string;
@@ -65,6 +75,27 @@ export function StoreMatch() {
     load();
   }
 
+  // scroll mode: an alias only reads correctly as store SKU -> canonical SKU,
+  // side by side.
+  const aliasColumns: Column<Alias>[] = [
+    { key: 'brand', header: 'Brand', priority: 'primary', minWidth: 140, cell: (a) => a.brand_name },
+    { key: 'woo', header: 'Store SKU', mono: true, minWidth: 150, cell: (a) => a.woo_sku },
+    { key: 'canonical', header: '\u2192 Canonical', mono: true, minWidth: 150, cell: (a) => a.canonical_sku },
+    { key: 'product', header: 'Product', minWidth: 180, cell: (a) => a.product_name },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      minWidth: 100,
+      cell: (a) =>
+        writable ? (
+          <Button variant="danger" size="sm" onClick={() => delAlias(a)}>
+            Remove
+          </Button>
+        ) : null,
+    },
+  ];
+
   return (
     <>
       <PageHeader title="Store Match" subtitle="Resolve No-Match store items by mapping a store SKU to a catalog product. Mapping auto-releases blocked orders." />
@@ -72,29 +103,47 @@ export function StoreMatch() {
       <div className="mb-3">
         <Tabs<Tab> active={tab} onChange={setTab} tabs={[{ key: 'no_match', label: 'No-Match', count: orders.length }, { key: 'aliases', label: 'Aliases', count: aliases.length }]} />
       </div>
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && (
+        <div className="mb-3">
+          <InlineAlert tone="danger">{err}</InlineAlert>
+        </div>
+      )}
 
       {tab === 'no_match' ? (
         orders.length === 0 ? <EmptyState title="All clear" hint="No unmatched store orders." /> : (
           <div className="space-y-3">
             {orders.map((o) => (
-              <div key={o.id} className="card p-4">
-                <div className="mb-2 flex items-center justify-between text-[13px]">
-                  <div><span className="text-text">{o.brand_name}</span> · {o.recipient.name} · {o.recipient.city}, {o.recipient.state}</div>
-                  <div className="font-mono text-[11px] text-faint">{o.external_order_id}</div>
+              <div key={o.id} className={cardClass('p-4')}>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <div><span className="text-content">{o.brand_name}</span> · {o.recipient.name} · {o.recipient.city}, {o.recipient.state}</div>
+                  <div className="font-mono text-2xs text-content-faint">{o.external_order_id}</div>
                 </div>
                 <div className="space-y-2">
                   {o.unmatched_skus.map((sku) => {
                     const key = `${o.id}:${sku}`;
                     return (
-                      <div key={sku} className="flex items-center gap-2 text-[13px]">
-                        <span className="rounded-pill border border-amber/40 bg-amber/10 px-2 py-0.5 font-mono text-[11px] text-amber">{sku}</span>
-                        <span className="text-faint">→</span>
-                        <select className="input flex-1" value={pick[key] ?? ''} onChange={(e) => setPick({ ...pick, [key]: e.target.value })}>
-                          <option value="">Select a catalog product…</option>
-                          {catalog.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.canonicalSku})</option>)}
-                        </select>
-                        {writable && <button className="btn" disabled={busy === key || !pick[key]} onClick={() => mapSku(o, sku)}>{busy === key ? '…' : 'Map'}</button>}
+                      <div key={sku} className="flex items-center gap-2 text-sm">
+                        <span className="rounded-pill border border-warning/40 bg-warning/10 px-2 py-0.5 font-mono text-2xs text-warning">{sku}</span>
+                        <span className="text-content-faint">→</span>
+                        <Select
+                          className="flex-1"
+                          placeholder="Select a catalog product…"
+                          value={pick[key] ?? ''}
+                          onValueChange={(v) => setPick({ ...pick, [key]: v })}
+                          options={catalog.map((p) => ({
+                            value: p.id,
+                            label: `${p.name} (${p.canonicalSku})`,
+                          }))}
+                        />
+                        {writable && (
+                          <Button
+                            disabled={!pick[key]}
+                            loading={busy === key}
+                            onClick={() => mapSku(o, sku)}
+                          >
+                            Map
+                          </Button>
+                        )}
                       </div>
                     );
                   })}
@@ -103,25 +152,17 @@ export function StoreMatch() {
             ))}
           </div>
         )
-      ) : aliases.length === 0 ? <EmptyState title="No aliases" hint="Aliases you create here will appear in this list." /> : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-              <th className="px-4 py-3">Brand</th><th className="px-4 py-3">Store SKU</th><th className="px-4 py-3">→ Canonical</th><th className="px-4 py-3">Product</th><th className="px-4 py-3 text-right"></th>
-            </tr></thead>
-            <tbody>
-              {aliases.map((a) => (
-                <tr key={a.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-text">{a.brand_name}</td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-muted">{a.woo_sku}</td>
-                  <td className="px-4 py-3 font-mono text-[11px]">{a.canonical_sku}</td>
-                  <td className="px-4 py-3 text-muted">{a.product_name}</td>
-                  <td className="px-4 py-3 text-right">{writable && <button className="btn-ghost text-[12px] text-danger" onClick={() => delAlias(a)}>Remove</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      ) : (
+        <DataTable
+          caption="SKU aliases mapping store SKUs to catalog products"
+          mode="scroll"
+          columns={aliasColumns}
+          rows={aliases}
+          rowKey={(a) => a.id}
+          empty={
+            <EmptyState title="No aliases" hint="Aliases you create here will appear in this list." />
+          }
+        />
       )}
     </>
   );

@@ -1,0 +1,117 @@
+/* RUOStack design tokens — "Refined Slate".
+ *
+ * Every value here is verified at WCAG AA in both themes by
+ * scripts/check-contrast.mjs, which parses THIS FILE. Change a hex here and the
+ * gate re-measures it; the gate can never disagree with what ships.
+ *
+ * Values are plain 6-digit hex on purpose: the contrast script parses them, and
+ * tailwind-preset.js wraps each one in color-mix() so Tailwind opacity
+ * modifiers (bg-accent/40) still work. Do not switch to rgb() or channel
+ * triplets without updating both consumers.
+ */
+
+:root {
+  --canvas: #F6F8FC;
+  --surface-1: #FFFFFF;
+  --surface-2: #FFFFFF;
+  --surface-3: #EDF1F7;
+  /* Input fill. Distinct from --surface-1 so a field still reads as a field
+     when it sits on a card, which is the common case. */
+  --field: #F7F9FC;
+  --border-subtle: #E4E9F2;
+  --border-default: #DDE3EE;
+  --border-strong: #C7D0E0;
+  --text: #131A2B;
+  --text-muted: #55607A;
+  --text-faint: #656F88;
+  --accent: #0F7A5C;
+  --accent-hover: #0C6349;
+  --accent-solid: #13805F;
+  --success: #1F7A43;
+  --warning: #8A5B10;
+  --danger: #C13540;
+  --info: #1F5FD0;
+  --ring: #0F7A5C;
+
+  --accent-tint: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
+  --success-tint: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  --warning-tint: color-mix(in srgb, var(--warning) 12%, var(--surface-1));
+  --danger-tint: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
+  --info-tint: color-mix(in srgb, var(--info) 12%, var(--surface-1));
+
+  /* Light: elevation is shadow-only — no inner highlight, no surface gradient. */
+  --elev-1: 0 1px 2px rgb(19 26 43 / .04), 0 4px 12px -4px rgb(19 26 43 / .08);
+  --elev-2: 0 8px 24px -8px rgb(19 26 43 / .16);
+  --elev-3: 0 24px 56px -16px rgb(19 26 43 / .22);
+  --elev-accent: 0 6px 16px -6px rgb(19 128 95 / .45);
+  --surface-1-gradient: var(--surface-1);
+  --inner-highlight: 0 0 0 0 transparent;
+}
+
+.dark {
+  --canvas: #0A0E16;
+  --surface-1: #111725;
+  --surface-2: #171E2E;
+  --surface-3: #1E2739;
+  /* Slightly LIFTED from the card rather than recessed: on a dark card a
+     darker fill reads as a hole punched in the surface. */
+  --field: #1B2334;
+  --border-subtle: #232C40;
+  --border-default: #2E3850;
+  --border-strong: #3B4763;
+  --text: #E9EDF6;
+  --text-muted: #98A2BA;
+  --text-faint: #7C87A3;
+  --accent: #17A67D;
+  --accent-hover: #2ACB9A;
+  --accent-solid: #13805F;
+  --success: #5BC46F;
+  --warning: #E7AC4A;
+  --danger: #F0656B;
+  --info: #5B9CF6;
+  --ring: #2ACB9A;
+
+  --accent-tint: color-mix(in srgb, var(--accent) 14%, var(--surface-1));
+  --success-tint: color-mix(in srgb, var(--success) 14%, var(--surface-1));
+  --warning-tint: color-mix(in srgb, var(--warning) 14%, var(--surface-1));
+  --danger-tint: color-mix(in srgb, var(--danger) 14%, var(--surface-1));
+  --info-tint: color-mix(in srgb, var(--info) 14%, var(--surface-1));
+
+  /* Dark: the inner highlight + surface gradient are what stop cards reading
+     flat against the canvas. This is the whole point of the redesign. */
+  --elev-1: 0 8px 18px -10px rgb(0 0 0 / .9);
+  --elev-2: 0 14px 32px -12px rgb(0 0 0 / .95);
+  --elev-3: 0 28px 64px -20px rgb(0 0 0 / .95);
+  --elev-accent: 0 6px 16px -6px rgb(23 166 125 / .75);
+  --surface-1-gradient: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  --inner-highlight: inset 0 1px 0 rgb(255 255 255 / .055);
+}
+
+@layer base {
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Every interactive element gets a visible focus ring. This replaces the old
+     `outline-none` + border-colour-only pattern, which left keyboard users with
+     no indication of focus. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

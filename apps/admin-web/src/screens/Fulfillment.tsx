@@ -2,7 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, Tabs } from '../components/ui.js';
+import {
+  Button,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  PageHeader,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  labelClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -22,16 +36,16 @@ interface Order {
 }
 
 const TONE: Record<string, string> = {
-  amber: 'border-amber/40 bg-amber/10 text-amber',
-  slate: 'border-line2 bg-card2 text-muted',
-  teal: 'border-teal/40 bg-teal/10 text-teal',
+  amber: 'border-warning/40 bg-warning/10 text-warning',
+  slate: 'border-line-strong bg-surface-3 text-content-muted',
+  teal: 'border-accent/40 bg-accent/10 text-accent',
   success: 'border-success/40 bg-success/10 text-success',
-  muted: 'border-line2 bg-card2 text-muted',
+  muted: 'border-line-strong bg-surface-3 text-content-muted',
 };
 
 function FulfillmentBadge({ order }: { order: { status: string; blocker: string; exported_at: string | null } }) {
   const meta = FULFILLMENT_META[fulfillmentState(order)];
-  return <span className={`pill ${TONE[meta.tone]}`} title={meta.label}>{meta.icon} {meta.label}</span>;
+  return <span className={pillClass(`${TONE[meta.tone]}`)} title={meta.label}>{meta.icon} {meta.label}</span>;
 }
 
 const isPreShip = (o: Order) => o.status === 'ready_for_fulfillment' || o.status === 'processing';
@@ -74,6 +88,67 @@ export function Fulfillment() {
     finally { setBusyId(null); }
   }
 
+  // scroll mode: an operator queue row carries brand + destination + charge +
+  // status + three actions; stacking that into a card buries the actions.
+  const columns: Column<Order>[] = [
+    { key: 'brand', header: 'Brand', priority: 'primary', minWidth: 140, cell: (o) => o.brand_name },
+    {
+      key: 'shipto',
+      header: 'Ship to',
+      minWidth: 220,
+      cell: (o) => `${o.recipient.name} \u00b7 ${o.recipient.city}, ${o.recipient.state} ${o.recipient.zip}`,
+    },
+    { key: 'items', header: 'Items', align: 'right', mono: true, minWidth: 70, cell: (o) => o.item_count },
+    {
+      key: 'charge',
+      header: 'Charge',
+      align: 'right',
+      mono: true,
+      minWidth: 100,
+      cell: (o) => dollars(o.wallet_charge_cents),
+    },
+    { key: 'status', header: 'Status', minWidth: 130, cell: (o) => <FulfillmentBadge order={o} /> },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      minWidth: 260,
+      cell: (o) => (
+        <>
+          {writable && isPreShip(o) && (
+            <div className="flex items-center justify-end gap-1.5">
+              <Button variant="ghost" size="sm" onClick={() => setEditing(o)}>
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={busyId === o.id}
+                onClick={() => resend(o.id)}
+                title="Re-queue for ShipStation's next export pull"
+              >
+                {o.exported_at ? 'Re-send' : 'Send'}
+              </Button>
+              <Button size="sm" onClick={() => setShipping(o)} title="Manually mark shipped (failsafe)">
+                Mark shipped
+              </Button>
+            </div>
+          )}
+          {writable && o.status === 'shipped' && (
+            <Button variant="ghost" size="sm" onClick={() => deliver(o.id)}>
+              Mark delivered
+            </Button>
+          )}
+          {o.status === 'shipped' && o.tracking_number && (
+            <div className="mt-1 font-mono text-2xs text-accent-hover">
+              {o.carrier} {o.tracking_number}
+            </div>
+          )}
+        </>
+      ),
+    },
+  ];
+
   return (
     <>
       <PageHeader title="Fulfillment Monitor" subtitle="Orders flow to ShipStation for fulfillment; tracking flows back via shipnotify. Failsafes below for exceptions." />
@@ -92,54 +167,15 @@ export function Fulfillment() {
         />
       </div>
 
-      {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
-      ) : visible.length === 0 ? (
-        <EmptyState title="Nothing here" hint="No orders in this state." />
-      ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3">Ship to</th>
-                <th className="px-4 py-3">Items</th>
-                <th className="px-4 py-3">Charge</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((o) => (
-                <tr key={o.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-text">{o.brand_name}</td>
-                  <td className="px-4 py-3 text-muted">{o.recipient.name} · {o.recipient.city}, {o.recipient.state} {o.recipient.zip}</td>
-                  <td className="px-4 py-3">{o.item_count}</td>
-                  <td className="px-4 py-3">{dollars(o.wallet_charge_cents)}</td>
-                  <td className="px-4 py-3"><FulfillmentBadge order={o} /></td>
-                  <td className="px-4 py-3 text-right">
-                    {writable && isPreShip(o) && (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button className="btn-ghost text-[12px]" onClick={() => setEditing(o)}>Edit</button>
-                        <button className="btn-ghost text-[12px]" disabled={busyId === o.id} onClick={() => resend(o.id)} title="Re-queue for ShipStation's next export pull">
-                          {busyId === o.id ? '…' : o.exported_at ? 'Re-send' : 'Send'}
-                        </button>
-                        <button className="btn" onClick={() => setShipping(o)} title="Manually mark shipped (failsafe)">Mark shipped</button>
-                      </div>
-                    )}
-                    {writable && o.status === 'shipped' && (
-                      <button className="btn-ghost" onClick={() => deliver(o.id)}>Mark delivered</button>
-                    )}
-                    {o.status === 'shipped' && o.tracking_number && (
-                      <div className="mt-1 font-mono text-[11px] text-teal-bright">{o.carrier} {o.tracking_number}</div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Fulfillment queue"
+        mode="scroll"
+        columns={columns}
+        rows={visible}
+        rowKey={(o) => o.id}
+        loading={loading}
+        empty={<EmptyState title="Nothing here" hint="No orders in this state." />}
+      />
 
       {shipping && <ShipModal order={shipping} onClose={() => setShipping(null)} onShipped={() => { setShipping(null); load(); }} />}
       {editing && <EditDrawer order={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
@@ -168,21 +204,21 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
-      <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-        <h2 className="mb-1 text-[16px] font-semibold text-text">Mark shipped (manual)</h2>
-        <p className="mb-4 text-[12px] text-muted">{order.brand_name} → {order.recipient.name}. Captures {dollars(order.wallet_charge_cents)} from the brand's wallet. Use only when ShipStation's shipnotify didn't arrive.</p>
-        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      <div className={cardClass('w-full max-w-sm p-6')} onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-1 text-lg font-semibold text-content">Mark shipped (manual)</h2>
+        <p className="mb-4 text-xs text-content-muted">{order.brand_name} → {order.recipient.name}. Captures {dollars(order.wallet_charge_cents)} from the brand's wallet. Use only when ShipStation's shipnotify didn't arrive.</p>
+        {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
         <Field label="Carrier">
-          <select className="input" value={carrier} onChange={(e) => setCarrier(e.target.value)}>
+          <select className={inputClass()} value={carrier} onChange={(e) => setCarrier(e.target.value)}>
             <option>USPS</option><option>UPS</option><option>FedEx</option>
           </select>
         </Field>
         <Field label="Tracking number">
-          <input className="input" value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
+          <input className={inputClass()} value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
         </Field>
         <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn" disabled={!tracking || busy} onClick={ship}>{busy ? '…' : 'Capture & ship'}</button>
+          <button className={buttonClass('ghost', 'md')} onClick={onClose}>Cancel</button>
+          <button className={buttonClass('primary', 'md')} disabled={!tracking || busy} onClick={ship}>{busy ? '…' : 'Capture & ship'}</button>
         </div>
       </div>
     </div>
@@ -258,62 +294,62 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
     <Drawer
       open
       title={`Edit order · ${order.brand_name}`}
-      onClose={onClose}
+      onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
-        <button className="btn w-full" disabled={!valid || busy || !detail} onClick={save}>{busy ? '…' : 'Save changes (re-prices wallet)'}</button>
+        <button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy || !detail} onClick={save}>{busy ? '…' : 'Save changes (re-prices wallet)'}</button>
       }
     >
       {!detail ? (
-        <div className="p-6 text-center text-muted">Loading…</div>
+        <div className="p-6 text-center text-content-muted">Loading…</div>
       ) : (
         <div className="space-y-4">
-          {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+          {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
           {detail.exported_at && (
-            <div className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[12px] text-amber">
+            <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
               Already at ShipStation. Saving updates the record but won't push to the shipping platform — use <span className="font-medium">Re-send</span> afterward to re-queue it.
             </div>
           )}
           {detail.box_name && (
-            <div className="rounded-lg border border-line bg-card2 px-3 py-2 text-[12px] text-muted">
-              Package: <span className="text-text">{detail.box_name}</span>
+            <div className="rounded-lg border border-line bg-surface-3 px-3 py-2 text-xs text-content-muted">
+              Package: <span className="text-content">{detail.box_name}</span>
               {detail.box_dims && <> · {detail.box_dims.l}×{detail.box_dims.w}×{detail.box_dims.h} in</>}
               {detail.billable_weight_oz != null && <> · {detail.billable_weight_oz} oz billable</>}
-              <span className="text-faint"> (re-derived on save)</span>
+              <span className="text-content-faint"> (re-derived on save)</span>
             </div>
           )}
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="label">Products</span>
-              <button className="text-[12px] text-teal" onClick={addLine}>+ Add product</button>
+              <span className={labelClass()}>Products</span>
+              <button className="text-xs text-accent" onClick={addLine}>+ Add product</button>
             </div>
             {lines.map((l, i) => (
               <div key={i} className="mb-2 flex items-center gap-2">
-                <select className="input flex-1" value={l.product_id} onChange={(e) => setLine(i, { product_id: e.target.value })}>
+                <select className={inputClass('flex-1')} value={l.product_id} onChange={(e) => setLine(i, { product_id: e.target.value })}>
                   {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <input className="input w-16" type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
-                <button className="text-faint hover:text-danger" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>✕</button>
+                <input className={inputClass('w-16')} type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
+                <button className="text-content-faint hover:text-danger" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>✕</button>
               </div>
             ))}
           </div>
 
           <div className="space-y-2">
-            <span className="label">Ship to</span>
-            <input className="input" placeholder="Recipient name" value={r.recipient_name} onChange={(e) => setR({ ...r, recipient_name: e.target.value })} />
-            <input className="input" placeholder="Email (optional)" value={r.recipient_email} onChange={(e) => setR({ ...r, recipient_email: e.target.value })} />
-            <input className="input" placeholder="Phone (optional)" value={r.recipient_phone} onChange={(e) => setR({ ...r, recipient_phone: e.target.value })} />
-            <input className="input" placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
-            <input className="input" placeholder="Address line 2 (optional)" value={r.address2} onChange={(e) => setR({ ...r, address2: e.target.value })} />
-            <div className="grid grid-cols-3 gap-2">
-              <input className="input" placeholder="City" value={r.city} onChange={(e) => setR({ ...r, city: e.target.value })} />
-              <input className="input" placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
-              <input className="input" placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />
+            <span className={labelClass()}>Ship to</span>
+            <input className={inputClass()} placeholder="Recipient name" value={r.recipient_name} onChange={(e) => setR({ ...r, recipient_name: e.target.value })} />
+            <input className={inputClass()} placeholder="Email (optional)" value={r.recipient_email} onChange={(e) => setR({ ...r, recipient_email: e.target.value })} />
+            <input className={inputClass()} placeholder="Phone (optional)" value={r.recipient_phone} onChange={(e) => setR({ ...r, recipient_phone: e.target.value })} />
+            <input className={inputClass()} placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
+            <input className={inputClass()} placeholder="Address line 2 (optional)" value={r.address2} onChange={(e) => setR({ ...r, address2: e.target.value })} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input className={inputClass()} placeholder="City" value={r.city} onChange={(e) => setR({ ...r, city: e.target.value })} />
+              <input className={inputClass()} placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
+              <input className={inputClass()} placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />
             </div>
           </div>
 
           <Field label="Shipping service code (optional override)">
-            <input className="input" placeholder="leave blank to auto-rate" value={service} onChange={(e) => setService(e.target.value)} />
+            <input className={inputClass()} placeholder="leave blank to auto-rate" value={service} onChange={(e) => setService(e.target.value)} />
           </Field>
         </div>
       )}

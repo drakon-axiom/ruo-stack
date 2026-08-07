@@ -2,7 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { EmptyState, KpiCard, PageHeader, Tabs } from '../components/ui.js';
+import {
+  DataTable,
+  EmptyState,
+  KpiTile,
+  PageHeader,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -74,6 +85,69 @@ const TABS: { key: string; label: string; types?: TxnType[] }[] = [
 
 /** `YYYY-MM-DD` (what <input type="date"> wants) for N days ago. */
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+
+const SUMMARY_COLUMNS: Column<BrandSummary>[] = [
+  { key: 'brand', header: 'Brand', priority: 'primary', minWidth: 160, cell: (b) => b.brandName },
+  { key: 'opening', header: 'Opening', align: 'right', mono: true, minWidth: 110, cell: (b) => money(b.openingBalance) },
+  { key: 'deposits', header: 'Deposits', align: 'right', mono: true, minWidth: 110, cell: (b) => money(b.byType.deposit ?? 0) },
+  { key: 'captures', header: 'Captures', align: 'right', mono: true, minWidth: 110, cell: (b) => money(b.byType.capture ?? 0) },
+  {
+    key: 'credits',
+    header: 'Credits',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (b) => money((b.byType.refund_credit ?? 0) + (b.byType.referral_credit ?? 0)),
+  },
+  {
+    key: 'net',
+    header: 'Net',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (b) => <span className={b.net < 0 ? 'text-danger' : 'text-success'}>{money(b.net)}</span>,
+  },
+  {
+    key: 'closing',
+    header: 'Closing',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (b) => <span className="font-medium">{money(b.closingBalance)}</span>,
+  },
+];
+
+const ENTRY_COLUMNS: Column<Entry>[] = [
+  { key: 'date', header: 'Date', priority: 'primary', minWidth: 120, cell: (e) => day(e.createdAt) },
+  { key: 'brand', header: 'Brand', minWidth: 150, cell: (e) => e.brandName },
+  { key: 'type', header: 'Type', minWidth: 130, cell: (e) => TYPE_LABEL[e.type] },
+  {
+    key: 'reason',
+    header: 'Reason',
+    minWidth: 200,
+    cell: (e) => (
+      <span className="block max-w-[280px] truncate" title={e.reason ?? ''}>
+        {e.reason ?? '\u2014'}
+      </span>
+    ),
+  },
+  {
+    key: 'amount',
+    header: 'Amount',
+    align: 'right',
+    mono: true,
+    minWidth: 110,
+    cell: (e) => <span className={e.amount < 0 ? 'text-danger' : 'text-success'}>{money(e.amount)}</span>,
+  },
+  {
+    key: 'balance',
+    header: 'Balance after',
+    align: 'right',
+    mono: true,
+    minWidth: 130,
+    cell: (e) => money(e.balanceAfter),
+  },
+];
 
 export function Ledger() {
   const { claims } = useAuth();
@@ -166,48 +240,48 @@ export function Ledger() {
         subtitle="Wallet movement across every brand, the float, and drift that needs resolving."
         action={
           <div className="flex gap-2">
-            <button className="btn-ghost" onClick={() => exportCsv('summary')}>Export summary</button>
-            <button className="btn-ghost" onClick={() => exportCsv('detail')}>Export detail</button>
+            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('summary')}>Export summary</button>
+            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('detail')}>Export detail</button>
           </div>
         }
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Wallet float (all brands)" value={summary ? money(summary.wallet_float_cents) : '—'} />
-        <KpiCard label="Net movement (period)" value={summary ? money(summary.totals.net) : '—'} />
-        <KpiCard label="Entries (period)" value={summary ? summary.totals.entryCount : '—'} />
-        <KpiCard label="Uncaptured drift" value={uncaptured.length} />
+        <KpiTile label="Wallet float (all brands)" value={summary ? money(summary.wallet_float_cents) : '—'} />
+        <KpiTile label="Net movement (period)" value={summary ? money(summary.totals.net) : '—'} />
+        <KpiTile label="Entries (period)" value={summary ? summary.totals.entryCount : '—'} />
+        <KpiTile label="Uncaptured drift" value={uncaptured.length} />
       </div>
 
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
-      {notice && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-[13px] text-success">{notice}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
+      {notice && <div className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">{notice}</div>}
 
       {/* ── Drift: the actionable face of the reconciliation worker ────────── */}
       {drift.length > 0 && (
-        <div className="card mb-5 p-4">
-          <div className="mb-2 text-[14px] font-semibold">Reconciliation drift</div>
+        <div className={cardClass('mb-5 p-4')}>
+          <div className="mb-2 text-base font-semibold">Reconciliation drift</div>
           <div className="space-y-2">
             {drift.map((d) => (
-              <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-[13px]">
+              <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <span className={`pill mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-amber/40 bg-amber/10 text-amber'}`}>
+                  <span className={pillClass(`mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-warning/40 bg-warning/10 text-warning'}`)}>
                     {d.kind === 'shipped_not_captured' ? 'not captured' : 'stale export'}
                   </span>
-                  <span className="text-text">{d.brand_name}</span>
-                  <span className="ml-2 text-muted">{d.detail}</span>
-                  {d.at && <span className="ml-2 text-faint">{day(d.at)}</span>}
+                  <span className="text-content">{d.brand_name}</span>
+                  <span className="ml-2 text-content-muted">{d.detail}</span>
+                  {d.at && <span className="ml-2 text-content-faint">{day(d.at)}</span>}
                 </div>
                 {d.kind === 'shipped_not_captured' ? (
                   canHeal ? (
-                    <button className="btn" disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
+                    <button className={buttonClass('primary', 'md')} disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
                       {healing === d.order_id ? '…' : 'Re-run capture'}
                     </button>
                   ) : (
-                    <span className="text-[12px] text-faint">finance only</span>
+                    <span className="text-xs text-content-faint">finance only</span>
                   )
                 ) : (
                   // The heal for a stale export is a re-queue, which lives with ops.
-                  <span className="text-[12px] text-faint">re-send from Fulfillment Queue</span>
+                  <span className="text-xs text-content-faint">re-send from Fulfillment Queue</span>
                 )}
               </div>
             ))}
@@ -219,80 +293,43 @@ export function Ledger() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={setTab} />
         <div className="flex flex-wrap items-center gap-2">
-          <select className="input max-w-[180px]" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+          <select className={inputClass('max-w-[180px]')} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
             <option value="">All brands</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
           </select>
-          <input className="input w-[150px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input className="input w-[150px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <input className={inputClass('w-[150px]')} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <input className={inputClass('w-[150px]')} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
 
       {/* ── Per-brand period summary ──────────────────────────────────────── */}
       {summary && summary.brands.length > 0 && (
-        <div className="card mb-5 overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-              <tr>
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3 text-right">Opening</th>
-                <th className="px-4 py-3 text-right">Deposits</th>
-                <th className="px-4 py-3 text-right">Captures</th>
-                <th className="px-4 py-3 text-right">Credits</th>
-                <th className="px-4 py-3 text-right">Net</th>
-                <th className="px-4 py-3 text-right">Closing</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.brands.map((b) => (
-                <tr key={b.brandId} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-2.5">{b.brandName}</td>
-                  <td className="px-4 py-2.5 text-right text-muted">{money(b.openingBalance)}</td>
-                  <td className="px-4 py-2.5 text-right">{money(b.byType.deposit ?? 0)}</td>
-                  <td className="px-4 py-2.5 text-right">{money(b.byType.capture ?? 0)}</td>
-                  <td className="px-4 py-2.5 text-right">{money((b.byType.refund_credit ?? 0) + (b.byType.referral_credit ?? 0))}</td>
-                  <td className={`px-4 py-2.5 text-right ${b.net < 0 ? 'text-danger' : 'text-success'}`}>{money(b.net)}</td>
-                  <td className="px-4 py-2.5 text-right font-medium">{money(b.closingBalance)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mb-5">
+          <DataTable
+            caption="Per-brand wallet summary for the selected period"
+            mode="scroll"
+            columns={SUMMARY_COLUMNS}
+            rows={summary.brands}
+            rowKey={(b) => b.brandId}
+          />
         </div>
       )}
 
       {/* ── Entries ───────────────────────────────────────────────────────── */}
-      {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
-      ) : visible.length === 0 ? (
-        <EmptyState title="No wallet movement in this period" hint="Widen the date range or clear the filters." />
-      ) : (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-              <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3 text-right">Balance after</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((e) => (
-                <tr key={e.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-2.5 text-muted">{day(e.createdAt)}</td>
-                  <td className="px-4 py-2.5">{e.brandName}</td>
-                  <td className="px-4 py-2.5">{TYPE_LABEL[e.type]}</td>
-                  <td className="px-4 py-2.5 max-w-[280px] truncate text-muted" title={e.reason ?? ''}>{e.reason ?? '—'}</td>
-                  <td className={`px-4 py-2.5 text-right ${e.amount < 0 ? 'text-danger' : 'text-success'}`}>{money(e.amount)}</td>
-                  <td className="px-4 py-2.5 text-right text-muted">{money(e.balanceAfter)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Wallet ledger entries"
+        mode="scroll"
+        columns={ENTRY_COLUMNS}
+        rows={visible}
+        rowKey={(e) => e.id}
+        loading={loading}
+        empty={
+          <EmptyState
+            title="No wallet movement in this period"
+            hint="Widen the date range or clear the filters."
+          />
+        }
+      />
     </>
   );
 }

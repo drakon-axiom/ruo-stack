@@ -1,0 +1,7 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import '../src/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

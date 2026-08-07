@@ -2,7 +2,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, KpiCard, PageHeader, Tabs } from '../components/ui.js';
+import {
+  Button,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  KpiTile,
+  PageHeader,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  labelClass,
+  pillClass,
+  type Column,
+} from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -23,11 +38,11 @@ interface Brand { id: string; brand_name: string }
 type Tab = 'all' | 'draft' | 'scheduled' | 'live' | 'expired' | 'archived';
 
 const STATE_STYLE: Record<Announcement['display_state'], string> = {
-  draft: 'border-white/15 bg-white/5 text-muted',
-  scheduled: 'border-amber/40 bg-amber/10 text-amber',
+  draft: 'border-line bg-surface-3 text-content-muted',
+  scheduled: 'border-warning/40 bg-warning/10 text-warning',
   live: 'border-success/40 bg-success/10 text-success',
-  expired: 'border-white/15 bg-white/5 text-faint',
-  archived: 'border-white/15 bg-white/5 text-faint',
+  expired: 'border-line bg-surface-3 text-content-faint',
+  archived: 'border-line bg-surface-3 text-content-faint',
 };
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
@@ -92,22 +107,88 @@ export function Announcements() {
     }
   }
 
+  const columns: Column<Announcement>[] = [
+    {
+      key: 'title',
+      header: 'Title',
+      priority: 'primary',
+      minWidth: 220,
+      cell: (a) => (
+        <div>
+          <button
+            className="text-left font-medium text-content transition-colors duration-fast hover:text-accent"
+            onClick={() => setEditing(a)}
+          >
+            {a.title}
+          </button>
+          <div className="mt-0.5 line-clamp-1 text-xs text-content-muted">{a.body}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'audience',
+      header: 'Audience',
+      minWidth: 130,
+      cell: (a) => (a.audience === 'all_brands' ? 'All brands' : (a.brand_name ?? 'One brand')),
+    },
+    { key: 'type', header: 'Type', minWidth: 120, cell: (a) => announcementTypeLabel(a.type) },
+    {
+      key: 'state',
+      header: 'State',
+      minWidth: 110,
+      cell: (a) => <span className={pillClass(STATE_STYLE[a.display_state])}>{a.display_state}</span>,
+    },
+    { key: 'publish', header: 'Publish', minWidth: 140, cell: (a) => fmt(a.publish_at) },
+    { key: 'expires', header: 'Expires', minWidth: 140, cell: (a) => fmt(a.expires_at) },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      minWidth: 190,
+      cell: (a) =>
+        writable ? (
+          <div className="flex justify-end gap-2">
+            {a.status === 'draft' && (
+              <Button variant="ghost" size="sm" onClick={() => setStatus(a, 'published')}>
+                Publish
+              </Button>
+            )}
+            {a.status === 'published' && (
+              <Button variant="ghost" size="sm" onClick={() => setStatus(a, 'archived')}>
+                Archive
+              </Button>
+            )}
+            {a.status === 'archived' && (
+              <Button variant="ghost" size="sm" onClick={() => setStatus(a, 'published')}>
+                Restore
+              </Button>
+            )}
+            {a.status === 'draft' && (
+              <Button variant="danger" size="sm" onClick={() => remove(a)}>
+                Delete
+              </Button>
+            )}
+          </div>
+        ) : null,
+    },
+  ];
+
   return (
     <>
       <PageHeader
         title="Announcements"
         subtitle="Broadcasts that appear in every brand's Notifications inbox."
-        action={writable ? <button className="btn" onClick={() => setEditing('new')}>Compose</button> : undefined}
+        action={writable ? <button className={buttonClass('primary', 'md')} onClick={() => setEditing('new')}>Compose</button> : undefined}
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Live now" value={counts.live ?? 0} />
-        <KpiCard label="Scheduled" value={counts.scheduled ?? 0} />
-        <KpiCard label="Drafts" value={counts.draft ?? 0} />
-        <KpiCard label="Total" value={rows.length} />
+        <KpiTile label="Live now" value={counts.live ?? 0} />
+        <KpiTile label="Scheduled" value={counts.scheduled ?? 0} />
+        <KpiTile label="Drafts" value={counts.draft ?? 0} />
+        <KpiTile label="Total" value={rows.length} />
       </div>
 
-      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs<Tab>
@@ -122,57 +203,24 @@ export function Announcements() {
             { key: 'archived', label: 'Archived', count: counts.archived ?? 0 },
           ]}
         />
-        <input className="input max-w-xs" placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className={inputClass('max-w-xs')} placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       {loading ? (
-        <div className="card p-10 text-center text-muted">Loading…</div>
+        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
       ) : visible.length === 0 ? (
         <EmptyState
           title={rows.length === 0 ? 'No announcements yet' : 'Nothing matches that filter'}
           hint={rows.length === 0 ? 'Compose one to broadcast it to every brand’s inbox.' : undefined}
         />
       ) : (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-              <tr>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Audience</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">State</th>
-                <th className="px-4 py-3">Publish</th>
-                <th className="px-4 py-3">Expires</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((a) => (
-                <tr key={a.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-3">
-                    <button className="text-left font-medium text-text hover:text-teal" onClick={() => setEditing(a)}>{a.title}</button>
-                    <div className="mt-0.5 line-clamp-1 text-[12px] text-muted">{a.body}</div>
-                  </td>
-                  <td className="px-4 py-3 text-muted">{a.audience === 'all_brands' ? 'All brands' : (a.brand_name ?? 'One brand')}</td>
-                  <td className="px-4 py-3 text-muted">{announcementTypeLabel(a.type)}</td>
-                  <td className="px-4 py-3"><span className={`pill ${STATE_STYLE[a.display_state]}`}>{a.display_state}</span></td>
-                  <td className="px-4 py-3 text-muted">{fmt(a.publish_at)}</td>
-                  <td className="px-4 py-3 text-muted">{fmt(a.expires_at)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {writable && (
-                      <div className="flex justify-end gap-2">
-                        {a.status === 'draft' && <button className="btn-ghost" onClick={() => setStatus(a, 'published')}>Publish</button>}
-                        {a.status === 'published' && <button className="btn-ghost" onClick={() => setStatus(a, 'archived')}>Archive</button>}
-                        {a.status === 'archived' && <button className="btn-ghost" onClick={() => setStatus(a, 'published')}>Restore</button>}
-                        {a.status === 'draft' && <button className="btn-danger" onClick={() => remove(a)}>Delete</button>}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          caption="Announcements and their publication state"
+          mode="scroll"
+          columns={columns}
+          rows={visible}
+          rowKey={(a) => a.id}
+        />
       )}
 
       {editing && (
@@ -246,22 +294,22 @@ function Compose({
     <Drawer
       open
       title={existing ? 'Edit announcement' : 'Compose announcement'}
-      onClose={onClose}
+      onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={() => save(false)} disabled={busy || !title || !body}>
+          <button className={buttonClass('ghost', 'md', 'flex-1')} onClick={() => save(false)} disabled={busy || !title || !body}>
             {busy ? '…' : 'Save draft'}
           </button>
-          <button className="btn flex-1" onClick={() => save(true)} disabled={busy || !title || !body || (audience === 'single_brand' && !brandId)}>
+          <button className={buttonClass('primary', 'md', 'flex-1')} onClick={() => save(true)} disabled={busy || !title || !body || (audience === 'single_brand' && !brandId)}>
             {busy ? '…' : scheduled ? 'Schedule' : 'Publish now'}
           </button>
         </div>
       }
     >
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <Field label="Audience">
-        <select className="input" value={audience} onChange={(e) => setAudience(e.target.value as 'all_brands' | 'single_brand')}>
+        <select className={inputClass()} value={audience} onChange={(e) => setAudience(e.target.value as 'all_brands' | 'single_brand')}>
           <option value="all_brands">All brands</option>
           <option value="single_brand">A single brand</option>
         </select>
@@ -269,7 +317,7 @@ function Compose({
 
       {audience === 'single_brand' && (
         <Field label="Brand">
-          <select className="input" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+          <select className={inputClass()} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
             <option value="">Select a brand…</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
           </select>
@@ -277,35 +325,35 @@ function Compose({
       )}
 
       <Field label="Type">
-        <select className="input" value={type} onChange={(e) => setType(e.target.value as AnnouncementType)}>
+        <select className={inputClass()} value={type} onChange={(e) => setType(e.target.value as AnnouncementType)}>
           {ANNOUNCEMENT_TYPES.map((t) => <option key={t} value={t}>{announcementTypeLabel(t)}</option>)}
         </select>
       </Field>
 
-      <Field label="Title"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
-      <Field label="Body"><textarea className="input min-h-[120px]" value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
+      <Field label="Title"><input className={inputClass()} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
+      <Field label="Body"><textarea className={inputClass('min-h-[120px]')} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Publish at (blank = now)">
-          <input className="input" type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+          <input className={inputClass()} type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
         </Field>
         <Field label="Expires at (blank = never)">
-          <input className="input" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+          <input className={inputClass()} type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         </Field>
       </div>
 
       {/* §1.3: "preview as it appears in the brand Notifications inbox" */}
       <div className="mt-4">
-        <div className="label mb-1.5">Preview — as the brand sees it</div>
-        <div className="rounded-xl border border-line bg-bg p-3">
+        <div className={labelClass('mb-1.5')}>Preview — as the brand sees it</div>
+        <div className="rounded-xl border border-line bg-canvas p-3">
           <div className="flex items-start gap-2.5">
-            <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-teal/15 text-[13px]">
+            <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent/15 text-sm">
               {type === 'restock' ? '📦' : type === 'maintenance' ? '🛠' : '📣'}
             </span>
             <div className="min-w-0">
-              <div className="text-[13.5px] font-semibold text-text">{title || 'Untitled announcement'}</div>
-              <div className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-muted">{body || 'Body text appears here.'}</div>
-              <div className="mt-1 text-[11px] text-faint">
+              <div className="text-sm font-semibold text-content">{title || 'Untitled announcement'}</div>
+              <div className="mt-0.5 whitespace-pre-wrap text-xs text-content-muted">{body || 'Body text appears here.'}</div>
+              <div className="mt-1 text-2xs text-content-faint">
                 {scheduled ? `Scheduled for ${new Date(publishAt).toLocaleString()}` : 'Just now'}
               </div>
             </div>

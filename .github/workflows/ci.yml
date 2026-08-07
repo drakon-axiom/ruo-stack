@@ -41,12 +41,39 @@ jobs:
       - name: Payments-isolation guard
         run: pnpm lint:stripe-guard
 
+      # Design tokens must meet WCAG AA in both themes. Reads the hex values
+      # straight out of packages/ui/src/tokens.css, so it cannot drift.
+      - name: Token contrast gate
+        run: pnpm lint:contrast
+
+      # No screen may reference a class from the deleted @layer components
+      # blocks -- such elements render with no styling and nothing else catches it.
+      - name: Legacy-class gate
+        run: pnpm lint:legacy-classes
+
       - name: Generate Prisma client
         run: pnpm db:generate
 
       - run: pnpm typecheck
 
       - run: pnpm -r test
+
+  # Drives the @ruostack/ui component harness: every app screen is behind auth,
+  # so a browser hitting the real app reaches only the login page and exercises
+  # none of the shell or table behaviour this guards.
+  responsive:
+    name: Responsive regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
 
   # The integration suites self-skip without RUN_DB_TESTS=1. Run them against a
   # throwaway Postgres so migrations, the audit trigger and the RLS/hook spine

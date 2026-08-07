@@ -2,7 +2,21 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Drawer, EmptyState, Field, PageHeader, Tabs } from '../components/ui.js';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  PageHeader,
+  Plus,
+  Tabs,
+  buttonClass,
+  cardClass,
+  inputClass,
+  type Column,
+} from '@ruostack/ui';
 
 interface Box {
   id: string;
@@ -49,12 +63,91 @@ export function ShippingRules() {
   async function toggleSvc(s: Service) { await api(`/api/admin/shipping/services/${s.id}`, { method: 'PATCH', body: { enabled: !s.enabled } }); load(); }
   async function delSvc(s: Service) { if (confirm(`Delete service "${s.displayLabel}"?`)) { await api(`/api/admin/shipping/services/${s.id}`, { method: 'DELETE' }); load(); } }
 
+  const rowActions = (
+    enabled: boolean,
+    onToggle: () => void,
+    onEdit: () => void,
+    onDelete: () => void,
+  ) =>
+    writable ? (
+      <span className="flex justify-end gap-1.5">
+        <Button variant="ghost" size="sm" onClick={onToggle}>
+          {enabled ? 'Disable' : 'Enable'}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onEdit}>
+          Edit
+        </Button>
+        <Button variant="danger" size="sm" onClick={onDelete}>
+          Delete
+        </Button>
+      </span>
+    ) : null;
+
+  const enabledPill = (enabled: boolean) => (
+    <Badge tone={enabled ? 'success' : 'neutral'}>{enabled ? 'enabled' : 'disabled'}</Badge>
+  );
+
+  const boxColumns: Column<Box>[] = [
+    { key: 'name', header: 'Name', priority: 'primary', minWidth: 150, cell: (b) => b.name },
+    {
+      key: 'dims',
+      header: 'Inner L\u00d7W\u00d7H (in)',
+      minWidth: 150,
+      cell: (b) => `${b.innerLengthIn} \u00d7 ${b.innerWidthIn} \u00d7 ${b.innerHeightIn}`,
+    },
+    { key: 'maxwt', header: 'Max wt (oz)', align: 'right', mono: true, minWidth: 110, cell: (b) => b.maxWeightOz },
+    { key: 'tare', header: 'Tare (oz)', align: 'right', mono: true, minWidth: 100, cell: (b) => b.tareOz },
+    { key: 'status', header: 'Status', minWidth: 110, cell: (b) => enabledPill(b.enabled) },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      minWidth: 230,
+      cell: (b) => rowActions(b.enabled, () => toggleBox(b), () => setEditBox(b), () => delBox(b)),
+    },
+  ];
+
+  const svcColumns: Column<Service>[] = [
+    {
+      key: 'tier',
+      header: 'Tier',
+      priority: 'primary',
+      minWidth: 110,
+      cell: (x) => <span className="capitalize">{x.tier}</span>,
+    },
+    { key: 'code', header: 'Service code', mono: true, minWidth: 170, cell: (x) => x.carrierServiceCode },
+    { key: 'label', header: 'Display label', minWidth: 160, cell: (x) => x.displayLabel },
+    { key: 'transit', header: 'Transit', minWidth: 110, cell: (x) => x.transitEstimate },
+    { key: 'maxwt', header: 'Max wt', align: 'right', mono: true, minWidth: 90, cell: (x) => x.maxWeightOz },
+    { key: 'policy', header: 'Policy', minWidth: 120, cell: (x) => x.selectionPolicy },
+    { key: 'status', header: 'Status', minWidth: 110, cell: (x) => enabledPill(x.enabled) },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      minWidth: 230,
+      cell: (x) => rowActions(x.enabled, () => toggleSvc(x), () => setEditSvc(x), () => delSvc(x)),
+    },
+  ];
+
   return (
     <>
       <PageHeader
         title="Shipping Rules"
         subtitle="Box catalog + carrier service mappings for the fulfillment rules engine. Changes take effect at the next rate quote."
-        action={writable ? (tab === 'boxes' ? <button className="btn" onClick={() => setEditBox('new')}>+ Box</button> : <button className="btn" onClick={() => setEditSvc('new')}>+ Service</button>) : undefined}
+        action={
+          writable ? (
+            tab === 'boxes' ? (
+              <Button icon={Plus} onClick={() => setEditBox('new')}>
+                Box
+              </Button>
+            ) : (
+              <Button icon={Plus} onClick={() => setEditSvc('new')}>
+                Service
+              </Button>
+            )
+          ) : undefined
+        }
       />
 
       <div className="mb-3">
@@ -62,61 +155,23 @@ export function ShippingRules() {
       </div>
 
       {tab === 'boxes' ? (
-        boxes.length === 0 ? <EmptyState title="No boxes" hint="Add a box for the rules engine." /> : (
-          <div className="card overflow-hidden">
-            <table className="w-full text-[13px]">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-                <th className="px-4 py-3">Name</th><th className="px-4 py-3">Inner L×W×H (in)</th><th className="px-4 py-3">Max wt (oz)</th><th className="px-4 py-3">Tare (oz)</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right"></th>
-              </tr></thead>
-              <tbody>
-                {boxes.map((b) => (
-                  <tr key={b.id} className="border-b border-line/60">
-                    <td className="px-4 py-3 text-text">{b.name}</td>
-                    <td className="px-4 py-3 text-muted">{b.innerLengthIn} × {b.innerWidthIn} × {b.innerHeightIn}</td>
-                    <td className="px-4 py-3">{b.maxWeightOz}</td>
-                    <td className="px-4 py-3 text-muted">{b.tareOz}</td>
-                    <td className="px-4 py-3"><span className={`pill ${b.enabled ? 'border-success/40 bg-success/10 text-success' : 'border-line2 bg-card2 text-muted'}`}>{b.enabled ? 'enabled' : 'disabled'}</span></td>
-                    <td className="px-4 py-3 text-right">
-                      {writable && <span className="flex justify-end gap-1.5">
-                        <button className="btn-ghost text-[12px]" onClick={() => toggleBox(b)}>{b.enabled ? 'Disable' : 'Enable'}</button>
-                        <button className="btn-ghost text-[12px]" onClick={() => setEditBox(b)}>Edit</button>
-                        <button className="btn-ghost text-[12px] text-danger" onClick={() => delBox(b)}>Delete</button>
-                      </span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      ) : services.length === 0 ? <EmptyState title="No services" hint="Map carrier services to tiers." /> : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-              <th className="px-4 py-3">Tier</th><th className="px-4 py-3">Service code</th><th className="px-4 py-3">Display label</th><th className="px-4 py-3">Transit</th><th className="px-4 py-3">Max wt</th><th className="px-4 py-3">Policy</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right"></th>
-            </tr></thead>
-            <tbody>
-              {services.map((s) => (
-                <tr key={s.id} className="border-b border-line/60">
-                  <td className="px-4 py-3 text-text capitalize">{s.tier}</td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-muted">{s.carrierServiceCode}</td>
-                  <td className="px-4 py-3">{s.displayLabel}</td>
-                  <td className="px-4 py-3 text-muted">{s.transitEstimate}</td>
-                  <td className="px-4 py-3 text-muted">{s.maxWeightOz}</td>
-                  <td className="px-4 py-3 text-muted">{s.selectionPolicy}</td>
-                  <td className="px-4 py-3"><span className={`pill ${s.enabled ? 'border-success/40 bg-success/10 text-success' : 'border-line2 bg-card2 text-muted'}`}>{s.enabled ? 'enabled' : 'disabled'}</span></td>
-                  <td className="px-4 py-3 text-right">
-                    {writable && <span className="flex justify-end gap-1.5">
-                      <button className="btn-ghost text-[12px]" onClick={() => toggleSvc(s)}>{s.enabled ? 'Disable' : 'Enable'}</button>
-                      <button className="btn-ghost text-[12px]" onClick={() => setEditSvc(s)}>Edit</button>
-                      <button className="btn-ghost text-[12px] text-danger" onClick={() => delSvc(s)}>Delete</button>
-                    </span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          caption="Box catalog for the fulfillment rules engine"
+          mode="scroll"
+          columns={boxColumns}
+          rows={boxes}
+          rowKey={(b) => b.id}
+          empty={<EmptyState title="No boxes" hint="Add a box for the rules engine." />}
+        />
+      ) : (
+        <DataTable
+          caption="Carrier service mappings"
+          mode="scroll"
+          columns={svcColumns}
+          rows={services}
+          rowKey={(x) => x.id}
+          empty={<EmptyState title="No services" hint="Map carrier services to tiers." />}
+        />
       )}
 
       {editBox && <BoxDrawer box={editBox === 'new' ? null : editBox} onClose={() => setEditBox(null)} onSaved={() => { setEditBox(null); load(); }} />}
@@ -148,18 +203,18 @@ function BoxDrawer({ box, onClose, onSaved }: { box: Box | null; onClose: () => 
   const valid = f.name && num(f.inner_length_in) > 0 && num(f.inner_width_in) > 0 && num(f.inner_height_in) > 0 && num(f.max_weight_oz) > 0;
 
   return (
-    <Drawer open title={box ? 'Edit box' : 'New box'} onClose={onClose} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
-      <Field label="Name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="Length (in)"><input className="input" value={f.inner_length_in} onChange={(e) => setF({ ...f, inner_length_in: e.target.value })} /></Field>
-        <Field label="Width (in)"><input className="input" value={f.inner_width_in} onChange={(e) => setF({ ...f, inner_width_in: e.target.value })} /></Field>
-        <Field label="Height (in)"><input className="input" value={f.inner_height_in} onChange={(e) => setF({ ...f, inner_height_in: e.target.value })} /></Field>
+    <Drawer open title={box ? 'Edit box' : 'New box'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
+      <Field label="Name"><input className={inputClass()} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <Field label="Length (in)"><input className={inputClass()} value={f.inner_length_in} onChange={(e) => setF({ ...f, inner_length_in: e.target.value })} /></Field>
+        <Field label="Width (in)"><input className={inputClass()} value={f.inner_width_in} onChange={(e) => setF({ ...f, inner_width_in: e.target.value })} /></Field>
+        <Field label="Height (in)"><input className={inputClass()} value={f.inner_height_in} onChange={(e) => setF({ ...f, inner_height_in: e.target.value })} /></Field>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="Max wt (oz)"><input className="input" value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
-        <Field label="Tare (oz)"><input className="input" value={f.tare_oz} onChange={(e) => setF({ ...f, tare_oz: e.target.value })} /></Field>
-        <Field label="Sort"><input className="input" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <Field label="Max wt (oz)"><input className={inputClass()} value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
+        <Field label="Tare (oz)"><input className={inputClass()} value={f.tare_oz} onChange={(e) => setF({ ...f, tare_oz: e.target.value })} /></Field>
+        <Field label="Sort"><input className={inputClass()} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
       </div>
     </Drawer>
   );
@@ -185,20 +240,20 @@ function ServiceDrawer({ svc, onClose, onSaved }: { svc: Service | null; onClose
   const valid = f.carrier_service_code && f.display_label && f.transit_estimate && num(f.max_weight_oz) > 0;
 
   return (
-    <Drawer open title={svc ? 'Edit service' : 'New service'} onClose={onClose} footer={<button className="btn w-full" disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
-      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</div>}
+    <Drawer open title={svc ? 'Edit service' : 'New service'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Tier">
-        <select className="input" value={f.tier} onChange={(e) => setF({ ...f, tier: e.target.value })}>
+        <select className={inputClass()} value={f.tier} onChange={(e) => setF({ ...f, tier: e.target.value })}>
           <option value="economy">Economy</option><option value="standard">Standard</option><option value="expedited">Expedited</option>
         </select>
       </Field>
-      <Field label="Carrier service code"><input className="input font-mono text-[12px]" placeholder="usps_ground_advantage" value={f.carrier_service_code} onChange={(e) => setF({ ...f, carrier_service_code: e.target.value })} /></Field>
-      <Field label="Display label"><input className="input" placeholder="USPS Ground Advantage" value={f.display_label} onChange={(e) => setF({ ...f, display_label: e.target.value })} /></Field>
-      <Field label="Transit estimate"><input className="input" placeholder="2–5 business days" value={f.transit_estimate} onChange={(e) => setF({ ...f, transit_estimate: e.target.value })} /></Field>
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="Max wt (oz)"><input className="input" value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
-        <Field label="Policy"><select className="input" value={f.selection_policy} onChange={(e) => setF({ ...f, selection_policy: e.target.value })}><option value="cheapest">cheapest</option><option value="fixed">fixed</option></select></Field>
-        <Field label="Sort"><input className="input" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
+      <Field label="Carrier service code"><input className={inputClass('font-mono text-xs')} placeholder="usps_ground_advantage" value={f.carrier_service_code} onChange={(e) => setF({ ...f, carrier_service_code: e.target.value })} /></Field>
+      <Field label="Display label"><input className={inputClass()} placeholder="USPS Ground Advantage" value={f.display_label} onChange={(e) => setF({ ...f, display_label: e.target.value })} /></Field>
+      <Field label="Transit estimate"><input className={inputClass()} placeholder="2–5 business days" value={f.transit_estimate} onChange={(e) => setF({ ...f, transit_estimate: e.target.value })} /></Field>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <Field label="Max wt (oz)"><input className={inputClass()} value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
+        <Field label="Policy"><select className={inputClass()} value={f.selection_policy} onChange={(e) => setF({ ...f, selection_policy: e.target.value })}><option value="cheapest">cheapest</option><option value="fixed">fixed</option></select></Field>
+        <Field label="Sort"><input className={inputClass()} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
       </div>
     </Drawer>
   );

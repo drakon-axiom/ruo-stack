@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-
+import { Badge, DataTable, EmptyState, PageHeader, type Column } from '@ruostack/ui';
 import { api } from '../lib/api.js';
 
 interface Order {
@@ -20,6 +20,38 @@ function trackingUrl(carrier: string | null, tracking: string): string | null {
   return null;
 }
 
+const COLUMNS: Column<Order>[] = [
+  { key: 'recipient', header: 'Recipient', priority: 'primary', cell: (o) => o.recipient.name },
+  {
+    key: 'where',
+    header: 'Destination',
+    priority: 'meta',
+    cell: (o) => `${o.recipient.city}, ${o.recipient.state}`,
+  },
+  { key: 'carrier', header: 'Carrier', cell: (o) => o.carrier ?? '—' },
+  {
+    key: 'tracking',
+    header: 'Tracking',
+    mono: true,
+    cell: (o) => {
+      if (!o.tracking_number) return '—';
+      const url = trackingUrl(o.carrier, o.tracking_number);
+      return url ? (
+        <a className="text-accent hover:underline" href={url} target="_blank" rel="noreferrer">
+          {o.tracking_number}
+        </a>
+      ) : (
+        o.tracking_number
+      );
+    },
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (o) => <Badge tone={o.status === 'delivered' ? 'success' : 'accent'}>{o.status}</Badge>,
+  },
+];
+
 export function Tracking() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,48 +65,16 @@ export function Tracking() {
 
   return (
     <>
-      <h1 className="mb-1 text-[23px] font-bold">Tracking</h1>
-      <p className="mb-5 text-[13px] text-muted">Shipments and their carrier tracking.</p>
+      <PageHeader title="Tracking" subtitle="Shipments and their carrier tracking." />
 
-      {loading ? (
-        <div className="surface p-10 text-center text-muted">Loading…</div>
-      ) : orders.length === 0 ? (
-        <div className="surface p-10 text-center text-muted">No shipments yet.</div>
-      ) : (
-        <div className="surface overflow-hidden">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-lline text-left text-[11px] uppercase tracking-wide text-faint dark:border-line">
-                <th className="px-4 py-3">Recipient</th>
-                <th className="px-4 py-3">Carrier</th>
-                <th className="px-4 py-3">Tracking</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o) => {
-                const url = o.tracking_number ? trackingUrl(o.carrier, o.tracking_number) : null;
-                return (
-                  <tr key={o.id} className="border-b border-lline/60 dark:border-line/60">
-                    <td className="px-4 py-3 font-medium">{o.recipient.name}<span className="text-muted"> · {o.recipient.city}, {o.recipient.state}</span></td>
-                    <td className="px-4 py-3 text-muted">{o.carrier ?? '—'}</td>
-                    <td className="px-4 py-3 font-mono text-[12px]">
-                      {o.tracking_number
-                        ? url
-                          ? <a className="text-teal hover:underline" href={url} target="_blank" rel="noreferrer">{o.tracking_number}</a>
-                          : o.tracking_number
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`pill ${o.status === 'delivered' ? 'border-success/40 bg-success/10 text-success' : 'border-teal/40 bg-teal/10 text-teal'}`}>{o.status}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Shipments and their carrier tracking numbers"
+        columns={COLUMNS}
+        rows={orders}
+        rowKey={(o) => o.id}
+        loading={loading}
+        empty={<EmptyState title="No shipments yet" hint="Shipped orders appear here with tracking." />}
+      />
     </>
   );
 }

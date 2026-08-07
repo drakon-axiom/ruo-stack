@@ -15,7 +15,7 @@ import { Overview } from './screens/Overview.js';
 import { Brands } from './screens/Brands.js';
 import { Announcements } from './screens/Announcements.js';
 import { Ledger } from './screens/Ledger.js';
-import { EmptyState, PageHeader } from './components/ui.js';
+import { EmptyState, PageHeader } from '@ruostack/ui';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { claims } = useAuth();
