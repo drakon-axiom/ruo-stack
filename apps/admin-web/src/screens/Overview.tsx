@@ -27,13 +27,13 @@ export function Overview() {
     <>
       <PageHeader title="Overview" subtitle="Platform health at a glance." />
 
-      <div className="mb-4 grid grid-cols-4 gap-3">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiTile label="Brands" value={d.brands.total} />
         <KpiTile label="Orders today" value={d.orders.today} />
         <KpiTile label="Captured GMV" value={dollars(d.money.captured_gmv_cents)} />
         <KpiTile label="Wallet float" value={dollars(d.money.wallet_float_cents)} />
       </div>
-      <div className="mb-4 grid grid-cols-4 gap-3">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiTile label="Ready to ship" value={d.orders.ready} />
         <KpiTile label="Shipped" value={d.orders.shipped} />
         <KpiTile label="Action required" value={<span className={d.orders.action_required ? 'text-warning' : ''}>{d.orders.action_required}</span>} />

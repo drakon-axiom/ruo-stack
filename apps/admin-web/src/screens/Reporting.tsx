@@ -62,7 +62,7 @@ export function Reporting() {
 
       {!r ? <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div> : (
         <div className="space-y-5">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiTile label="Shipping margin" value={dollars(r.shipping.margin_cents)} />
             <KpiTile label="Fallback rate" value={pct(r.fallback.share)} />
             <KpiTile label="Captured GMV" value={dollars(r.money.captured_cents)} />

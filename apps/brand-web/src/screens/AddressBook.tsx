@@ -171,7 +171,7 @@ function AddressModal({ address, onClose, onSaved }: { address: Address | null; 
           <input className={inputClass()} placeholder="Phone (optional)" value={f.recipient_phone} onChange={(e) => set({ recipient_phone: e.target.value })} />
           <input className={inputClass()} placeholder="Address line 1" value={f.address1} onChange={(e) => set({ address1: e.target.value })} />
           <input className={inputClass()} placeholder="Address line 2 (optional)" value={f.address2} onChange={(e) => set({ address2: e.target.value })} />
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input className={inputClass()} placeholder="City" value={f.city} onChange={(e) => set({ city: e.target.value })} />
             <input className={inputClass()} placeholder="State" value={f.state} onChange={(e) => set({ state: e.target.value })} />
             <input className={inputClass()} placeholder="ZIP" value={f.zip} onChange={(e) => set({ zip: e.target.value })} />

@@ -169,7 +169,7 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
           </div>
 
           <div className={cardClass('p-3')}>
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
               <div><div className="text-xl font-extrabold text-accent">{dollars(d.wallet.available_cents)}</div><div className="text-2xs text-content-faint">available</div></div>
               <div><div className="text-xl font-extrabold">{dollars(d.wallet.held_cents)}</div><div className="text-2xs text-content-faint">held</div></div>
               <div><div className="text-xl font-extrabold">{dollars(d.wallet.balance_cents)}</div><div className="text-2xs text-content-faint">balance</div></div>

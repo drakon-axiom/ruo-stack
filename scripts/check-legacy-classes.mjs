@@ -37,6 +37,8 @@ function* walk(dir) {
 }
 
 let hits = 0;
+let grids = 0;
+
 for (const root of ROOTS) {
   for (const file of walk(root)) {
     const src = readFileSync(file, 'utf8');
@@ -45,20 +47,30 @@ for (const root of ROOTS) {
       // interpolation are checked for their static parts too.
       for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
         const value = m[1] ?? m[2] ?? '';
+
         for (const token of value.split(/[\s${}]+/)) {
           if (LEGACY.has(token)) {
             console.log(`${file}:${i + 1}  ${token}`);
             hits++;
           }
         }
+
+        // A 3+ column grid with no breakpoint squashes its cells on a phone.
+        // It does not overflow, so the Playwright gate cannot see it.
+        if (/\bgrid-cols-([3-9]|1[0-2])\b/.test(value) && !/\b(sm|md|lg|xl):grid-cols-/.test(value)) {
+          console.log(`${file}:${i + 1}  non-responsive grid: ${value.trim().slice(0, 60)}`);
+          grids++;
+        }
       }
     });
   }
 }
 
-console.log(
-  hits === 0
-    ? '\nNo legacy component classes remain.\n'
-    : `\n${hits} legacy class reference(s) still present — these render unstyled.\n`,
-);
-process.exit(hits === 0 ? 0 : 1);
+if (hits === 0 && grids === 0) {
+  console.log('\nNo legacy component classes or non-responsive grids remain.\n');
+} else {
+  if (hits) console.log(`\n${hits} legacy class reference(s) — these render unstyled.`);
+  if (grids) console.log(`${grids} non-responsive grid(s) — add a breakpoint variant.`);
+  console.log('');
+}
+process.exit(hits === 0 && grids === 0 ? 0 : 1);

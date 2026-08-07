@@ -41,7 +41,7 @@ export function Referrals() {
         Invite other brands to RUOStack. Share your link — when they sign up and upgrade, you earn wallet credit.
       </p>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className={cardClass('p-4')}>
           <div className="text-3xl font-extrabold">{data ? data.invited : '—'}</div>
           <div className="text-xs text-content-muted">Brands invited</div>

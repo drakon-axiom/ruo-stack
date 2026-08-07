@@ -156,7 +156,7 @@ export function Catalog() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-4 gap-3">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiTile label="Total SKUs" value={counts.all} />
         <KpiTile label="In stock" value={counts.in_stock} />
         <KpiTile label="Soon" value={counts.soon} />
@@ -412,7 +412,7 @@ function EditDrawer({
         <input className={inputClass()} value={name} disabled={!writable} onChange={(e) => setName(e.target.value)} />
       </Field>
       <div className="mb-1 mt-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Wholesale cost by plan ($)</div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Starter">
           <input className={inputClass()} value={costS} disabled={!writable} onChange={(e) => setCostS(e.target.value)} />
         </Field>
@@ -504,7 +504,7 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         <input className={inputClass()} value={compound} onChange={(e) => setCompound(e.target.value)} />
       </Field>
       <div className="mb-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Wholesale cost by plan ($)</div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Starter">
           <input className={inputClass()} value={costS} onChange={(e) => setCostS(e.target.value)} />
         </Field>

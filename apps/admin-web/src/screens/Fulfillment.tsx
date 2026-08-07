@@ -341,7 +341,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
             <input className={inputClass()} placeholder="Phone (optional)" value={r.recipient_phone} onChange={(e) => setR({ ...r, recipient_phone: e.target.value })} />
             <input className={inputClass()} placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
             <input className={inputClass()} placeholder="Address line 2 (optional)" value={r.address2} onChange={(e) => setR({ ...r, address2: e.target.value })} />
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input className={inputClass()} placeholder="City" value={r.city} onChange={(e) => setR({ ...r, city: e.target.value })} />
               <input className={inputClass()} placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
               <input className={inputClass()} placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />

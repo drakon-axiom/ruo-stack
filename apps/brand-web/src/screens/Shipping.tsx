@@ -44,7 +44,7 @@ export function Shipping() {
         We fulfill every order under your label. Here's your carrier, what's included, and how it works.
       </p>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className={cardClass('p-4')}>
           <div className="text-3xl font-extrabold">{orders ? shippedThisMonth : '—'}</div>
           <div className="text-xs text-content-muted">Shipped this month</div>
