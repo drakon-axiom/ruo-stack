@@ -84,8 +84,8 @@ export function Team() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-base font-medium">{m.full_name ?? m.email ?? 'Unknown'}</span>
-                  {m.is_you && <span className={pillClass('border-white/15 bg-white/5 text-content-muted')}>you</span>}
-                  <span className={pillClass(`${m.role === 'owner' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-white/15 bg-white/5 text-content-muted'}`)}>
+                  {m.is_you && <span className={pillClass('border-line bg-surface-3 text-content-muted')}>you</span>}
+                  <span className={pillClass(`${m.role === 'owner' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-line bg-surface-3 text-content-muted'}`)}>
                     {brandRoleLabel(m.role)}
                   </span>
                   {m.status === 'suspended' ? (

@@ -23,6 +23,7 @@ export default {
         'surface-1': v('--surface-1'),
         'surface-2': v('--surface-2'),
         'surface-3': v('--surface-3'),
+        field: v('--field'),
         line: {
           subtle: v('--border-subtle'),
           DEFAULT: v('--border-default'),

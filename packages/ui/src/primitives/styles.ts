@@ -21,8 +21,8 @@ export function cardClass(className?: string): string {
 /** Text input / select / textarea. Matches <Input>. */
 export function inputClass(className?: string): string {
   return cn(
-    'min-h-11 w-full rounded-[10px] border border-line bg-surface-1 px-3 text-base text-content',
-    'placeholder:text-content-faint transition-colors duration-fast',
+    'min-h-11 w-full rounded-[10px] border border-line bg-field px-3 text-base text-content',
+    'placeholder:text-content-muted transition-colors duration-fast',
     'focus:border-accent md:min-h-0 md:py-2 md:text-sm',
     className,
   );

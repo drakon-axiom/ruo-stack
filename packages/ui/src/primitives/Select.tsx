@@ -28,7 +28,7 @@ export function Select({
         id={id}
         className={cn(
           'inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-[10px]',
-          'border border-line bg-surface-1 px-3 text-base text-content md:min-h-0 md:py-2 md:text-sm',
+          'border border-line bg-field px-3 text-base text-content md:min-h-0 md:py-2 md:text-sm',
           className,
         )}
       >

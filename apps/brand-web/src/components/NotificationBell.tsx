@@ -130,7 +130,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-[340px] overflow-hidden rounded-xl border border-line bg-white shadow-2xl dark:border-line dark:bg-surface-1">
+        <div className="absolute right-0 z-40 mt-2 w-[340px] overflow-hidden rounded-xl border border-line bg-surface-2 shadow-e3">
           <div className="flex items-center justify-between border-b border-line px-3.5 py-2.5 dark:border-line">
             <span className="text-sm font-semibold">Notifications</span>
             {unread > 0 && <button className="text-xs text-accent hover:underline" onClick={markAll}>Mark all read</button>}
@@ -146,7 +146,7 @@ export function NotificationBell() {
                 <button
                   key={n.id}
                   onClick={() => openItem(n)}
-                  className={`flex w-full items-start gap-2.5 border-b border-line/60 px-3.5 py-2.5 text-left last:border-0 hover:bg-slate-50 dark:border-line/60 dark:hover:bg-surface-1 ${
+                  className={`flex w-full items-start gap-2.5 border-b border-line/60 px-3.5 py-2.5 text-left last:border-0 hover:bg-surface-3 ${
                     n.read_at ? '' : 'bg-accent/[0.06]'
                   }`}
                 >
@@ -154,7 +154,7 @@ export function NotificationBell() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
                       {!n.read_at && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
-                      <span className={`truncate text-sm ${n.read_at ? 'text-slate-600 dark:text-content-muted' : 'font-semibold'}`}>{n.title}</span>
+                      <span className={`truncate text-sm ${n.read_at ? 'text-content-muted' : 'font-semibold'}`}>{n.title}</span>
                     </span>
                     <span className="mt-0.5 line-clamp-2 block text-xs text-content-muted">{n.body}</span>
                     <span className="mt-0.5 block text-2xs text-content-faint">{relativeTime(n.published_at)}</span>
@@ -165,7 +165,7 @@ export function NotificationBell() {
           </div>
 
           <button
-            className="w-full border-t border-line px-3.5 py-2.5 text-xs text-accent hover:bg-slate-50 dark:border-line dark:hover:bg-surface-1"
+            className="w-full border-t border-line px-3.5 py-2.5 text-xs text-accent hover:bg-surface-3"
             onClick={() => { setOpen(false); navigate('/app/notifications'); }}
           >
             View all

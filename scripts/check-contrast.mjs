@@ -39,8 +39,18 @@ const ratio = (a, b) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
-const FOREGROUNDS = ['text', 'text-muted', 'text-faint', 'accent', 'success', 'warning', 'danger', 'info'];
-const BACKGROUNDS = ['surface-1', 'canvas'];
+const ALL_FG = ['text', 'text-muted', 'text-faint', 'accent', 'success', 'warning', 'danger', 'info'];
+
+/* Each background is checked against the foregrounds that actually render on
+ * it. `field` is an input fill: it carries the value (--text) and the
+ * placeholder (--text-muted) and nothing else. Checking --text-faint there
+ * would fail on a pair no screen produces, and "fixing" it would mean
+ * distorting the field colour to satisfy a combination that never ships. */
+const BACKGROUNDS = [
+  { name: 'surface-1', foregrounds: ALL_FG },
+  { name: 'canvas', foregrounds: ALL_FG },
+  { name: 'field', foregrounds: ['text', 'text-muted'] },
+];
 const MIN = 4.5;
 
 let failures = 0;
@@ -49,8 +59,8 @@ for (const [label, selector] of [['LIGHT', ':root'], ['DARK', '\\.dark']]) {
   const t = block(selector, label);
   console.log(`\n=== ${label} ===`);
 
-  for (const bg of BACKGROUNDS) {
-    for (const fg of FOREGROUNDS) {
+  for (const { name: bg, foregrounds } of BACKGROUNDS) {
+    for (const fg of foregrounds) {
       if (!t[fg]) throw new Error(`Missing --${fg} in the ${label} block`);
       if (!t[bg]) throw new Error(`Missing --${bg} in the ${label} block`);
       const r = ratio(t[fg], t[bg]);

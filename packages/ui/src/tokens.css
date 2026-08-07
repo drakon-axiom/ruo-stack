@@ -15,6 +15,9 @@
   --surface-1: #FFFFFF;
   --surface-2: #FFFFFF;
   --surface-3: #EDF1F7;
+  /* Input fill. Distinct from --surface-1 so a field still reads as a field
+     when it sits on a card, which is the common case. */
+  --field: #F7F9FC;
   --border-subtle: #E4E9F2;
   --border-default: #DDE3EE;
   --border-strong: #C7D0E0;
@@ -50,6 +53,9 @@
   --surface-1: #111725;
   --surface-2: #171E2E;
   --surface-3: #1E2739;
+  /* Slightly LIFTED from the card rather than recessed: on a dark card a
+     darker fill reads as a hole punched in the surface. */
+  --field: #1B2334;
   --border-subtle: #232C40;
   --border-default: #2E3850;
   --border-strong: #3B4763;

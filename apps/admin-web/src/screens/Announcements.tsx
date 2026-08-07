@@ -38,11 +38,11 @@ interface Brand { id: string; brand_name: string }
 type Tab = 'all' | 'draft' | 'scheduled' | 'live' | 'expired' | 'archived';
 
 const STATE_STYLE: Record<Announcement['display_state'], string> = {
-  draft: 'border-white/15 bg-white/5 text-content-muted',
+  draft: 'border-line bg-surface-3 text-content-muted',
   scheduled: 'border-warning/40 bg-warning/10 text-warning',
   live: 'border-success/40 bg-success/10 text-success',
-  expired: 'border-white/15 bg-white/5 text-content-faint',
-  archived: 'border-white/15 bg-white/5 text-content-faint',
+  expired: 'border-line bg-surface-3 text-content-faint',
+  archived: 'border-line bg-surface-3 text-content-faint',
 };
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
