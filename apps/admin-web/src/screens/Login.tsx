@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login, mfaEnroll, mfaVerify, setTokens, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Field, buttonClass, cardClass, inputClass } from '@ruostack/ui';
+import { Field, Logo, buttonClass, cardClass, inputClass } from '@ruostack/ui';
 
 type Stage = 'credentials' | 'totp' | 'enroll';
 
@@ -87,9 +87,7 @@ export function Login() {
     <div className="grid min-h-screen place-items-center px-4">
       <div className={cardClass('w-full max-w-sm p-7')}>
         <div className="mb-6 flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-lg font-black text-white">
-            R
-          </span>
+          <Logo variant="mark" className="text-accent" />
           <span className="text-xl font-bold text-content">RUOStack Admin</span>
         </div>
 

@@ -1,0 +1,8 @@
+<!-- Platform favicon. Favicons are fetched as standalone documents, so this
+     cannot use currentColor the way <Logo> does: the colours are explicit and
+     must be kept in step with --accent-solid in packages/ui/src/tokens.css.
+     Replace the <path> with the real mark; keep the 32x32 viewBox. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="8" fill="#13805F"/>
+  <path d="M11 23V9h6.4a4.3 4.3 0 0 1 1.5 8.34L21.6 23h-3.3l-2.4-5.1H14V23h-3Zm3-7.6h3.2a1.9 1.9 0 0 0 0-3.8H14v3.8Z" fill="#ffffff"/>
+</svg>
