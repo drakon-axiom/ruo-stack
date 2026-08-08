@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
-import { buttonClass, cardClass, inputClass, labelClass, pillClass } from '@ruostack/ui';
+import { Badge, Check, buttonClass, cardClass, cn, inputClass, labelClass } from '@ruostack/ui';
 
 interface Me {
   profile: { id: string; full_name: string; name_last_changed_at: string | null; name_editable: boolean };
@@ -254,29 +254,65 @@ function SubscriptionSection() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {(sub?.plans ?? []).map((p) => {
           const isCurrent = p.key === current;
-          return (
-            <div key={p.key} className={`rounded-card border p-4 ${isCurrent ? 'border-accent bg-accent/5' : 'border-line dark:border-line'}`}>
+          const cta = isCurrent ? 'Current plan' : p.paid ? `Choose ${p.name}` : 'Downgrade to Starter';
+
+          const body = (
+            <>
               <div className="flex items-center justify-between">
                 <span className="text-lg font-semibold">{p.name}</span>
-                {isCurrent && <span className={pillClass('border-accent/40 bg-accent/10 text-accent')}>Current</span>}
+                {isCurrent && <Badge tone="accent">Current</Badge>}
               </div>
-              <div className="mt-1 text-xl font-extrabold">{dollars(p.price_cents)}</div>
+              <div className="mt-1 text-xl font-extrabold tabular-nums">{dollars(p.price_cents)}</div>
               <ul className="mt-3 space-y-1.5 text-xs text-content-muted">
                 {p.features.map((f) => (
-                  <li key={f} className="flex gap-1.5"><span className="text-accent">✓</span>{f}</li>
+                  <li key={f} className="flex gap-1.5">
+                    <Check aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+                    {f}
+                  </li>
                 ))}
               </ul>
-              <button
-                className={`mt-4 w-full ${isCurrent ? 'btn-ghost opacity-60' : 'btn'}`}
-                disabled={isCurrent || busy}
-                onClick={() => choose(p)}
+              {/* Visual only — the whole card is the control, so this must not
+                  be a nested <button>. */}
+              <span
+                aria-hidden
+                className={cn(
+                  buttonClass(isCurrent ? 'ghost' : 'primary', 'md', 'mt-4 w-full'),
+                  isCurrent && 'opacity-60',
+                  !isCurrent && 'group-hover:brightness-110',
+                )}
               >
-                {isCurrent ? 'Current plan' : p.paid ? `Choose ${p.name}` : 'Downgrade to Starter'}
-              </button>
-            </div>
+                {cta}
+              </span>
+            </>
+          );
+
+          // The current plan is not selectable, so it stays a plain surface.
+          if (isCurrent) {
+            return (
+              <div key={p.key} className="rounded-card border border-accent bg-accent/5 p-4">
+                {body}
+              </div>
+            );
+          }
+
+          /* The whole card is the control. Previously only the inner button was
+             interactive and the card had no hover state at all, so there was no
+             signal that a plan was selectable. One <button> wrapping the card
+             gives hover, focus and keyboard for free without nesting controls. */
+          return (
+            <button
+              key={p.key}
+              type="button"
+              disabled={busy}
+              onClick={() => choose(p)}
+              aria-label={`${cta}, ${dollars(p.price_cents)}`}
+              className="group rounded-card border border-line p-4 text-left transition-[border-color,box-shadow,transform] duration-fast hover:-translate-y-0.5 hover:border-accent hover:shadow-e2 disabled:pointer-events-none disabled:opacity-60"
+            >
+              {body}
+            </button>
           );
         })}
       </div>
