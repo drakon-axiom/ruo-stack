@@ -50,7 +50,7 @@ export function AppShell({
   // Collapsed to a rail there is only room for the mark; expanded shows the
   // full lockup. brandName remains the accessible name in both cases.
   const brand = collapsed ? (
-    <Logo variant="mark" className="h-8 w-8 text-accent" />
+    <Logo variant="mark" className="h-8 w-auto text-accent" />
   ) : (
     <Logo variant="full" className="text-accent" />
   );
@@ -74,7 +74,7 @@ export function AppShell({
               )}
             </button>
 
-            <Logo variant="mark" className="h-7 w-7 text-accent md:hidden" />
+            <Logo variant="mark" className="h-7 w-auto text-accent md:hidden" />
             <span className="text-base font-bold md:hidden">{brandName}</span>
 
             <div className="ml-auto flex items-center gap-2">

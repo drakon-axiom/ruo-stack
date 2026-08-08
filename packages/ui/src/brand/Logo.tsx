@@ -2,56 +2,60 @@ import { cn } from '../lib/cn.js';
 
 /* The platform logo — the single definition for both apps.
  *
- * NOT to be confused with a merchant's own logo: this platform is white-label,
- * and per-brand artwork lives on `Brand.logoUrl` in Supabase Storage, uploaded
- * through apps/api/src/routes/brand-branding.ts and served at runtime. This is
- * the RUOStack mark, a build-time asset.
+ * NOT a merchant's logo: this platform is white-label, and per-brand artwork
+ * lives on `Brand.logoUrl` in Supabase Storage via
+ * apps/api/src/routes/brand-branding.ts. This is the RUOStack mark, a
+ * build-time asset.
  *
- * The artwork is inline SVG using `currentColor` rather than an <img>: it
- * inherits the surrounding text colour, so one definition themes correctly on
- * both the dark canvas and the light one, costs no network request, and stays
- * crisp at any size.
+ * Artwork is the monochrome mark from the brand kit
+ * (src/assets/ruostack-icon-monochrome.svg), inlined so it can use
+ * `currentColor`: it inherits the surrounding text colour, so ONE definition
+ * themes correctly on both canvases, with no light/dark variants and no
+ * network request.
  *
- * ─────────────────────────────────────────────────────────────────────────
- * INTERIM ARTWORK. The paths below are the placeholder "R" the UI shipped
- * with. To install the real logo, replace ONLY the two <path> elements:
- *   MarkArt     <- packages/ui/src/assets/logo-mark.svg
- *   WordmarkArt <- packages/ui/src/assets/logo-wordmark.svg
- * Strip any `fill="…"` / `stroke="…"` from the source so currentColor applies,
- * and keep each viewBox tight to the artwork so the sizing below holds.
- * ─────────────────────────────────────────────────────────────────────────
+ * The mark is 154x142 — NOT square. Size it by height and let the width
+ * follow, or it letterboxes inside a square box.
  */
 
-/** Square mark. Used by the collapsed rail, the mobile header and the favicon. */
+/** The mark alone. Used by the collapsed rail and the mobile header. */
 function MarkArt({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" role="img" aria-label="RUOStack" className={className}>
-      <rect width="32" height="32" rx="8" fill="currentColor" />
-      <path
-        d="M11 23V9h6.4a4.3 4.3 0 0 1 1.5 8.34L21.6 23h-3.3l-2.4-5.1H14V23h-3Zm3-7.6h3.2a1.9 1.9 0 0 0 0-3.8H14v3.8Z"
-        className="fill-white dark:fill-canvas"
-      />
+    <svg
+      viewBox="-2 -2 154 142"
+      fill="currentColor"
+      role="img"
+      aria-label="RUOStack"
+      className={cn('h-8 w-auto', className)}
+    >
+      <path d="M7,0 h136 a7,7 0 0 1 7,7 v24 a7,7 0 0 1 -7,7 h-136 a7,7 0 0 1 -7,-7 v-24 a7,7 0 0 1 7,-7 zM34.5,5 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM34,10 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 zM72.5,5 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM72,10 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 zM110.5,5 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM110,10 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 z" />
+      <path d="M7,50 h136 a7,7 0 0 1 7,7 v24 a7,7 0 0 1 -7,7 h-136 a7,7 0 0 1 -7,-7 v-24 a7,7 0 0 1 7,-7 zM34.5,55 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM34,60 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 zM72.5,55 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM72,60 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 zM110.5,55 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM110,60 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 z" />
+      <path d="M7,100 h136 a7,7 0 0 1 7,7 v24 a7,7 0 0 1 -7,7 h-136 a7,7 0 0 1 -7,-7 v-24 a7,7 0 0 1 7,-7 zM34.5,105 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM34,110 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 zM72.5,105 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM72,110 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 zM110.5,105 h5.0 a1.5,1.5 0 0 1 1.5,1.5 v1.0 a1.5,1.5 0 0 1 -1.5,1.5 h-5.0 a1.5,1.5 0 0 1 -1.5,-1.5 v-1.0 a1.5,1.5 0 0 1 1.5,-1.5 zM110,110 h6 a4,4 0 0 1 4,4 v15 a4,4 0 0 1 -4,4 h-6 a4,4 0 0 1 -4,-4 v-15 a4,4 0 0 1 4,-4 z" />
     </svg>
   );
 }
 
-/** Mark + wordmark lockup. Used by the expanded sidebar and the auth screens. */
+/* The kit's lockup (ruostack-lockup-monochrome.svg) sets the wordmark as an
+ * SVG <text> element in Arial rather than converting it to outlines. That
+ * renders in whatever font the viewer happens to have, does not match the Inter
+ * used everywhere else in this UI, and shifts between platforms. The lockup is
+ * therefore composed here: the kit's mark plus the wordmark in the app's own
+ * typeface. Swap to the kit lockup once its text is converted to paths. */
 function WordmarkArt({ className }: { className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-2', className)}>
-      <MarkArt className="h-8 w-8 shrink-0" />
+      <MarkArt className="h-8 w-auto shrink-0" />
       <span className="text-lg font-bold tracking-tight text-content">RUOStack</span>
     </span>
   );
 }
 
 export interface LogoProps {
-  /** `mark` is the square glyph alone; `full` is the mark plus the wordmark. */
+  /** `mark` is the glyph alone; `full` is the mark plus the wordmark. */
   variant?: 'mark' | 'full';
   className?: string;
 }
 
 export function Logo({ variant = 'mark', className }: LogoProps) {
   if (variant === 'full') return <WordmarkArt className={className} />;
-  return <MarkArt className={cn('h-8 w-8', className)} />;
+  return <MarkArt className={className} />;
 }

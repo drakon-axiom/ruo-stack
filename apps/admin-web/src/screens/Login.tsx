@@ -87,7 +87,7 @@ export function Login() {
     <div className="grid min-h-screen place-items-center px-4">
       <div className={cardClass('w-full max-w-sm p-7')}>
         <div className="mb-6 flex items-center gap-2">
-          <Logo variant="mark" className="text-accent" />
+          <Logo variant="mark" className="h-8 w-auto text-accent" />
           <span className="text-xl font-bold text-content">RUOStack Admin</span>
         </div>
 

@@ -1,8 +1,33 @@
-<!-- Platform favicon. Favicons are fetched as standalone documents, so this
-     cannot use currentColor the way <Logo> does: the colours are explicit and
-     must be kept in step with --accent-solid in packages/ui/src/tokens.css.
-     Replace the <path> with the real mark; keep the 32x32 viewBox. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#13805F"/>
-  <path d="M11 23V9h6.4a4.3 4.3 0 0 1 1.5 8.34L21.6 23h-3.3l-2.4-5.1H14V23h-3Zm3-7.6h3.2a1.9 1.9 0 0 0 0-3.8H14v3.8Z" fill="#ffffff"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" font-family="Arial, Helvetica, sans-serif"><defs>
+  <g id="v"><rect x="4" y="0" width="8" height="4" rx="1.5"/><rect x="1" y="5" width="14" height="23" rx="4"/></g>
+  <g id="iconColor">
+    <rect x="0" y="0" width="150" height="38" rx="7" fill="#1e2a44"/>
+    <rect x="0" y="50" width="150" height="38" rx="7" fill="#1e2a44"/>
+    <rect x="0" y="100" width="150" height="38" rx="7" fill="#2e8b6f"/>
+    <g fill="#ffffff">
+      <use href="#v" transform="translate(29,5)"/><use href="#v" transform="translate(67,5)"/><use href="#v" transform="translate(105,5)"/>
+      <use href="#v" transform="translate(29,55)"/><use href="#v" transform="translate(67,55)"/><use href="#v" transform="translate(105,55)"/>
+      <use href="#v" transform="translate(29,105)"/><use href="#v" transform="translate(67,105)"/><use href="#v" transform="translate(105,105)"/>
+    </g>
+  </g>
+  <g id="iconNavy">
+    <rect x="0" y="0" width="150" height="38" rx="7" fill="#1e2a44"/>
+    <rect x="0" y="50" width="150" height="38" rx="7" fill="#1e2a44"/>
+    <rect x="0" y="100" width="150" height="38" rx="7" fill="#1e2a44"/>
+    <g fill="#ffffff">
+      <use href="#v" transform="translate(29,5)"/><use href="#v" transform="translate(67,5)"/><use href="#v" transform="translate(105,5)"/>
+      <use href="#v" transform="translate(29,55)"/><use href="#v" transform="translate(67,55)"/><use href="#v" transform="translate(105,55)"/>
+      <use href="#v" transform="translate(29,105)"/><use href="#v" transform="translate(67,105)"/><use href="#v" transform="translate(105,105)"/>
+    </g>
+  </g>
+  <g id="iconWhite">
+    <rect x="0" y="0" width="150" height="38" rx="7" fill="#ffffff"/>
+    <rect x="0" y="50" width="150" height="38" rx="7" fill="#ffffff"/>
+    <rect x="0" y="100" width="150" height="38" rx="7" fill="#ffffff"/>
+    <g fill="#1e2a44">
+      <use href="#v" transform="translate(29,5)"/><use href="#v" transform="translate(67,5)"/><use href="#v" transform="translate(105,5)"/>
+      <use href="#v" transform="translate(29,55)"/><use href="#v" transform="translate(67,55)"/><use href="#v" transform="translate(105,55)"/>
+      <use href="#v" transform="translate(29,105)"/><use href="#v" transform="translate(67,105)"/><use href="#v" transform="translate(105,105)"/>
+    </g>
+  </g>
+</defs><rect x="0" y="0" width="512" height="512" rx="100" fill="#1e2a44"/><use href="#iconWhite" transform="translate(91,104) scale(2.2)"/></svg>
