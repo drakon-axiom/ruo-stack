@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login, mfaEnroll, mfaVerify, setTokens, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Field, Input, Logo, buttonClass, cardClass } from '@ruostack/ui';
+import { Button, Field, Input, Logo, cardClass } from '@ruostack/ui';
 
 type Stage = 'credentials' | 'totp' | 'enroll';
 
@@ -101,9 +101,7 @@ export function Login() {
             <Field label="Password">
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </Field>
-            <button className={buttonClass('primary', 'md', 'mt-2 w-full')} disabled={busy}>
-              {busy ? '…' : 'Continue'}
-            </button>
+            <Button className="mt-2 w-full" loading={busy}>Continue</Button>
           </form>
         )}
 
@@ -113,9 +111,7 @@ export function Login() {
             <Field label="Authentication code">
               <Input className="tracking-[0.4em]" inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value)} required />
             </Field>
-            <button className={buttonClass('primary', 'md', 'mt-2 w-full')} disabled={busy}>
-              {busy ? '…' : 'Verify'}
-            </button>
+            <Button className="mt-2 w-full" loading={busy}>Verify</Button>
           </form>
         )}
 
@@ -133,9 +129,7 @@ export function Login() {
             <Field label="Authentication code">
               <Input className="tracking-[0.4em]" inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value)} required />
             </Field>
-            <button className={buttonClass('primary', 'md', 'mt-2 w-full')} disabled={busy}>
-              {busy ? '…' : 'Enable MFA & sign in'}
-            </button>
+            <Button className="mt-2 w-full" loading={busy}>Enable MFA & sign in</Button>
           </form>
         )}
       </div>

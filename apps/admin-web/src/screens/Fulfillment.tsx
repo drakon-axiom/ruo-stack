@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Tabs, buttonClass, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Tabs, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -203,8 +203,8 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
           <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
         </Field>
         <div className="mt-4 flex justify-end gap-2">
-          <button className={buttonClass('ghost', 'md')} onClick={onClose}>Cancel</button>
-          <button className={buttonClass('primary', 'md')} disabled={!tracking || busy} onClick={ship}>{busy ? '…' : 'Capture & ship'}</button>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button disabled={!tracking} loading={busy} onClick={ship}>Capture & ship</Button>
         </div>
       </div>
     </div>
@@ -282,7 +282,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
       title={`Edit order · ${order.brand_name}`}
       onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
-        <button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy || !detail} onClick={save}>{busy ? '…' : 'Save changes (re-prices wallet)'}</button>
+        <Button className="w-full" disabled={!valid || !detail} loading={busy} onClick={save}>Save changes (re-prices wallet)</Button>
       }
     >
       {!detail ? (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { DataTable, Drawer, EmptyState, Field, Input, PageHeader, StatusPill, buttonClass, cardClass, pillClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, StatusPill, cardClass, pillClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const PLAN_PILL: Record<string, string> = {
@@ -177,7 +177,7 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
                 <Field label="Amount $ (+/-)"><Input value={adjAmt} onChange={(e) => setAdjAmt(e.target.value)} placeholder="-25 or 50" /></Field>
                 <Field label="Reason"><Input value={adjReason} onChange={(e) => setAdjReason(e.target.value)} /></Field>
               </div>
-              <button className={buttonClass('ghost', 'md', 'w-full')} disabled={busy || !adjAmt || !adjReason} onClick={adjust}>Apply adjustment</button>
+              <Button variant="ghost" className="w-full" disabled={busy || !adjAmt || !adjReason} onClick={adjust}>Apply adjustment</Button>
             </div>
           )}
 
@@ -190,8 +190,8 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
               </div>
               <div className="flex items-end gap-2">
                 <Field label="Override $/shipment"><Input value={fee} onChange={(e) => setFee(e.target.value)} placeholder={(d.shipping.global_default_cents / 100).toFixed(2)} /></Field>
-                <button className={buttonClass('primary', 'md')} disabled={busy || !fee} onClick={() => savePickpack(false)}>Save</button>
-                <button className={buttonClass('ghost', 'md')} disabled={busy || d.shipping.pickpack_fee_override_cents == null} onClick={() => savePickpack(true)}>Use global</button>
+                <Button disabled={busy || !fee} onClick={() => savePickpack(false)}>Save</Button>
+                <Button variant="ghost" disabled={busy || d.shipping.pickpack_fee_override_cents == null} onClick={() => savePickpack(true)}>Use global</Button>
               </div>
             </div>
           )}

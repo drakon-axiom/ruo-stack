@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { TYPE_ICON, relativeTime, type Notification } from '../components/NotificationBell.js';
-import { buttonClass, cardClass, chipClass } from '@ruostack/ui';
+import { Button, cardClass, chipClass } from '@ruostack/ui';
 
 /**
  * Full notifications history. The bell panel shows the most recent few; this is
@@ -57,7 +57,7 @@ export function Notifications() {
           <h1 className="mb-1 text-2xl font-bold">Notifications</h1>
           <p className="text-sm text-content-muted">Platform announcements, restocks and maintenance notices.</p>
         </div>
-        {unreadCount > 0 && <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={markAll}>Mark all read</button>}
+        {unreadCount > 0 && <Button variant="ghost" className="text-xs" onClick={markAll}>Mark all read</Button>}
       </div>
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
@@ -94,7 +94,7 @@ export function Notifications() {
                 <div className="mt-1.5 text-xs text-content-faint">{relativeTime(n.published_at)}</div>
               </div>
               {!n.read_at && (
-                <button className={buttonClass('ghost', 'md', 'shrink-0 text-xs')} onClick={() => markRead(n)}>Mark read</button>
+                <Button variant="ghost" className="shrink-0 text-xs" onClick={() => markRead(n)}>Mark read</Button>
               )}
             </div>
           ))}

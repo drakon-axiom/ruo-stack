@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { DataTable, EmptyState, Input, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, pillClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, EmptyState, Input, KpiTile, PageHeader, Tabs, cardClass, inputClass, pillClass, type Column } from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -229,8 +229,8 @@ export function Ledger() {
         subtitle="Wallet movement across every brand, the float, and drift that needs resolving."
         action={
           <div className="flex gap-2">
-            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('summary')}>Export summary</button>
-            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('detail')}>Export detail</button>
+            <Button variant="ghost" onClick={() => exportCsv('summary')}>Export summary</Button>
+            <Button variant="ghost" onClick={() => exportCsv('detail')}>Export detail</Button>
           </div>
         }
       />
@@ -262,9 +262,9 @@ export function Ledger() {
                 </div>
                 {d.kind === 'shipped_not_captured' ? (
                   canHeal ? (
-                    <button className={buttonClass('primary', 'md')} disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
+                    <Button disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
                       {healing === d.order_id ? '…' : 'Re-run capture'}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="text-xs text-content-faint">finance only</span>
                   )

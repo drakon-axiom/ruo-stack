@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { brandRoleLabel, type BrandMemberRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
-import { Input, buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
+import { Button, Input, cardClass, inputClass, pillClass } from '@ruostack/ui';
 
 /**
  * Team (architecture §3.1). Invites are LINK-based: we mint a Supabase action
@@ -69,7 +69,7 @@ export function Team() {
             connection, branding or the team.
           </p>
         </div>
-        {isOwner && <button className={buttonClass('primary', 'md')} onClick={() => setInviting(true)}>Invite someone</button>}
+        {isOwner && <Button onClick={() => setInviting(true)}>Invite someone</Button>}
       </div>
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
@@ -100,19 +100,19 @@ export function Team() {
               {isOwner && !m.is_you && (
                 <div className="flex flex-wrap gap-2">
                   {m.pending && m.status !== 'suspended' && (
-                    <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={() => resend(m)}>Get link</button>
+                    <Button variant="ghost" className="text-xs" onClick={() => resend(m)}>Get link</Button>
                   )}
                   {m.status === 'suspended' ? (
-                    <button
-                      className={buttonClass('ghost', 'md', 'text-xs')}
+                    <Button
+                      variant="ghost" className="text-xs"
                       onClick={() => act(() => api(`/api/brand/members/${m.user_id}/reactivate`, { method: 'POST' }))}
                     >
                       Restore access
-                    </button>
+                    </Button>
                   ) : (
                     <>
-                      <button
-                        className={buttonClass('ghost', 'md', 'text-xs')}
+                      <Button
+                        variant="ghost" className="text-xs"
                         onClick={() =>
                           act(() =>
                             api(`/api/brand/members/${m.user_id}`, {
@@ -123,9 +123,9 @@ export function Team() {
                         }
                       >
                         Make {m.role === 'owner' ? 'staff' : 'owner'}
-                      </button>
-                      <button
-                        className={buttonClass('ghost', 'md', 'text-xs text-danger')}
+                      </Button>
+                      <Button
+                        variant="ghost" className="text-xs text-danger"
                         onClick={() => {
                           if (confirm(`Revoke access for ${m.full_name ?? m.email}? They lose access immediately.`)) {
                             void act(() => api(`/api/brand/members/${m.user_id}`, { method: 'DELETE' }));
@@ -133,7 +133,7 @@ export function Team() {
                         }}
                       >
                         Revoke
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
@@ -202,10 +202,8 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
         </p>
 
         <div className="flex gap-2">
-          <button className={buttonClass('ghost', 'md', 'flex-1')} onClick={onClose} disabled={busy}>Cancel</button>
-          <button className={buttonClass('primary', 'md', 'flex-1')} onClick={submit} disabled={busy || !email || !fullName}>
-            {busy ? '…' : 'Create invite'}
-          </button>
+          <Button variant="ghost" className="flex-1" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button className="flex-1" onClick={submit} disabled={!email || !fullName} loading={busy}>Create invite</Button>
         </div>
       </div>
     </div>
@@ -234,8 +232,8 @@ function InviteLink({ email, url, onClose }: { email: string; url: string; onClo
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Input className="flex-1 font-mono text-xs" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
-        <button className={buttonClass('primary', 'md')} onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
-        <button className={buttonClass('ghost', 'md')} onClick={onClose}>Done</button>
+        <Button onClick={copy}>{copied ? 'Copied' : 'Copy'}</Button>
+        <Button variant="ghost" onClick={onClose}>Done</Button>
       </div>
     </div>
   );

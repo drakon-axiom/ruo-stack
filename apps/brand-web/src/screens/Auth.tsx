@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { signupBrand, ApiError } from '../lib/api.js';
-import { Card, InlineAlert, Input, Logo, buttonClass } from '@ruostack/ui';
+import { Button, Card, InlineAlert, Input, Logo } from '@ruostack/ui';
 
 /* Auth shell. This used to be light-only (the old "light auth, dark app"
  * pattern) and still carried a hard-coded white card and slate text, so in dark
@@ -90,7 +90,7 @@ export function Signup() {
         <Input placeholder="Research company name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
         <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <Input type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
-        <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Create account'}</button>
+        <Button className="w-full" loading={busy}>Create account</Button>
         <p className="text-center text-2xs text-content-faint">No card required. Research use only.</p>
       </form>
     </AuthShell>
@@ -120,7 +120,7 @@ export function Login() {
       <form onSubmit={submit} className="space-y-3">
         <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Sign in'}</button>
+        <Button className="w-full" loading={busy}>Sign in</Button>
         <div className="text-center"><Link className="text-xs text-content-muted transition-colors duration-fast hover:text-accent" to="/forgot">Forgot password?</Link></div>
       </form>
     </AuthShell>
@@ -150,7 +150,7 @@ export function Forgot() {
         <form onSubmit={submit} className="space-y-3">
           <Err msg={err} />
           <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <button className={buttonClass('primary', 'md', 'w-full')}>Send reset link</button>
+          <Button className="w-full">Send reset link</Button>
         </form>
       )}
     </AuthShell>
@@ -178,7 +178,7 @@ export function Reset() {
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
         <Input type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
-        <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Update password'}</button>
+        <Button className="w-full" loading={busy}>Update password</Button>
       </form>
     </AuthShell>
   );

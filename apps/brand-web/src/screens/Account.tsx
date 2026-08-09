@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
-import { Badge, Check, Input, buttonClass, cardClass, cn, labelClass } from '@ruostack/ui';
+import { Badge, Button, Check, Input, buttonClass, cardClass, cn, labelClass } from '@ruostack/ui';
 
 interface Me {
   profile: { id: string; full_name: string; name_last_changed_at: string | null; name_editable: boolean };
@@ -125,18 +125,18 @@ export function Account() {
               <Input value={channel} onChange={(e) => setChannel(e.target.value)} />
             </label>
           </div>
-          <button className={buttonClass('primary', 'md')} onClick={saveProfile}>Save profile</button>
+          <Button onClick={saveProfile}>Save profile</Button>
         </div>
       </Section>
 
       <Section title="Email">
         <p className="mb-3 text-sm text-content-muted">Changing your email sends a confirmation to the new address (Supabase Auth).</p>
-        <button className={buttonClass('ghost', 'md')} onClick={changeEmail}>Change email</button>
+        <Button variant="ghost" onClick={changeEmail}>Change email</Button>
       </Section>
 
       <Section title="Password">
         <p className="mb-3 text-sm text-content-muted">We'll email you a secure reset link.</p>
-        <button className={buttonClass('ghost', 'md')} onClick={resetPassword}>Send password reset</button>
+        <Button variant="ghost" onClick={resetPassword}>Send password reset</Button>
       </Section>
 
       <SubscriptionSection />
@@ -229,7 +229,7 @@ function SubscriptionSection() {
           <span>
             Payment failed — your plan features stay active{sub?.grace_ends_at ? ` until ${new Date(sub.grace_ends_at).toLocaleDateString()}` : ''}. Update your card to avoid interruption.
           </span>
-          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Update payment method</button>
+          <Button className="shrink-0" disabled={busy} onClick={manage}>Update payment method</Button>
         </div>
       )}
       {/* Paid-through has passed but the stored status hasn't caught up (or the
@@ -241,7 +241,7 @@ function SubscriptionSection() {
             Your membership ended {new Date(sub.current_period_end!).toLocaleDateString()}. Renew to keep your plan
             features — they'll drop back to Starter shortly.
           </span>
-          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Renew</button>
+          <Button className="shrink-0" disabled={busy} onClick={manage}>Renew</Button>
         </div>
       )}
       {ended && (
@@ -250,7 +250,7 @@ function SubscriptionSection() {
             Your membership expired and you're on the Starter plan. Your account, orders and wallet are unaffected —
             add a payment method to restore your plan pricing.
           </span>
-          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Restore plan</button>
+          <Button className="shrink-0" disabled={busy} onClick={manage}>Restore plan</Button>
         </div>
       )}
 

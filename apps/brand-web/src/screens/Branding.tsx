@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
-import { Input, buttonClass, cardClass, labelClass } from '@ruostack/ui';
+import { Button, Input, cardClass, labelClass } from '@ruostack/ui';
 
 interface Me {
   brand: {
@@ -120,10 +120,10 @@ export function Branding() {
               )}
             </div>
             <div className="flex flex-col gap-2">
-              <button className={buttonClass('primary', 'md')} disabled={busy} onClick={() => fileRef.current?.click()}>
+              <Button disabled={busy} onClick={() => fileRef.current?.click()}>
                 {logoUrl ? 'Replace logo' : 'Upload logo'}
-              </button>
-              {logoUrl && <button className={buttonClass('ghost', 'md', 'text-xs')} disabled={busy} onClick={removeLogo}>Remove</button>}
+              </Button>
+              {logoUrl && <Button variant="ghost" className="text-xs" disabled={busy} onClick={removeLogo}>Remove</Button>}
             </div>
             <input
               ref={fileRef}
@@ -143,7 +143,7 @@ export function Branding() {
             <ColorField label="Primary" value={primary} onChange={setPrimary} />
             <ColorField label="Accent" value={accent} onChange={setAccent} />
           </div>
-          <button className={buttonClass('primary', 'md', 'mt-4')} disabled={busy || !colorsDirty} onClick={saveColors}>Save colors</button>
+          <Button className="mt-4" disabled={busy || !colorsDirty} onClick={saveColors}>Save colors</Button>
         </div>
       </div>
 

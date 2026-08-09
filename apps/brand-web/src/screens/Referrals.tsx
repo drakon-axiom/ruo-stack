@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { buttonClass, cardClass, inputClass, labelClass } from '@ruostack/ui';
+import { Button, cardClass, inputClass, labelClass } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -23,7 +23,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     }
   }
   return (
-    <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={copy}>{copied ? '✓ Copied' : label}</button>
+    <Button variant="ghost" className="text-xs" onClick={copy}>{copied ? '✓ Copied' : label}</Button>
   );
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Tabs, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -163,7 +163,7 @@ export function Announcements() {
       <PageHeader
         title="Announcements"
         subtitle="Broadcasts that appear in every brand's Notifications inbox."
-        action={writable ? <button className={buttonClass('primary', 'md')} onClick={() => setEditing('new')}>Compose</button> : undefined}
+        action={writable ? <Button onClick={() => setEditing('new')}>Compose</Button> : undefined}
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -282,12 +282,8 @@ function Compose({
       onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         <div className="flex gap-2">
-          <button className={buttonClass('ghost', 'md', 'flex-1')} onClick={() => save(false)} disabled={busy || !title || !body}>
-            {busy ? '…' : 'Save draft'}
-          </button>
-          <button className={buttonClass('primary', 'md', 'flex-1')} onClick={() => save(true)} disabled={busy || !title || !body || (audience === 'single_brand' && !brandId)}>
-            {busy ? '…' : scheduled ? 'Schedule' : 'Publish now'}
-          </button>
+          <Button variant="ghost" className="flex-1" onClick={() => save(false)} disabled={!title || !body} loading={busy}>Save draft</Button>
+          <Button className="flex-1" onClick={() => save(true)} disabled={!title || !body || (audience === 'single_brand' && !brandId)} loading={busy}>{scheduled ? 'Schedule' : 'Publish now'}</Button>
         </div>
       }
     >

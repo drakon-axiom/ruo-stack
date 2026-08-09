@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api.js';
 import { ManagedProducts, ProvisioningWizard } from '../components/ProvisioningWizard.js';
-import { Input, buttonClass, cardClass, labelClass, pillClass } from '@ruostack/ui';
+import { Button, Input, buttonClass, cardClass, labelClass, pillClass } from '@ruostack/ui';
 
 interface ManualSetup { webhook_url: string | null; webhook_secret: string; topics: string[] }
 interface Connection {
@@ -107,7 +107,7 @@ function ShippingMarkup() {
       <div className="flex items-center gap-2">
         <span className="text-content-muted">$</span>
         <Input className="w-28" value={val} inputMode="decimal" onChange={(e) => setVal(e.target.value)} />
-        <button className={buttonClass('primary', 'md')} disabled={busy} onClick={save}>{busy ? '…' : 'Save'}</button>
+        <Button loading={busy} onClick={save}>Save</Button>
         {msg && <span className="text-xs text-content-muted">{msg}</span>}
       </div>
     </div>
@@ -161,7 +161,7 @@ function ConnectForm({ onConnected }: { onConnected: (m: ManualSetup | null) => 
         <label className={labelClass()}>Consumer secret (cs_…)</label>
         <Input className="font-mono text-xs" type="password" placeholder="cs_xxxxxxxx" value={f.consumer_secret} onChange={(e) => setF({ ...f, consumer_secret: e.target.value })} />
       </div>
-      <button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy} onClick={connect}>{busy ? 'Verifying…' : 'Connect store'}</button>
+      <Button className="w-full" disabled={!valid || busy} onClick={connect}>{busy ? 'Verifying…' : 'Connect store'}</Button>
       <p className="text-center text-2xs text-content-faint">We verify the keys against your store and store them encrypted.</p>
     </div>
   );
@@ -209,8 +209,8 @@ function Connected({ conn, onChanged }: { conn: Connection; onChanged: () => voi
       </div>
 
       <div className="flex gap-2">
-        <button className={buttonClass('ghost', 'md')} disabled={!!busy} onClick={test}>{busy === 'test' ? '…' : 'Test connection'}</button>
-        <button className={buttonClass('ghost', 'md', 'text-danger')} disabled={!!busy} onClick={disconnect}>{busy === 'disconnect' ? '…' : 'Disconnect'}</button>
+        <Button variant="ghost" disabled={!!busy} onClick={test}>{busy === 'test' ? '…' : 'Test connection'}</Button>
+        <Button variant="ghost" className="text-danger" disabled={!!busy} onClick={disconnect}>{busy === 'disconnect' ? '…' : 'Disconnect'}</Button>
       </div>
     </div>
   );
@@ -228,7 +228,7 @@ function ManualSetupCard({ setup, onDismiss }: { setup: ManualSetup; onDismiss: 
         <Row label="Secret" value={setup.webhook_secret} />
         <Row label="Topics" value={setup.topics.join(', ')} />
       </div>
-      <button className={buttonClass('ghost', 'md')} onClick={onDismiss}>Done</button>
+      <Button variant="ghost" onClick={onDismiss}>Done</Button>
     </div>
   );
 }

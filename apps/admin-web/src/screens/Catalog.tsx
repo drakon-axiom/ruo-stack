@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, Lock, PageHeader, Plus, StatusPill, Tabs, buttonClass, cardClass, inputClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, Lock, PageHeader, Plus, StatusPill, Tabs, cardClass, inputClass, type Column } from '@ruostack/ui';
 
 interface Product {
   id: string;
@@ -128,13 +128,13 @@ export function Catalog() {
         }
         action={
           <div className="flex items-center gap-2">
-            <button className={buttonClass('ghost', 'md')} onClick={() => setShowArchived((v) => !v)}>
+            <Button variant="ghost" onClick={() => setShowArchived((v) => !v)}>
               {showArchived ? 'Back to catalog' : 'View archived'}
-            </button>
+            </Button>
             {writable && !showArchived && (
-              <button className={buttonClass('primary', 'md')} onClick={() => setCreating(true)}>
+              <Button onClick={() => setCreating(true)}>
                 + Create product
-              </button>
+              </Button>
             )}
           </div>
         }
@@ -339,24 +339,22 @@ function EditDrawer({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               {product.archived ? (
-                <button className={buttonClass('ghost', 'md')} onClick={unarchive} disabled={busy}>Restore from archive</button>
+                <Button variant="ghost" onClick={unarchive} disabled={busy}>Restore from archive</Button>
               ) : !product.isPublished ? (
-                <button className={buttonClass('ghost', 'md')} onClick={publish} disabled={busy}>Publish</button>
+                <Button variant="ghost" onClick={publish} disabled={busy}>Publish</Button>
               ) : (
-                <button className={buttonClass('ghost', 'md')} onClick={unpublish} disabled={busy}>Unpublish</button>
+                <Button variant="ghost" onClick={unpublish} disabled={busy}>Unpublish</Button>
               )}
-              <button className={buttonClass('primary', 'md')} onClick={save} disabled={busy || product.archived}>
-                {busy ? '…' : 'Save'}
-              </button>
+              <Button onClick={save} disabled={product.archived} loading={busy}>Save</Button>
             </div>
 
             {!product.archived && (
               <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
                 {canDelete ? (
-                  <button className={buttonClass('danger', 'md')} onClick={remove} disabled={busy}>Delete</button>
+                  <Button variant="danger" onClick={remove} disabled={busy}>Delete</Button>
                 ) : (
-                  <button
-                    className={buttonClass('danger', 'md', 'disabled:opacity-40')}
+                  <Button
+                    variant="danger" className="disabled:opacity-40"
                     onClick={archive}
                     disabled={busy || status !== 'out_of_stock'}
                     title={
@@ -366,7 +364,7 @@ function EditDrawer({
                     }
                   >
                     Archive
-                  </button>
+                  </Button>
                 )}
                 <span className="text-2xs text-content-faint">
                   {canDelete
@@ -472,9 +470,7 @@ function CreateDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       title="Create product"
       onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
-        <button className={buttonClass('primary', 'md', 'w-full')} onClick={create} disabled={busy || !sku || !name || !compound}>
-          {busy ? '…' : 'Create (unpublished)'}
-        </button>
+        <Button className="w-full" onClick={create} disabled={!sku || !name || !compound} loading={busy}>Create (unpublished)</Button>
       }
     >
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}

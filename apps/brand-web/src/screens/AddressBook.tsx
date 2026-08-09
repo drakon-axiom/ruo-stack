@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
-import { Input, buttonClass, cardClass } from '@ruostack/ui';
+import { Button, Input, cardClass } from '@ruostack/ui';
 
 export interface Address {
   id: string;
@@ -68,7 +68,7 @@ export function AddressBook() {
       <div className="mb-1 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Address Book</h1>
         {addresses && addresses.length > 0 && (
-          <button className={buttonClass('primary', 'md')} onClick={() => setEditing('new')}>+ Add address</button>
+          <Button onClick={() => setEditing('new')}>+ Add address</Button>
         )}
       </div>
       <p className="mb-5 text-sm text-content-muted">
@@ -83,7 +83,7 @@ export function AddressBook() {
           <div className="max-w-md text-sm text-content-muted">
             Add addresses you ship to often, or tick “Save this address” when placing an order.
           </div>
-          <button className={buttonClass('primary', 'md', 'mt-1')} onClick={() => setEditing('new')}>+ Add your first address</button>
+          <Button className="mt-1" onClick={() => setEditing('new')}>+ Add your first address</Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -95,7 +95,7 @@ export function AddressBook() {
                   <div className="font-medium">{a.recipient_name}</div>
                 </div>
                 <div className="flex shrink-0 gap-2 text-xs">
-                  <button className={buttonClass('ghost', 'md')} onClick={() => setEditing(a)}>Edit</button>
+                  <Button variant="ghost" onClick={() => setEditing(a)}>Edit</Button>
                   <button className="text-content-faint hover:text-danger" onClick={() => remove(a)}>Delete</button>
                 </div>
               </div>
@@ -177,7 +177,7 @@ function AddressModal({ address, onClose, onSaved }: { address: Address | null; 
             <Input placeholder="ZIP" value={f.zip} onChange={(e) => set({ zip: e.target.value })} />
           </div>
         </div>
-        <button className={buttonClass('primary', 'md', 'mt-4 w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : address ? 'Save changes' : 'Add address'}</button>
+        <Button className="mt-4 w-full" disabled={!valid} loading={busy} onClick={save}>{address ? 'Save changes' : 'Add address'}</Button>
       </div>
     </div>
   );

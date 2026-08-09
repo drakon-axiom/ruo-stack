@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Plus, Tabs, buttonClass, cardClass, inputClass, type Column } from '@ruostack/ui';
+import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Plus, Tabs, cardClass, inputClass, type Column } from '@ruostack/ui';
 
 interface Box {
   id: string;
@@ -189,7 +189,7 @@ function BoxDrawer({ box, onClose, onSaved }: { box: Box | null; onClose: () => 
   const valid = f.name && num(f.inner_length_in) > 0 && num(f.inner_width_in) > 0 && num(f.inner_height_in) > 0 && num(f.max_weight_oz) > 0;
 
   return (
-    <Drawer open title={box ? 'Edit box' : 'New box'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
+    <Drawer open title={box ? 'Edit box' : 'New box'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<Button className="w-full" disabled={!valid} loading={busy} onClick={save}>Save</Button>}>
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Name"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -226,7 +226,7 @@ function ServiceDrawer({ svc, onClose, onSaved }: { svc: Service | null; onClose
   const valid = f.carrier_service_code && f.display_label && f.transit_estimate && num(f.max_weight_oz) > 0;
 
   return (
-    <Drawer open title={svc ? 'Edit service' : 'New service'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
+    <Drawer open title={svc ? 'Edit service' : 'New service'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<Button className="w-full" disabled={!valid} loading={busy} onClick={save}>Save</Button>}>
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Tier">
         <select className={inputClass()} value={f.tier} onChange={(e) => setF({ ...f, tier: e.target.value })}>
