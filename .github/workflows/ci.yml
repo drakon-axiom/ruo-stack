@@ -51,6 +51,11 @@ jobs:
       - name: Legacy-class gate
         run: pnpm lint:legacy-classes
 
+      # Guards against this workflow invoking a root script that does not
+      # exist — how the Responsive job stayed red across two merged PRs.
+      - name: CI script references
+        run: pnpm lint:ci-scripts
+
       - name: Generate Prisma client
         run: pnpm db:generate
 

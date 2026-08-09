@@ -2,7 +2,7 @@
   "name": "ruostack",
   "version": "0.0.0",
   "private": true,
-  "description": "RUOStack — two-sided white-label fulfillment platform (Phase 0 foundations)",
+  "description": "RUOStack \u2014 two-sided white-label fulfillment platform (Phase 0 foundations)",
   "engines": {
     "node": ">=20"
   },
@@ -18,9 +18,11 @@
     "db:deploy": "pnpm --filter @ruostack/db run deploy",
     "seed:superadmin": "pnpm --filter @ruostack/api seed:superadmin",
     "test": "pnpm -r test",
+    "test:e2e": "playwright test",
     "lint:stripe-guard": "node scripts/check-stripe-imports.mjs",
     "lint:contrast": "node scripts/check-contrast.mjs",
     "lint:legacy-classes": "node scripts/check-legacy-classes.mjs",
+    "lint:ci-scripts": "node scripts/check-ci-scripts.mjs",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
