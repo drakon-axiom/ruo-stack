@@ -2,21 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Button,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  labelClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Tabs, buttonClass, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -214,7 +200,7 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
           </select>
         </Field>
         <Field label="Tracking number">
-          <input className={inputClass()} value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
+          <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
         </Field>
         <div className="mt-4 flex justify-end gap-2">
           <button className={buttonClass('ghost', 'md')} onClick={onClose}>Cancel</button>
@@ -328,7 +314,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
                 <select className={inputClass('flex-1')} value={l.product_id} onChange={(e) => setLine(i, { product_id: e.target.value })}>
                   {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <input className={inputClass('w-16')} type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
+                <Input className="w-16" type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
                 <button className="text-content-faint hover:text-danger" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>✕</button>
               </div>
             ))}
@@ -336,20 +322,20 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
 
           <div className="space-y-2">
             <span className={labelClass()}>Ship to</span>
-            <input className={inputClass()} placeholder="Recipient name" value={r.recipient_name} onChange={(e) => setR({ ...r, recipient_name: e.target.value })} />
-            <input className={inputClass()} placeholder="Email (optional)" value={r.recipient_email} onChange={(e) => setR({ ...r, recipient_email: e.target.value })} />
-            <input className={inputClass()} placeholder="Phone (optional)" value={r.recipient_phone} onChange={(e) => setR({ ...r, recipient_phone: e.target.value })} />
-            <input className={inputClass()} placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
-            <input className={inputClass()} placeholder="Address line 2 (optional)" value={r.address2} onChange={(e) => setR({ ...r, address2: e.target.value })} />
+            <Input placeholder="Recipient name" value={r.recipient_name} onChange={(e) => setR({ ...r, recipient_name: e.target.value })} />
+            <Input placeholder="Email (optional)" value={r.recipient_email} onChange={(e) => setR({ ...r, recipient_email: e.target.value })} />
+            <Input placeholder="Phone (optional)" value={r.recipient_phone} onChange={(e) => setR({ ...r, recipient_phone: e.target.value })} />
+            <Input placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
+            <Input placeholder="Address line 2 (optional)" value={r.address2} onChange={(e) => setR({ ...r, address2: e.target.value })} />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <input className={inputClass()} placeholder="City" value={r.city} onChange={(e) => setR({ ...r, city: e.target.value })} />
-              <input className={inputClass()} placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
-              <input className={inputClass()} placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />
+              <Input placeholder="City" value={r.city} onChange={(e) => setR({ ...r, city: e.target.value })} />
+              <Input placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
+              <Input placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />
             </div>
           </div>
 
           <Field label="Shipping service code (optional override)">
-            <input className={inputClass()} placeholder="leave blank to auto-rate" value={service} onChange={(e) => setService(e.target.value)} />
+            <Input placeholder="leave blank to auto-rate" value={service} onChange={(e) => setService(e.target.value)} />
           </Field>
         </div>
       )}

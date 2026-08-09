@@ -2,18 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  DataTable,
-  EmptyState,
-  KpiTile,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { DataTable, EmptyState, Input, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, pillClass, type Column } from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -297,8 +286,8 @@ export function Ledger() {
             <option value="">All brands</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
           </select>
-          <input className={inputClass('w-[150px]')} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input className={inputClass('w-[150px]')} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <Input className="w-[150px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <Input className="w-[150px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
 

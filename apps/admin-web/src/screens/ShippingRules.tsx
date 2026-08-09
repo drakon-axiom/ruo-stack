@@ -2,21 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Badge,
-  Button,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  PageHeader,
-  Plus,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  type Column,
-} from '@ruostack/ui';
+import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Plus, Tabs, buttonClass, cardClass, inputClass, type Column } from '@ruostack/ui';
 
 interface Box {
   id: string;
@@ -205,16 +191,16 @@ function BoxDrawer({ box, onClose, onSaved }: { box: Box | null; onClose: () => 
   return (
     <Drawer open title={box ? 'Edit box' : 'New box'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : 'Save'}</button>}>
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
-      <Field label="Name"><input className={inputClass()} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+      <Field label="Name"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <Field label="Length (in)"><input className={inputClass()} value={f.inner_length_in} onChange={(e) => setF({ ...f, inner_length_in: e.target.value })} /></Field>
-        <Field label="Width (in)"><input className={inputClass()} value={f.inner_width_in} onChange={(e) => setF({ ...f, inner_width_in: e.target.value })} /></Field>
-        <Field label="Height (in)"><input className={inputClass()} value={f.inner_height_in} onChange={(e) => setF({ ...f, inner_height_in: e.target.value })} /></Field>
+        <Field label="Length (in)"><Input value={f.inner_length_in} onChange={(e) => setF({ ...f, inner_length_in: e.target.value })} /></Field>
+        <Field label="Width (in)"><Input value={f.inner_width_in} onChange={(e) => setF({ ...f, inner_width_in: e.target.value })} /></Field>
+        <Field label="Height (in)"><Input value={f.inner_height_in} onChange={(e) => setF({ ...f, inner_height_in: e.target.value })} /></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <Field label="Max wt (oz)"><input className={inputClass()} value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
-        <Field label="Tare (oz)"><input className={inputClass()} value={f.tare_oz} onChange={(e) => setF({ ...f, tare_oz: e.target.value })} /></Field>
-        <Field label="Sort"><input className={inputClass()} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
+        <Field label="Max wt (oz)"><Input value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
+        <Field label="Tare (oz)"><Input value={f.tare_oz} onChange={(e) => setF({ ...f, tare_oz: e.target.value })} /></Field>
+        <Field label="Sort"><Input value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
       </div>
     </Drawer>
   );
@@ -247,13 +233,13 @@ function ServiceDrawer({ svc, onClose, onSaved }: { svc: Service | null; onClose
           <option value="economy">Economy</option><option value="standard">Standard</option><option value="expedited">Expedited</option>
         </select>
       </Field>
-      <Field label="Carrier service code"><input className={inputClass('font-mono text-xs')} placeholder="usps_ground_advantage" value={f.carrier_service_code} onChange={(e) => setF({ ...f, carrier_service_code: e.target.value })} /></Field>
-      <Field label="Display label"><input className={inputClass()} placeholder="USPS Ground Advantage" value={f.display_label} onChange={(e) => setF({ ...f, display_label: e.target.value })} /></Field>
-      <Field label="Transit estimate"><input className={inputClass()} placeholder="2–5 business days" value={f.transit_estimate} onChange={(e) => setF({ ...f, transit_estimate: e.target.value })} /></Field>
+      <Field label="Carrier service code"><Input className="font-mono text-xs" placeholder="usps_ground_advantage" value={f.carrier_service_code} onChange={(e) => setF({ ...f, carrier_service_code: e.target.value })} /></Field>
+      <Field label="Display label"><Input placeholder="USPS Ground Advantage" value={f.display_label} onChange={(e) => setF({ ...f, display_label: e.target.value })} /></Field>
+      <Field label="Transit estimate"><Input placeholder="2–5 business days" value={f.transit_estimate} onChange={(e) => setF({ ...f, transit_estimate: e.target.value })} /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <Field label="Max wt (oz)"><input className={inputClass()} value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
+        <Field label="Max wt (oz)"><Input value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
         <Field label="Policy"><select className={inputClass()} value={f.selection_policy} onChange={(e) => setF({ ...f, selection_policy: e.target.value })}><option value="cheapest">cheapest</option><option value="fixed">fixed</option></select></Field>
-        <Field label="Sort"><input className={inputClass()} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
+        <Field label="Sort"><Input value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
       </div>
     </Drawer>
   );

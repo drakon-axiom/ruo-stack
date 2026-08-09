@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
-import { buttonClass, cardClass, inputClass, labelClass } from '@ruostack/ui';
+import { Input, buttonClass, cardClass, labelClass } from '@ruostack/ui';
 
 interface Me {
   brand: {
@@ -185,8 +185,8 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
       />
       <div className="flex-1">
         <span className={labelClass('mb-1 block')}>{label}</span>
-        <input
-          className={inputClass('font-mono')}
+        <Input
+          className="font-mono"
           value={value}
           spellCheck={false}
           onChange={(e) => onChange(e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`)}

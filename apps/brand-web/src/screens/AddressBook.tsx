@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
-import { buttonClass, cardClass, inputClass } from '@ruostack/ui';
+import { Input, buttonClass, cardClass } from '@ruostack/ui';
 
 export interface Address {
   id: string;
@@ -165,16 +165,16 @@ function AddressModal({ address, onClose, onSaved }: { address: Address | null; 
         </div>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
         <div className="space-y-2">
-          <input className={inputClass()} placeholder="Label (optional, e.g. “John — home”)" value={f.label} onChange={(e) => set({ label: e.target.value })} />
-          <input className={inputClass()} placeholder="Recipient name" value={f.recipient_name} onChange={(e) => set({ recipient_name: e.target.value })} />
-          <input className={inputClass()} placeholder="Email (optional)" value={f.recipient_email} onChange={(e) => set({ recipient_email: e.target.value })} />
-          <input className={inputClass()} placeholder="Phone (optional)" value={f.recipient_phone} onChange={(e) => set({ recipient_phone: e.target.value })} />
-          <input className={inputClass()} placeholder="Address line 1" value={f.address1} onChange={(e) => set({ address1: e.target.value })} />
-          <input className={inputClass()} placeholder="Address line 2 (optional)" value={f.address2} onChange={(e) => set({ address2: e.target.value })} />
+          <Input placeholder="Label (optional, e.g. “John — home”)" value={f.label} onChange={(e) => set({ label: e.target.value })} />
+          <Input placeholder="Recipient name" value={f.recipient_name} onChange={(e) => set({ recipient_name: e.target.value })} />
+          <Input placeholder="Email (optional)" value={f.recipient_email} onChange={(e) => set({ recipient_email: e.target.value })} />
+          <Input placeholder="Phone (optional)" value={f.recipient_phone} onChange={(e) => set({ recipient_phone: e.target.value })} />
+          <Input placeholder="Address line 1" value={f.address1} onChange={(e) => set({ address1: e.target.value })} />
+          <Input placeholder="Address line 2 (optional)" value={f.address2} onChange={(e) => set({ address2: e.target.value })} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input className={inputClass()} placeholder="City" value={f.city} onChange={(e) => set({ city: e.target.value })} />
-            <input className={inputClass()} placeholder="State" value={f.state} onChange={(e) => set({ state: e.target.value })} />
-            <input className={inputClass()} placeholder="ZIP" value={f.zip} onChange={(e) => set({ zip: e.target.value })} />
+            <Input placeholder="City" value={f.city} onChange={(e) => set({ city: e.target.value })} />
+            <Input placeholder="State" value={f.state} onChange={(e) => set({ state: e.target.value })} />
+            <Input placeholder="ZIP" value={f.zip} onChange={(e) => set({ zip: e.target.value })} />
           </div>
         </div>
         <button className={buttonClass('primary', 'md', 'mt-4 w-full')} disabled={!valid || busy} onClick={save}>{busy ? '…' : address ? 'Save changes' : 'Add address'}</button>

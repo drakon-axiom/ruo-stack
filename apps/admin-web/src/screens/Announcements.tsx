@@ -2,22 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Button,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  KpiTile,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  labelClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Tabs, buttonClass, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -203,7 +188,7 @@ export function Announcements() {
             { key: 'archived', label: 'Archived', count: counts.archived ?? 0 },
           ]}
         />
-        <input className={inputClass('max-w-xs')} placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input className="max-w-xs" placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       {loading ? (
@@ -330,15 +315,15 @@ function Compose({
         </select>
       </Field>
 
-      <Field label="Title"><input className={inputClass()} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
+      <Field label="Title"><Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
       <Field label="Body"><textarea className={inputClass('min-h-[120px]')} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Publish at (blank = now)">
-          <input className={inputClass()} type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+          <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
         </Field>
         <Field label="Expires at (blank = never)">
-          <input className={inputClass()} type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+          <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         </Field>
       </div>
 

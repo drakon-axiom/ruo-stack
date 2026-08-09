@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
-import { Badge, Check, buttonClass, cardClass, cn, inputClass, labelClass } from '@ruostack/ui';
+import { Badge, Check, Input, buttonClass, cardClass, cn, labelClass } from '@ruostack/ui';
 
 interface Me {
   profile: { id: string; full_name: string; name_last_changed_at: string | null; name_editable: boolean };
@@ -106,23 +106,23 @@ export function Account() {
         <div className="space-y-3">
           <label className="block">
             <span className={labelClass('mb-1 block')}>Full name</span>
-            <input className={inputClass()} value={fullName} disabled={!me.profile.name_editable} onChange={(e) => setFullName(e.target.value)} />
+            <Input value={fullName} disabled={!me.profile.name_editable} onChange={(e) => setFullName(e.target.value)} />
             {!me.profile.name_editable && (
               <span className="mt-1 block text-2xs text-content-faint">Name can only be changed once every 7 days.</span>
             )}
           </label>
           <label className="block">
             <span className={labelClass('mb-1 block')}>Research company name</span>
-            <input className={inputClass()} value={brandName} onChange={(e) => setBrandName(e.target.value)} />
+            <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className={labelClass('mb-1 block')}>Website</span>
-              <input className={inputClass()} value={website} onChange={(e) => setWebsite(e.target.value)} />
+              <Input value={website} onChange={(e) => setWebsite(e.target.value)} />
             </label>
             <label className="block">
               <span className={labelClass('mb-1 block')}>Sales channel</span>
-              <input className={inputClass()} value={channel} onChange={(e) => setChannel(e.target.value)} />
+              <Input value={channel} onChange={(e) => setChannel(e.target.value)} />
             </label>
           </div>
           <button className={buttonClass('primary', 'md')} onClick={saveProfile}>Save profile</button>

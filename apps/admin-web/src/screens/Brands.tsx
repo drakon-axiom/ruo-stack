@@ -1,19 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  PageHeader,
-  StatusPill,
-  buttonClass,
-  cardClass,
-  inputClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { DataTable, Drawer, EmptyState, Field, Input, PageHeader, StatusPill, buttonClass, cardClass, pillClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const PLAN_PILL: Record<string, string> = {
@@ -186,8 +174,8 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
             <div className={cardClass('p-3')}>
               <div className="mb-2 text-2xs uppercase tracking-[0.1em] text-content-faint">Manual wallet adjustment (Finance)</div>
               <div className="mb-2 grid grid-cols-2 gap-2">
-                <Field label="Amount $ (+/-)"><input className={inputClass()} value={adjAmt} onChange={(e) => setAdjAmt(e.target.value)} placeholder="-25 or 50" /></Field>
-                <Field label="Reason"><input className={inputClass()} value={adjReason} onChange={(e) => setAdjReason(e.target.value)} /></Field>
+                <Field label="Amount $ (+/-)"><Input value={adjAmt} onChange={(e) => setAdjAmt(e.target.value)} placeholder="-25 or 50" /></Field>
+                <Field label="Reason"><Input value={adjReason} onChange={(e) => setAdjReason(e.target.value)} /></Field>
               </div>
               <button className={buttonClass('ghost', 'md', 'w-full')} disabled={busy || !adjAmt || !adjReason} onClick={adjust}>Apply adjustment</button>
             </div>
@@ -201,7 +189,7 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
                 {d.shipping.pickpack_fee_override_cents == null ? ' (global default)' : ' (override)'} · global {dollars(d.shipping.global_default_cents)}
               </div>
               <div className="flex items-end gap-2">
-                <Field label="Override $/shipment"><input className={inputClass()} value={fee} onChange={(e) => setFee(e.target.value)} placeholder={(d.shipping.global_default_cents / 100).toFixed(2)} /></Field>
+                <Field label="Override $/shipment"><Input value={fee} onChange={(e) => setFee(e.target.value)} placeholder={(d.shipping.global_default_cents / 100).toFixed(2)} /></Field>
                 <button className={buttonClass('primary', 'md')} disabled={busy || !fee} onClick={() => savePickpack(false)}>Save</button>
                 <button className={buttonClass('ghost', 'md')} disabled={busy || d.shipping.pickpack_fee_override_cents == null} onClick={() => savePickpack(true)}>Use global</button>
               </div>

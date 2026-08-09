@@ -2,23 +2,7 @@ import { useEffect, useState } from 'react';
 import { ADMIN_ROLES, type AdminRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Button,
-  Check,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  InlineAlert,
-  PageHeader,
-  Plus,
-  Select,
-  StatusPill,
-  buttonClass,
-  cardClass,
-  inputClass,
-  type Column,
-} from '@ruostack/ui';
+import { Button, Check, DataTable, Drawer, EmptyState, Field, InlineAlert, Input, PageHeader, Plus, Select, StatusPill, buttonClass, cardClass, inputClass, type Column } from '@ruostack/ui';
 
 interface Admin {
   id: string;
@@ -184,10 +168,10 @@ function CreateAdmin({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         </div>
       )}
       <Field label="Full name">
-        <input className={inputClass()} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </Field>
       <Field label="Email">
-        <input className={inputClass()} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
       <Field label="Role">
         <select className={inputClass()} value={role} onChange={(e) => setRole(e.target.value as AdminRole)}>

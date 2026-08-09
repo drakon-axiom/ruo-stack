@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { signupBrand, ApiError } from '../lib/api.js';
-import { Card, InlineAlert, Logo, buttonClass, inputClass } from '@ruostack/ui';
+import { Card, InlineAlert, Input, Logo, buttonClass } from '@ruostack/ui';
 
 /* Auth shell. This used to be light-only (the old "light auth, dark app"
  * pattern) and still carried a hard-coded white card and slate text, so in dark
@@ -86,10 +86,10 @@ export function Signup() {
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
         {ref && <div className="rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent">Referral code applied: {ref}</div>}
-        <input className={inputClass()} placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-        <input className={inputClass()} placeholder="Research company name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
-        <input className={inputClass()} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className={inputClass()} type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+        <Input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+        <Input placeholder="Research company name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
+        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
         <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Create account'}</button>
         <p className="text-center text-2xs text-content-faint">No card required. Research use only.</p>
       </form>
@@ -118,8 +118,8 @@ export function Login() {
     <AuthShell title="Sign in" footer={<>New here? <Link className="text-accent" to="/signup">Create an account</Link></>}>
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
-        <input className={inputClass()} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className={inputClass()} type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Sign in'}</button>
         <div className="text-center"><Link className="text-xs text-content-muted transition-colors duration-fast hover:text-accent" to="/forgot">Forgot password?</Link></div>
       </form>
@@ -149,7 +149,7 @@ export function Forgot() {
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <Err msg={err} />
-          <input className={inputClass()} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <button className={buttonClass('primary', 'md', 'w-full')}>Send reset link</button>
         </form>
       )}
@@ -177,7 +177,7 @@ export function Reset() {
     <AuthShell title="Choose a new password" footer={<Link className="text-accent" to="/login">Back to sign in</Link>}>
       <Err msg={err} />
       <form onSubmit={submit} className="space-y-3">
-        <input className={inputClass()} type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+        <Input type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
         <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy}>{busy ? '…' : 'Update password'}</button>
       </form>
     </AuthShell>

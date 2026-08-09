@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api.js';
 import { ManagedProducts, ProvisioningWizard } from '../components/ProvisioningWizard.js';
-import { buttonClass, cardClass, inputClass, labelClass, pillClass } from '@ruostack/ui';
+import { Input, buttonClass, cardClass, labelClass, pillClass } from '@ruostack/ui';
 
 interface ManualSetup { webhook_url: string | null; webhook_secret: string; topics: string[] }
 interface Connection {
@@ -106,7 +106,7 @@ function ShippingMarkup() {
       <p className="text-xs text-content-muted">Optional profit added to the shipping price your customers see at checkout, on top of the live carrier rate. Your wallet is only charged the carrier rate plus our pick &amp; pack — the markup is yours.</p>
       <div className="flex items-center gap-2">
         <span className="text-content-muted">$</span>
-        <input className={inputClass('w-28')} value={val} inputMode="decimal" onChange={(e) => setVal(e.target.value)} />
+        <Input className="w-28" value={val} inputMode="decimal" onChange={(e) => setVal(e.target.value)} />
         <button className={buttonClass('primary', 'md')} disabled={busy} onClick={save}>{busy ? '…' : 'Save'}</button>
         {msg && <span className="text-xs text-content-muted">{msg}</span>}
       </div>
@@ -155,11 +155,11 @@ function ConnectForm({ onConnected }: { onConnected: (m: ManualSetup | null) => 
       {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <div className="space-y-2">
         <label className={labelClass()}>Store URL</label>
-        <input className={inputClass()} placeholder="https://yourbrand.com" value={f.store_url} onChange={(e) => setF({ ...f, store_url: e.target.value })} />
+        <Input placeholder="https://yourbrand.com" value={f.store_url} onChange={(e) => setF({ ...f, store_url: e.target.value })} />
         <label className={labelClass()}>Consumer key (ck_…)</label>
-        <input className={inputClass('font-mono text-xs')} placeholder="ck_xxxxxxxx" value={f.consumer_key} onChange={(e) => setF({ ...f, consumer_key: e.target.value })} />
+        <Input className="font-mono text-xs" placeholder="ck_xxxxxxxx" value={f.consumer_key} onChange={(e) => setF({ ...f, consumer_key: e.target.value })} />
         <label className={labelClass()}>Consumer secret (cs_…)</label>
-        <input className={inputClass('font-mono text-xs')} type="password" placeholder="cs_xxxxxxxx" value={f.consumer_secret} onChange={(e) => setF({ ...f, consumer_secret: e.target.value })} />
+        <Input className="font-mono text-xs" type="password" placeholder="cs_xxxxxxxx" value={f.consumer_secret} onChange={(e) => setF({ ...f, consumer_secret: e.target.value })} />
       </div>
       <button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy} onClick={connect}>{busy ? 'Verifying…' : 'Connect store'}</button>
       <p className="text-center text-2xs text-content-faint">We verify the keys against your store and store them encrypted.</p>

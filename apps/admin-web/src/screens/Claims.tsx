@@ -2,20 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite, canResolveClaim, claimTypeLabel, type ClaimType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Badge,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Badge, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Tabs, buttonClass, cardClass, inputClass, pillClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -167,7 +154,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
             <div className="flex flex-wrap gap-2">
               {c.status === 'open' && <button className={buttonClass('ghost', 'md')} disabled={busy} onClick={() => patch({ status: 'investigating' })}>Start investigating</button>}
               <span className="flex items-center gap-1">
-                <input className={inputClass('w-40')} placeholder="carrier claim id" value={carrierId} onChange={(e) => setCarrierId(e.target.value)} />
+                <Input className="w-40" placeholder="carrier claim id" value={carrierId} onChange={(e) => setCarrierId(e.target.value)} />
                 <button className={buttonClass('ghost', 'md')} disabled={busy || !carrierId} onClick={() => patch({ status: 'carrier_filed', carrier_claim_id: carrierId })}>File carrier claim</button>
               </span>
             </div>
@@ -183,9 +170,9 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
                   {!creditOnly && <option value="denied">Deny</option>}
                 </select>
               </Field>
-              {res === 'credited' && <Field label="Credit amount ($)"><input className={inputClass()} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={(c.order.walletChargeCents / 100).toFixed(2)} /></Field>}
+              {res === 'credited' && <Field label="Credit amount ($)"><Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={(c.order.walletChargeCents / 100).toFixed(2)} /></Field>}
               {res === 'reshipped' && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Platform-comped ($0) — uncheck to charge the brand's wallet</label>}
-              <Field label="Reason"><input className={inputClass()} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+              <Field label="Reason"><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
               <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy || !reason || (res === 'credited' && !amount)} onClick={resolve}>Resolve claim</button>
             </div>
           )}

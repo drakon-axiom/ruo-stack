@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { brandRoleLabel, type BrandMemberRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
-import { buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
+import { Input, buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
 
 /**
  * Team (architecture §3.1). Invites are LINK-based: we mint a Supabase action
@@ -183,11 +183,11 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
 
         <label className="mb-3 block">
           <span className="mb-1 block text-xs text-content-muted">Full name</span>
-          <input className={inputClass()} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </label>
         <label className="mb-3 block">
           <span className="mb-1 block text-xs text-content-muted">Email</span>
-          <input className={inputClass()} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="mb-4 block">
           <span className="mb-1 block text-xs text-content-muted">Role</span>
@@ -233,7 +233,7 @@ function InviteLink({ email, url, onClose }: { email: string; url: string; onClo
         You can generate a fresh one at any time.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <input className={inputClass('flex-1 font-mono text-xs')} readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
+        <Input className="flex-1 font-mono text-xs" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
         <button className={buttonClass('primary', 'md')} onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
         <button className={buttonClass('ghost', 'md')} onClick={onClose}>Done</button>
       </div>
