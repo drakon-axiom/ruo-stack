@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Plus, Tabs, cardClass, inputClass, type Column } from '@ruostack/ui';
+import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Plus, Select, Tabs, type Column } from '@ruostack/ui';
 
 interface Box {
   id: string;
@@ -229,16 +229,31 @@ function ServiceDrawer({ svc, onClose, onSaved }: { svc: Service | null; onClose
     <Drawer open title={svc ? 'Edit service' : 'New service'} onOpenChange={(o) => { if (!o) onClose(); }} footer={<Button className="w-full" disabled={!valid} loading={busy} onClick={save}>Save</Button>}>
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       <Field label="Tier">
-        <select className={inputClass()} value={f.tier} onChange={(e) => setF({ ...f, tier: e.target.value })}>
-          <option value="economy">Economy</option><option value="standard">Standard</option><option value="expedited">Expedited</option>
-        </select>
+        <Select
+          value={f.tier}
+          onValueChange={(v) => setF({ ...f, tier: v })}
+          options={[
+            { value: 'economy', label: 'Economy' },
+            { value: 'standard', label: 'Standard' },
+            { value: 'expedited', label: 'Expedited' },
+          ]}
+        />
       </Field>
       <Field label="Carrier service code"><Input className="font-mono text-xs" placeholder="usps_ground_advantage" value={f.carrier_service_code} onChange={(e) => setF({ ...f, carrier_service_code: e.target.value })} /></Field>
       <Field label="Display label"><Input placeholder="USPS Ground Advantage" value={f.display_label} onChange={(e) => setF({ ...f, display_label: e.target.value })} /></Field>
       <Field label="Transit estimate"><Input placeholder="2–5 business days" value={f.transit_estimate} onChange={(e) => setF({ ...f, transit_estimate: e.target.value })} /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Max wt (oz)"><Input value={f.max_weight_oz} onChange={(e) => setF({ ...f, max_weight_oz: e.target.value })} /></Field>
-        <Field label="Policy"><select className={inputClass()} value={f.selection_policy} onChange={(e) => setF({ ...f, selection_policy: e.target.value })}><option value="cheapest">cheapest</option><option value="fixed">fixed</option></select></Field>
+        <Field label="Policy">
+        <Select
+          value={f.selection_policy}
+          onValueChange={(v) => setF({ ...f, selection_policy: v })}
+          options={[
+            { value: 'cheapest', label: 'cheapest' },
+            { value: 'fixed', label: 'fixed' },
+          ]}
+        />
+      </Field>
         <Field label="Sort"><Input value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
       </div>
     </Drawer>

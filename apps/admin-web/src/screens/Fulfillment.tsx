@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Tabs, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, cardClass, labelClass, pillClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -195,9 +195,15 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
         <p className="mb-4 text-xs text-content-muted">{order.brand_name} → {order.recipient.name}. Captures {dollars(order.wallet_charge_cents)} from the brand's wallet. Use only when ShipStation's shipnotify didn't arrive.</p>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
         <Field label="Carrier">
-          <select className={inputClass()} value={carrier} onChange={(e) => setCarrier(e.target.value)}>
-            <option>USPS</option><option>UPS</option><option>FedEx</option>
-          </select>
+          <Select
+            value={carrier}
+            onValueChange={setCarrier}
+            options={[
+              { value: 'USPS', label: 'USPS' },
+              { value: 'UPS', label: 'UPS' },
+              { value: 'FedEx', label: 'FedEx' },
+            ]}
+          />
         </Field>
         <Field label="Tracking number">
           <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
@@ -311,9 +317,12 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
             </div>
             {lines.map((l, i) => (
               <div key={i} className="mb-2 flex items-center gap-2">
-                <select className={inputClass('flex-1')} value={l.product_id} onChange={(e) => setLine(i, { product_id: e.target.value })}>
-                  {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <Select
+                  className="flex-1"
+                  value={l.product_id}
+                  onValueChange={(v) => setLine(i, { product_id: v })}
+                  options={catalog.map((p) => ({ value: p.id, label: p.name }))}
+                />
                 <Input className="w-16" type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
                 <button className="text-content-faint hover:text-danger" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>✕</button>
               </div>

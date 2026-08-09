@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ADMIN_ROLES, type AdminRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, Check, DataTable, Drawer, EmptyState, Field, InlineAlert, Input, PageHeader, Plus, Select, StatusPill, cardClass, inputClass, type Column } from '@ruostack/ui';
+import { Button, Check, DataTable, Drawer, EmptyState, Field, InlineAlert, Input, PageHeader, Plus, Select, StatusPill, type Column } from '@ruostack/ui';
 
 interface Admin {
   id: string;
@@ -172,9 +172,11 @@ function CreateAdmin({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
       <Field label="Role">
-        <select className={inputClass()} value={role} onChange={(e) => setRole(e.target.value as AdminRole)}>
-          {ADMIN_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
+        <Select
+          value={role}
+          onValueChange={(v) => setRole(v as AdminRole)}
+          options={ADMIN_ROLES.map((r) => ({ value: r, label: r }))}
+        />
       </Field>
       <p className="text-2xs text-content-faint">A temporary password is emailed (console adapter in dev). They enroll TOTP on first login.</p>
     </Drawer>

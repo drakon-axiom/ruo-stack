@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite, canResolveClaim, claimTypeLabel, type ClaimType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Tabs, cardClass, inputClass, pillClass, type Column } from '@ruostack/ui';
+import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, cardClass, pillClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -164,11 +164,18 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
             <div className={cardClass('space-y-2 p-3')}>
               <div className="text-2xs uppercase tracking-[0.1em] text-content-faint">Resolve</div>
               <Field label="Resolution">
-                <select className={inputClass()} value={res} onChange={(e) => setRes(e.target.value as typeof res)} disabled={creditOnly}>
-                  {!creditOnly && <option value="reshipped">Reship</option>}
-                  <option value="credited">Wallet credit</option>
-                  {!creditOnly && <option value="denied">Deny</option>}
-                </select>
+                <Select
+                  value={res}
+                  disabled={creditOnly}
+                  onValueChange={(v) => setRes(v as typeof res)}
+                  options={[
+                    // Gated: a credit-only role is offered the credit outcome
+                    // and nothing else.
+                    ...(creditOnly ? [] : [{ value: 'reshipped', label: 'Reship' }]),
+                    { value: 'credited', label: 'Wallet credit' },
+                    ...(creditOnly ? [] : [{ value: 'denied', label: 'Deny' }]),
+                  ]}
+                />
               </Field>
               {res === 'credited' && <Field label="Credit amount ($)"><Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={(c.order.walletChargeCents / 100).toFixed(2)} /></Field>}
               {res === 'reshipped' && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Platform-comped ($0) — uncheck to charge the brand's wallet</label>}

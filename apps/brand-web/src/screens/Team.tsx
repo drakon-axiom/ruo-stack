@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { brandRoleLabel, type BrandMemberRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
-import { Button, Input, cardClass, inputClass, pillClass } from '@ruostack/ui';
+import { Button, Input, Select, cardClass, pillClass } from '@ruostack/ui';
 
 /**
  * Team (architecture §3.1). Invites are LINK-based: we mint a Supabase action
@@ -191,10 +191,14 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
         </label>
         <label className="mb-4 block">
           <span className="mb-1 block text-xs text-content-muted">Role</span>
-          <select className={inputClass()} value={role} onChange={(e) => setRole(e.target.value as BrandMemberRole)}>
-            <option value="staff">Staff — orders, tracking, claims, customers (no pricing)</option>
-            <option value="owner">Owner — full access including billing and the wallet</option>
-          </select>
+          <Select
+            value={role}
+            onValueChange={(v) => setRole(v as BrandMemberRole)}
+            options={[
+              { value: 'staff', label: 'Staff — orders, tracking, claims, customers (no pricing)' },
+              { value: 'owner', label: 'Owner — full access including billing and the wallet' },
+            ]}
+          />
         </label>
 
         <p className="mb-4 text-xs text-content-muted">

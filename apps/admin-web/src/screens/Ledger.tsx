@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, EmptyState, Input, KpiTile, PageHeader, Tabs, cardClass, inputClass, pillClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, EmptyState, Input, KpiTile, PageHeader, Select, Tabs, cardClass, pillClass, type Column } from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -74,6 +74,10 @@ const TABS: { key: string; label: string; types?: TxnType[] }[] = [
 
 /** `YYYY-MM-DD` (what <input type="date"> wants) for N days ago. */
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+
+/* Radix Select rejects an item with an empty value, so the "no brand
+ * filter" choice needs a sentinel that maps back to '' for the API. */
+const ALL_BRANDS = '__all__';
 
 const SUMMARY_COLUMNS: Column<BrandSummary>[] = [
   { key: 'brand', header: 'Brand', priority: 'primary', minWidth: 160, cell: (b) => b.brandName },
@@ -282,10 +286,15 @@ export function Ledger() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={setTab} />
         <div className="flex flex-wrap items-center gap-2">
-          <select className={inputClass('max-w-[180px]')} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-            <option value="">All brands</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
-          </select>
+          <Select
+            className="max-w-[180px]"
+            value={brandId || ALL_BRANDS}
+            onValueChange={(v) => setBrandId(v === ALL_BRANDS ? '' : v)}
+            options={[
+              { value: ALL_BRANDS, label: 'All brands' },
+              ...brands.map((b) => ({ value: b.id, label: b.brand_name })),
+            ]}
+          />
           <Input className="w-[150px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           <Input className="w-[150px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>

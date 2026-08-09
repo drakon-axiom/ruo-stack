@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, Lock, PageHeader, Plus, StatusPill, Tabs, cardClass, inputClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, Lock, PageHeader, Plus, Select, StatusPill, Tabs, type Column } from '@ruostack/ui';
 
 interface Product {
   id: string;
@@ -409,11 +409,16 @@ function EditDrawer({
         <Input value={retail} disabled={!writable} onChange={(e) => setRetail(e.target.value)} />
       </Field>
       <Field label="Stock status">
-        <select className={inputClass()} value={status} disabled={!writable} onChange={(e) => changeStock(e.target.value as Product['status'])}>
-          <option value="in_stock">in_stock</option>
-          <option value="soon">soon</option>
-          <option value="out_of_stock">out_of_stock</option>
-        </select>
+        <Select
+          value={status}
+          disabled={!writable}
+          onValueChange={(v) => changeStock(v as Product['status'])}
+          options={[
+            { value: 'in_stock', label: 'in stock' },
+            { value: 'soon', label: 'soon' },
+            { value: 'out_of_stock', label: 'out of stock' },
+          ]}
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Weight">

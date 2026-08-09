@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Tabs, cardClass, inputClass, labelClass, pillClass, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Select, Tabs, Textarea, cardClass, labelClass, pillClass, type Column } from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -290,29 +290,44 @@ function Compose({
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <Field label="Audience">
-        <select className={inputClass()} value={audience} onChange={(e) => setAudience(e.target.value as 'all_brands' | 'single_brand')}>
-          <option value="all_brands">All brands</option>
-          <option value="single_brand">A single brand</option>
-        </select>
+        <Select
+          value={audience}
+          onValueChange={(v) => setAudience(v as 'all_brands' | 'single_brand')}
+          options={[
+            { value: 'all_brands', label: 'All brands' },
+            { value: 'single_brand', label: 'A single brand' },
+          ]}
+        />
       </Field>
 
       {audience === 'single_brand' && (
         <Field label="Brand">
-          <select className={inputClass()} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-            <option value="">Select a brand…</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
-          </select>
+          <Select
+            value={brandId}
+            onValueChange={setBrandId}
+            placeholder="Select a brand…"
+            options={brands.map((b) => ({ value: b.id, label: b.brand_name }))}
+          />
         </Field>
       )}
 
       <Field label="Type">
-        <select className={inputClass()} value={type} onChange={(e) => setType(e.target.value as AnnouncementType)}>
-          {ANNOUNCEMENT_TYPES.map((t) => <option key={t} value={t}>{announcementTypeLabel(t)}</option>)}
-        </select>
+        <Select
+          value={type}
+          onValueChange={(v) => setType(v as AnnouncementType)}
+          options={ANNOUNCEMENT_TYPES.map((t) => ({ value: t, label: announcementTypeLabel(t) }))}
+        />
       </Field>
 
       <Field label="Title"><Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
-      <Field label="Body"><textarea className={inputClass('min-h-[120px]')} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
+      <Field label="Body">
+        <Textarea
+          className="min-h-[120px]"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          maxLength={10000}
+        />
+      </Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Publish at (blank = now)">
