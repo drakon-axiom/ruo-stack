@@ -19,6 +19,7 @@ import { adminFulfillmentRoutes } from './routes/admin-fulfillment.js';
 import { adminOverviewRoutes } from './routes/admin-overview.js';
 import { adminBrandRoutes } from './routes/admin-brands.js';
 import { adminCatalogRoutes } from './routes/admin-catalog.js';
+import { adminCatalogImportRoutes } from './routes/admin-catalog-import.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
 import { adminShippingRoutes } from './routes/admin-shipping.js';
 import { adminAliasRoutes } from './routes/admin-aliases.js';
@@ -89,6 +90,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(shippingRatesRoutes);
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
+  await app.register(adminCatalogImportRoutes);
   await app.register(adminUsersRoutes);
   await app.register(adminFulfillmentRoutes);
   await app.register(adminOverviewRoutes);
