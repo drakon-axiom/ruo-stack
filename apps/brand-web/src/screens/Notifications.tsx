@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { TYPE_ICON, relativeTime, type Notification } from '../components/NotificationBell.js';
-import { Button, Card, chipClass } from '@ruostack/ui';
+import { Button, Card, Tabs } from '@ruostack/ui';
 
 /**
  * Full notifications history. The bell panel shows the most recent few; this is
@@ -62,11 +62,17 @@ export function Notifications() {
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
-      <div className="mb-4 flex gap-2">
-        <button className={chipClass(!unreadOnly)} onClick={() => setUnreadOnly(false)}>All</button>
-        <button className={chipClass(unreadOnly)} onClick={() => setUnreadOnly(true)}>
-          Unread{unreadCount > 0 && <span className="ml-1.5 opacity-70">{unreadCount}</span>}
-        </button>
+      {/* A two-option filter is a tab strip; Tabs carries the roles and the
+          aria-selected state that two bare buttons did not. */}
+      <div className="mb-4">
+        <Tabs
+          tabs={[
+            { key: 'all', label: 'All' },
+            { key: 'unread', label: 'Unread', ...(unreadCount > 0 ? { count: unreadCount } : {}) },
+          ]}
+          active={unreadOnly ? 'unread' : 'all'}
+          onChange={(k) => setUnreadOnly(k === 'unread')}
+        />
       </div>
 
       {loading ? (

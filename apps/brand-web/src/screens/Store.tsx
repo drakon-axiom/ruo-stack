@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api.js';
 import { ManagedProducts, ProvisioningWizard } from '../components/ProvisioningWizard.js';
-import { Badge, Button, Card, Input, buttonClass, labelClass } from '@ruostack/ui';
+import { Badge, Button, Card, Input, LinkButton, labelClass } from '@ruostack/ui';
 
 interface ManualSetup { webhook_url: string | null; webhook_secret: string; topics: string[] }
 interface Connection {
@@ -120,7 +119,7 @@ function Upsell() {
     <Card className="flex flex-col items-center gap-2 px-6 py-14 text-center">
       <div className="text-lg font-semibold">Store connections are a Pro feature</div>
       <div className="max-w-md text-sm text-content-muted">Upgrade to Pro or Volume to connect your WooCommerce store and pull orders in automatically.</div>
-      <Link to="/app/account" className={buttonClass('primary', 'md', 'mt-2')}>View plans</Link>
+      <LinkButton to="/app/account" className="mt-2">View plans</LinkButton>
     </Card>
   );
 }

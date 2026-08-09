@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FLAT_FALLBACK } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
-import { Card, buttonClass } from '@ruostack/ui';
+import { Card, LinkButton } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const SHIP = FLAT_FALLBACK.amountCents;
@@ -84,7 +84,7 @@ export function Shipping() {
               <p className="mb-3 text-sm text-content-muted">
                 Add a per-order shipping markup as profit on every store order. Available on Pro & Volume.
               </p>
-              <Link to="/app/account" className={buttonClass('primary', 'md')}>Upgrade plan</Link>
+              <LinkButton to="/app/account">Upgrade plan</LinkButton>
             </>
           ) : (
             <>
