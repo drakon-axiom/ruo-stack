@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
-import { Badge, Check, buttonClass, cardClass, cn, inputClass, labelClass } from '@ruostack/ui';
+import { Badge, Button, Card, Check, Input, buttonClass, cn, labelClass } from '@ruostack/ui';
 
 interface Me {
   profile: { id: string; full_name: string; name_last_changed_at: string | null; name_editable: boolean };
@@ -19,10 +19,10 @@ interface Me {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className={cardClass('mb-5 p-5')}>
+    <Card className="mb-5 p-5">
       <h2 className="mb-4 text-lg font-semibold">{title}</h2>
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -92,7 +92,7 @@ export function Account() {
     setErr(error?.message ?? '');
   }
 
-  if (!me) return <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>;
+  if (!me) return <Card className="p-10 text-center text-content-muted">Loading…</Card>;
 
   return (
     <>
@@ -106,37 +106,37 @@ export function Account() {
         <div className="space-y-3">
           <label className="block">
             <span className={labelClass('mb-1 block')}>Full name</span>
-            <input className={inputClass()} value={fullName} disabled={!me.profile.name_editable} onChange={(e) => setFullName(e.target.value)} />
+            <Input value={fullName} disabled={!me.profile.name_editable} onChange={(e) => setFullName(e.target.value)} />
             {!me.profile.name_editable && (
               <span className="mt-1 block text-2xs text-content-faint">Name can only be changed once every 7 days.</span>
             )}
           </label>
           <label className="block">
             <span className={labelClass('mb-1 block')}>Research company name</span>
-            <input className={inputClass()} value={brandName} onChange={(e) => setBrandName(e.target.value)} />
+            <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className={labelClass('mb-1 block')}>Website</span>
-              <input className={inputClass()} value={website} onChange={(e) => setWebsite(e.target.value)} />
+              <Input value={website} onChange={(e) => setWebsite(e.target.value)} />
             </label>
             <label className="block">
               <span className={labelClass('mb-1 block')}>Sales channel</span>
-              <input className={inputClass()} value={channel} onChange={(e) => setChannel(e.target.value)} />
+              <Input value={channel} onChange={(e) => setChannel(e.target.value)} />
             </label>
           </div>
-          <button className={buttonClass('primary', 'md')} onClick={saveProfile}>Save profile</button>
+          <Button onClick={saveProfile}>Save profile</Button>
         </div>
       </Section>
 
       <Section title="Email">
         <p className="mb-3 text-sm text-content-muted">Changing your email sends a confirmation to the new address (Supabase Auth).</p>
-        <button className={buttonClass('ghost', 'md')} onClick={changeEmail}>Change email</button>
+        <Button variant="ghost" onClick={changeEmail}>Change email</Button>
       </Section>
 
       <Section title="Password">
         <p className="mb-3 text-sm text-content-muted">We'll email you a secure reset link.</p>
-        <button className={buttonClass('ghost', 'md')} onClick={resetPassword}>Send password reset</button>
+        <Button variant="ghost" onClick={resetPassword}>Send password reset</Button>
       </Section>
 
       <SubscriptionSection />
@@ -229,7 +229,7 @@ function SubscriptionSection() {
           <span>
             Payment failed — your plan features stay active{sub?.grace_ends_at ? ` until ${new Date(sub.grace_ends_at).toLocaleDateString()}` : ''}. Update your card to avoid interruption.
           </span>
-          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Update payment method</button>
+          <Button className="shrink-0" disabled={busy} onClick={manage}>Update payment method</Button>
         </div>
       )}
       {/* Paid-through has passed but the stored status hasn't caught up (or the
@@ -241,7 +241,7 @@ function SubscriptionSection() {
             Your membership ended {new Date(sub.current_period_end!).toLocaleDateString()}. Renew to keep your plan
             features — they'll drop back to Starter shortly.
           </span>
-          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Renew</button>
+          <Button className="shrink-0" disabled={busy} onClick={manage}>Renew</Button>
         </div>
       )}
       {ended && (
@@ -250,7 +250,7 @@ function SubscriptionSection() {
             Your membership expired and you're on the Starter plan. Your account, orders and wallet are unaffected —
             add a payment method to restore your plan pricing.
           </span>
-          <button className={buttonClass('primary', 'md', 'shrink-0')} disabled={busy} onClick={manage}>Restore plan</button>
+          <Button className="shrink-0" disabled={busy} onClick={manage}>Restore plan</Button>
         </div>
       )}
 

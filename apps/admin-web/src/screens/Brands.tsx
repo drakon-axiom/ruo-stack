@@ -1,19 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  PageHeader,
-  StatusPill,
-  buttonClass,
-  cardClass,
-  inputClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, PageHeader, StatusPill, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const PLAN_PILL: Record<string, string> = {
@@ -36,7 +24,7 @@ const COLUMNS: Column<BrandRow>[] = [
   {
     key: 'plan',
     header: 'Plan',
-    cell: (b) => <span className={pillClass(PLAN_PILL[b.plan])}>{b.plan}</span>,
+    cell: (b) => <Badge >{b.plan}</Badge>,
   },
   {
     key: 'wallet',
@@ -164,17 +152,17 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
 
           <div className="flex items-center gap-2">
             <StatusPill value={d.status} />
-            <span className={pillClass()}>{d.subscription.plan}</span>
+            <Badge >{d.subscription.plan}</Badge>
             {d.owner_email && <span className="text-content-muted">{d.owner_email}</span>}
           </div>
 
-          <div className={cardClass('p-3')}>
+          <Card className="p-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
               <div><div className="text-xl font-extrabold text-accent">{dollars(d.wallet.available_cents)}</div><div className="text-2xs text-content-faint">available</div></div>
               <div><div className="text-xl font-extrabold">{dollars(d.wallet.held_cents)}</div><div className="text-2xs text-content-faint">held</div></div>
               <div><div className="text-xl font-extrabold">{dollars(d.wallet.balance_cents)}</div><div className="text-2xs text-content-faint">balance</div></div>
             </div>
-          </div>
+          </Card>
 
           {isSuper && (
             <button className={d.status === 'active' ? 'btn-danger w-full' : 'btn w-full'} onClick={toggleStatus} disabled={busy}>
@@ -183,36 +171,36 @@ function BrandDetail({ id, onClose, onChanged }: { id: string; onClose: () => vo
           )}
 
           {canAdjust && (
-            <div className={cardClass('p-3')}>
+            <Card className="p-3">
               <div className="mb-2 text-2xs uppercase tracking-[0.1em] text-content-faint">Manual wallet adjustment (Finance)</div>
               <div className="mb-2 grid grid-cols-2 gap-2">
-                <Field label="Amount $ (+/-)"><input className={inputClass()} value={adjAmt} onChange={(e) => setAdjAmt(e.target.value)} placeholder="-25 or 50" /></Field>
-                <Field label="Reason"><input className={inputClass()} value={adjReason} onChange={(e) => setAdjReason(e.target.value)} /></Field>
+                <Field label="Amount $ (+/-)"><Input value={adjAmt} onChange={(e) => setAdjAmt(e.target.value)} placeholder="-25 or 50" /></Field>
+                <Field label="Reason"><Input value={adjReason} onChange={(e) => setAdjReason(e.target.value)} /></Field>
               </div>
-              <button className={buttonClass('ghost', 'md', 'w-full')} disabled={busy || !adjAmt || !adjReason} onClick={adjust}>Apply adjustment</button>
-            </div>
+              <Button variant="ghost" className="w-full" disabled={busy || !adjAmt || !adjReason} onClick={adjust}>Apply adjustment</Button>
+            </Card>
           )}
 
           {canAdjust && (
-            <div className={cardClass('p-3')}>
+            <Card className="p-3">
               <div className="mb-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Pick-&amp;-pack fee override (Finance)</div>
               <div className="mb-2 text-xs text-content-muted">
                 Effective <span className="text-content">{dollars(d.shipping.pickpack_fee_effective_cents)}</span>/shipment
                 {d.shipping.pickpack_fee_override_cents == null ? ' (global default)' : ' (override)'} · global {dollars(d.shipping.global_default_cents)}
               </div>
               <div className="flex items-end gap-2">
-                <Field label="Override $/shipment"><input className={inputClass()} value={fee} onChange={(e) => setFee(e.target.value)} placeholder={(d.shipping.global_default_cents / 100).toFixed(2)} /></Field>
-                <button className={buttonClass('primary', 'md')} disabled={busy || !fee} onClick={() => savePickpack(false)}>Save</button>
-                <button className={buttonClass('ghost', 'md')} disabled={busy || d.shipping.pickpack_fee_override_cents == null} onClick={() => savePickpack(true)}>Use global</button>
+                <Field label="Override $/shipment"><Input value={fee} onChange={(e) => setFee(e.target.value)} placeholder={(d.shipping.global_default_cents / 100).toFixed(2)} /></Field>
+                <Button disabled={busy || !fee} onClick={() => savePickpack(false)}>Save</Button>
+                <Button variant="ghost" disabled={busy || d.shipping.pickpack_fee_override_cents == null} onClick={() => savePickpack(true)}>Use global</Button>
               </div>
-            </div>
+            </Card>
           )}
 
           <div>
             <div className="mb-1 text-2xs uppercase tracking-[0.1em] text-content-faint">Recent orders</div>
             {d.orders.length === 0 ? <p className="text-content-muted">None</p> : d.orders.map((o) => (
               <div key={o.id} className="flex justify-between border-b border-line/50 py-1.5">
-                <span>{o.recipient_name} <span className={pillClass('ml-1')}>{o.status.replace(/_/g, ' ')}</span></span>
+                <span>{o.recipient_name} <Badge className="ml-1">{o.status.replace(/_/g, ' ')}</Badge></span>
                 <span>{dollars(o.wallet_charge_cents)}</span>
               </div>
             ))}

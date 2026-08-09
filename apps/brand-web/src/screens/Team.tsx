@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { brandRoleLabel, type BrandMemberRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
-import { buttonClass, cardClass, inputClass, pillClass } from '@ruostack/ui';
+import { Badge, Button, Card, Input, Select } from '@ruostack/ui';
 
 /**
  * Team (architecture §3.1). Invites are LINK-based: we mint a Supabase action
@@ -69,29 +69,29 @@ export function Team() {
             connection, branding or the team.
           </p>
         </div>
-        {isOwner && <button className={buttonClass('primary', 'md')} onClick={() => setInviting(true)}>Invite someone</button>}
+        {isOwner && <Button onClick={() => setInviting(true)}>Invite someone</Button>}
       </div>
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
       {link && <InviteLink email={link.email} url={link.url} onClose={() => setLink(null)} />}
 
       {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
+        <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : (
-        <div className={cardClass('divide-y divide-lline dark:divide-line')}>
+        <Card className="divide-y divide-lline dark:divide-line">
           {members.map((m) => (
             <div key={m.user_id} className="flex flex-wrap items-center gap-3 p-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-base font-medium">{m.full_name ?? m.email ?? 'Unknown'}</span>
-                  {m.is_you && <span className={pillClass('border-line bg-surface-3 text-content-muted')}>you</span>}
-                  <span className={pillClass(`${m.role === 'owner' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-line bg-surface-3 text-content-muted'}`)}>
+                  {m.is_you && <Badge>you</Badge>}
+                  <Badge>
                     {brandRoleLabel(m.role)}
-                  </span>
+                  </Badge>
                   {m.status === 'suspended' ? (
-                    <span className={pillClass('border-danger/40 bg-danger/10 text-danger')}>access revoked</span>
+                    <Badge tone="danger">access revoked</Badge>
                   ) : m.pending ? (
-                    <span className={pillClass('border-warning/40 bg-warning/10 text-warning')}>pending — hasn’t signed in</span>
+                    <Badge tone="warning">pending — hasn’t signed in</Badge>
                   ) : null}
                 </div>
                 <div className="mt-0.5 text-xs text-content-muted">{m.email}</div>
@@ -100,19 +100,19 @@ export function Team() {
               {isOwner && !m.is_you && (
                 <div className="flex flex-wrap gap-2">
                   {m.pending && m.status !== 'suspended' && (
-                    <button className={buttonClass('ghost', 'md', 'text-xs')} onClick={() => resend(m)}>Get link</button>
+                    <Button variant="ghost" className="text-xs" onClick={() => resend(m)}>Get link</Button>
                   )}
                   {m.status === 'suspended' ? (
-                    <button
-                      className={buttonClass('ghost', 'md', 'text-xs')}
+                    <Button
+                      variant="ghost" className="text-xs"
                       onClick={() => act(() => api(`/api/brand/members/${m.user_id}/reactivate`, { method: 'POST' }))}
                     >
                       Restore access
-                    </button>
+                    </Button>
                   ) : (
                     <>
-                      <button
-                        className={buttonClass('ghost', 'md', 'text-xs')}
+                      <Button
+                        variant="ghost" className="text-xs"
                         onClick={() =>
                           act(() =>
                             api(`/api/brand/members/${m.user_id}`, {
@@ -123,9 +123,9 @@ export function Team() {
                         }
                       >
                         Make {m.role === 'owner' ? 'staff' : 'owner'}
-                      </button>
-                      <button
-                        className={buttonClass('ghost', 'md', 'text-xs text-danger')}
+                      </Button>
+                      <Button
+                        variant="ghost" className="text-xs text-danger"
                         onClick={() => {
                           if (confirm(`Revoke access for ${m.full_name ?? m.email}? They lose access immediately.`)) {
                             void act(() => api(`/api/brand/members/${m.user_id}`, { method: 'DELETE' }));
@@ -133,14 +133,14 @@ export function Team() {
                         }}
                       >
                         Revoke
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
               )}
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
       {inviting && (
@@ -177,24 +177,28 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/50 p-4" onClick={onClose}>
-      <div className={cardClass('w-full max-w-md p-5')} onClick={(e) => e.stopPropagation()}>
+      <Card className="w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 text-lg font-semibold">Invite a team member</div>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
         <label className="mb-3 block">
           <span className="mb-1 block text-xs text-content-muted">Full name</span>
-          <input className={inputClass()} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </label>
         <label className="mb-3 block">
           <span className="mb-1 block text-xs text-content-muted">Email</span>
-          <input className={inputClass()} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="mb-4 block">
           <span className="mb-1 block text-xs text-content-muted">Role</span>
-          <select className={inputClass()} value={role} onChange={(e) => setRole(e.target.value as BrandMemberRole)}>
-            <option value="staff">Staff — orders, tracking, claims, customers (no pricing)</option>
-            <option value="owner">Owner — full access including billing and the wallet</option>
-          </select>
+          <Select
+            value={role}
+            onValueChange={(v) => setRole(v as BrandMemberRole)}
+            options={[
+              { value: 'staff', label: 'Staff — orders, tracking, claims, customers (no pricing)' },
+              { value: 'owner', label: 'Owner — full access including billing and the wallet' },
+            ]}
+          />
         </label>
 
         <p className="mb-4 text-xs text-content-muted">
@@ -202,12 +206,10 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
         </p>
 
         <div className="flex gap-2">
-          <button className={buttonClass('ghost', 'md', 'flex-1')} onClick={onClose} disabled={busy}>Cancel</button>
-          <button className={buttonClass('primary', 'md', 'flex-1')} onClick={submit} disabled={busy || !email || !fullName}>
-            {busy ? '…' : 'Create invite'}
-          </button>
+          <Button variant="ghost" className="flex-1" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button className="flex-1" onClick={submit} disabled={!email || !fullName} loading={busy}>Create invite</Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -226,17 +228,17 @@ function InviteLink({ email, url, onClose }: { email: string; url: string; onClo
   }
 
   return (
-    <div className={cardClass('mb-4 border-accent/40 p-4')}>
+    <Card className="mb-4 border-accent/40 p-4">
       <div className="mb-1 text-base font-semibold">Send this link to {email || 'your new team member'}</div>
       <p className="mb-3 text-xs text-content-muted">
         It lets them set a password and sign in. Treat it like a password — anyone with the link can claim the account.
         You can generate a fresh one at any time.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <input className={inputClass('flex-1 font-mono text-xs')} readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
-        <button className={buttonClass('primary', 'md')} onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
-        <button className={buttonClass('ghost', 'md')} onClick={onClose}>Done</button>
+        <Input className="flex-1 font-mono text-xs" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
+        <Button onClick={copy}>{copied ? 'Copied' : 'Copy'}</Button>
+        <Button variant="ghost" onClick={onClose}>Done</Button>
       </div>
-    </div>
+    </Card>
   );
 }

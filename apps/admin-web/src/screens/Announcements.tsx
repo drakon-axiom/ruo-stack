@@ -2,22 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Button,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  KpiTile,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  labelClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Select, Tabs, Textarea, labelClass, type Column } from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -136,7 +121,7 @@ export function Announcements() {
       key: 'state',
       header: 'State',
       minWidth: 110,
-      cell: (a) => <span className={pillClass(STATE_STYLE[a.display_state])}>{a.display_state}</span>,
+      cell: (a) => <Badge >{a.display_state}</Badge>,
     },
     { key: 'publish', header: 'Publish', minWidth: 140, cell: (a) => fmt(a.publish_at) },
     { key: 'expires', header: 'Expires', minWidth: 140, cell: (a) => fmt(a.expires_at) },
@@ -178,7 +163,7 @@ export function Announcements() {
       <PageHeader
         title="Announcements"
         subtitle="Broadcasts that appear in every brand's Notifications inbox."
-        action={writable ? <button className={buttonClass('primary', 'md')} onClick={() => setEditing('new')}>Compose</button> : undefined}
+        action={writable ? <Button onClick={() => setEditing('new')}>Compose</Button> : undefined}
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -203,11 +188,11 @@ export function Announcements() {
             { key: 'archived', label: 'Archived', count: counts.archived ?? 0 },
           ]}
         />
-        <input className={inputClass('max-w-xs')} placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input className="max-w-xs" placeholder="Search title or body…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
+        <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : visible.length === 0 ? (
         <EmptyState
           title={rows.length === 0 ? 'No announcements yet' : 'Nothing matches that filter'}
@@ -297,48 +282,59 @@ function Compose({
       onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
         <div className="flex gap-2">
-          <button className={buttonClass('ghost', 'md', 'flex-1')} onClick={() => save(false)} disabled={busy || !title || !body}>
-            {busy ? '…' : 'Save draft'}
-          </button>
-          <button className={buttonClass('primary', 'md', 'flex-1')} onClick={() => save(true)} disabled={busy || !title || !body || (audience === 'single_brand' && !brandId)}>
-            {busy ? '…' : scheduled ? 'Schedule' : 'Publish now'}
-          </button>
+          <Button variant="ghost" className="flex-1" onClick={() => save(false)} disabled={!title || !body} loading={busy}>Save draft</Button>
+          <Button className="flex-1" onClick={() => save(true)} disabled={!title || !body || (audience === 'single_brand' && !brandId)} loading={busy}>{scheduled ? 'Schedule' : 'Publish now'}</Button>
         </div>
       }
     >
       {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
       <Field label="Audience">
-        <select className={inputClass()} value={audience} onChange={(e) => setAudience(e.target.value as 'all_brands' | 'single_brand')}>
-          <option value="all_brands">All brands</option>
-          <option value="single_brand">A single brand</option>
-        </select>
+        <Select
+          value={audience}
+          onValueChange={(v) => setAudience(v as 'all_brands' | 'single_brand')}
+          options={[
+            { value: 'all_brands', label: 'All brands' },
+            { value: 'single_brand', label: 'A single brand' },
+          ]}
+        />
       </Field>
 
       {audience === 'single_brand' && (
         <Field label="Brand">
-          <select className={inputClass()} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-            <option value="">Select a brand…</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
-          </select>
+          <Select
+            value={brandId}
+            onValueChange={setBrandId}
+            placeholder="Select a brand…"
+            options={brands.map((b) => ({ value: b.id, label: b.brand_name }))}
+          />
         </Field>
       )}
 
       <Field label="Type">
-        <select className={inputClass()} value={type} onChange={(e) => setType(e.target.value as AnnouncementType)}>
-          {ANNOUNCEMENT_TYPES.map((t) => <option key={t} value={t}>{announcementTypeLabel(t)}</option>)}
-        </select>
+        <Select
+          value={type}
+          onValueChange={(v) => setType(v as AnnouncementType)}
+          options={ANNOUNCEMENT_TYPES.map((t) => ({ value: t, label: announcementTypeLabel(t) }))}
+        />
       </Field>
 
-      <Field label="Title"><input className={inputClass()} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
-      <Field label="Body"><textarea className={inputClass('min-h-[120px]')} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
+      <Field label="Title"><Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
+      <Field label="Body">
+        <Textarea
+          className="min-h-[120px]"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          maxLength={10000}
+        />
+      </Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Publish at (blank = now)">
-          <input className={inputClass()} type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+          <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
         </Field>
         <Field label="Expires at (blank = never)">
-          <input className={inputClass()} type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+          <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         </Field>
       </div>
 

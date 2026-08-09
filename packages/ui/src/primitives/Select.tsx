@@ -14,6 +14,7 @@ export function Select({
   placeholder = 'Select…',
   id,
   className,
+  disabled,
 }: {
   options: SelectOption[];
   value: string;
@@ -21,14 +22,16 @@ export function Select({
   placeholder?: string;
   id?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
-    <RS.Root value={value} onValueChange={onValueChange}>
+    <RS.Root value={value} onValueChange={onValueChange} disabled={disabled}>
       <RS.Trigger
         id={id}
         className={cn(
           'inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-[10px]',
           'border border-line bg-field px-3 text-base text-content md:min-h-0 md:py-2 md:text-sm',
+          'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
       >

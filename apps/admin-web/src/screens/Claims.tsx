@@ -2,20 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite, canResolveClaim, claimTypeLabel, type ClaimType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Badge,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -58,10 +45,10 @@ const COLUMNS: Column<ClaimRow>[] = [
     key: 'status',
     header: 'Status',
     cell: (c) => (
-      <span className={pillClass(STATUS_TONE[c.status] ?? '')}>
+      <Badge >
         {c.status.replace(/_/g, ' ')}
         {c.resolution ? ` \u00b7 ${c.resolution}` : ''}
-      </span>
+      </Badge>
     ),
   },
   {
@@ -154,7 +141,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
         <div className="space-y-4 text-sm">
           {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">{err}</div>}
           <div className="flex items-center gap-2">
-            <span className={pillClass(`${STATUS_TONE[c.status] ?? ''}`)}>{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</span>
+            <Badge >{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</Badge>
             {c.order.trackingNumber && <span className="font-mono text-2xs text-content-muted">{c.order.carrier} {c.order.trackingNumber}</span>}
           </div>
           <div className="text-content-muted">{c.order.recipientName} · {c.order.city}, {c.order.state} · order value {dollars(c.order.walletChargeCents)}</div>
@@ -165,29 +152,36 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
 
           {writable && c.status !== 'resolved' && (
             <div className="flex flex-wrap gap-2">
-              {c.status === 'open' && <button className={buttonClass('ghost', 'md')} disabled={busy} onClick={() => patch({ status: 'investigating' })}>Start investigating</button>}
+              {c.status === 'open' && <Button variant="ghost" disabled={busy} onClick={() => patch({ status: 'investigating' })}>Start investigating</Button>}
               <span className="flex items-center gap-1">
-                <input className={inputClass('w-40')} placeholder="carrier claim id" value={carrierId} onChange={(e) => setCarrierId(e.target.value)} />
-                <button className={buttonClass('ghost', 'md')} disabled={busy || !carrierId} onClick={() => patch({ status: 'carrier_filed', carrier_claim_id: carrierId })}>File carrier claim</button>
+                <Input className="w-40" placeholder="carrier claim id" value={carrierId} onChange={(e) => setCarrierId(e.target.value)} />
+                <Button variant="ghost" disabled={busy || !carrierId} onClick={() => patch({ status: 'carrier_filed', carrier_claim_id: carrierId })}>File carrier claim</Button>
               </span>
             </div>
           )}
 
           {canResolve && c.status !== 'resolved' && (
-            <div className={cardClass('space-y-2 p-3')}>
+            <Card className="space-y-2 p-3">
               <div className="text-2xs uppercase tracking-[0.1em] text-content-faint">Resolve</div>
               <Field label="Resolution">
-                <select className={inputClass()} value={res} onChange={(e) => setRes(e.target.value as typeof res)} disabled={creditOnly}>
-                  {!creditOnly && <option value="reshipped">Reship</option>}
-                  <option value="credited">Wallet credit</option>
-                  {!creditOnly && <option value="denied">Deny</option>}
-                </select>
+                <Select
+                  value={res}
+                  disabled={creditOnly}
+                  onValueChange={(v) => setRes(v as typeof res)}
+                  options={[
+                    // Gated: a credit-only role is offered the credit outcome
+                    // and nothing else.
+                    ...(creditOnly ? [] : [{ value: 'reshipped', label: 'Reship' }]),
+                    { value: 'credited', label: 'Wallet credit' },
+                    ...(creditOnly ? [] : [{ value: 'denied', label: 'Deny' }]),
+                  ]}
+                />
               </Field>
-              {res === 'credited' && <Field label="Credit amount ($)"><input className={inputClass()} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={(c.order.walletChargeCents / 100).toFixed(2)} /></Field>}
+              {res === 'credited' && <Field label="Credit amount ($)"><Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={(c.order.walletChargeCents / 100).toFixed(2)} /></Field>}
               {res === 'reshipped' && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Platform-comped ($0) — uncheck to charge the brand's wallet</label>}
-              <Field label="Reason"><input className={inputClass()} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
-              <button className={buttonClass('primary', 'md', 'w-full')} disabled={busy || !reason || (res === 'credited' && !amount)} onClick={resolve}>Resolve claim</button>
-            </div>
+              <Field label="Reason"><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+              <Button className="w-full" disabled={busy || !reason || (res === 'credited' && !amount)} onClick={resolve}>Resolve claim</Button>
+            </Card>
           )}
         </div>
       )}

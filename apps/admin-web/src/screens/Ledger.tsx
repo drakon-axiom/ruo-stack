@@ -2,18 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  DataTable,
-  EmptyState,
-  KpiTile,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, EmptyState, Input, KpiTile, PageHeader, Select, Tabs, type Column } from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -85,6 +74,10 @@ const TABS: { key: string; label: string; types?: TxnType[] }[] = [
 
 /** `YYYY-MM-DD` (what <input type="date"> wants) for N days ago. */
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+
+/* Radix Select rejects an item with an empty value, so the "no brand
+ * filter" choice needs a sentinel that maps back to '' for the API. */
+const ALL_BRANDS = '__all__';
 
 const SUMMARY_COLUMNS: Column<BrandSummary>[] = [
   { key: 'brand', header: 'Brand', priority: 'primary', minWidth: 160, cell: (b) => b.brandName },
@@ -240,8 +233,8 @@ export function Ledger() {
         subtitle="Wallet movement across every brand, the float, and drift that needs resolving."
         action={
           <div className="flex gap-2">
-            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('summary')}>Export summary</button>
-            <button className={buttonClass('ghost', 'md')} onClick={() => exportCsv('detail')}>Export detail</button>
+            <Button variant="ghost" onClick={() => exportCsv('summary')}>Export summary</Button>
+            <Button variant="ghost" onClick={() => exportCsv('detail')}>Export detail</Button>
           </div>
         }
       />
@@ -258,24 +251,24 @@ export function Ledger() {
 
       {/* ── Drift: the actionable face of the reconciliation worker ────────── */}
       {drift.length > 0 && (
-        <div className={cardClass('mb-5 p-4')}>
+        <Card className="mb-5 p-4">
           <div className="mb-2 text-base font-semibold">Reconciliation drift</div>
           <div className="space-y-2">
             {drift.map((d) => (
               <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <span className={pillClass(`mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-warning/40 bg-warning/10 text-warning'}`)}>
+                  <Badge tone="warning">
                     {d.kind === 'shipped_not_captured' ? 'not captured' : 'stale export'}
-                  </span>
+                  </Badge>
                   <span className="text-content">{d.brand_name}</span>
                   <span className="ml-2 text-content-muted">{d.detail}</span>
                   {d.at && <span className="ml-2 text-content-faint">{day(d.at)}</span>}
                 </div>
                 {d.kind === 'shipped_not_captured' ? (
                   canHeal ? (
-                    <button className={buttonClass('primary', 'md')} disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
+                    <Button disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
                       {healing === d.order_id ? '…' : 'Re-run capture'}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="text-xs text-content-faint">finance only</span>
                   )
@@ -286,19 +279,24 @@ export function Ledger() {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Filters ───────────────────────────────────────────────────────── */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={setTab} />
         <div className="flex flex-wrap items-center gap-2">
-          <select className={inputClass('max-w-[180px]')} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-            <option value="">All brands</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
-          </select>
-          <input className={inputClass('w-[150px]')} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input className={inputClass('w-[150px]')} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <Select
+            className="max-w-[180px]"
+            value={brandId || ALL_BRANDS}
+            onValueChange={(v) => setBrandId(v === ALL_BRANDS ? '' : v)}
+            options={[
+              { value: ALL_BRANDS, label: 'All brands' },
+              ...brands.map((b) => ({ value: b.id, label: b.brand_name })),
+            ]}
+          />
+          <Input className="w-[150px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <Input className="w-[150px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
 

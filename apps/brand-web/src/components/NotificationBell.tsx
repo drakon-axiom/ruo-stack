@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { buttonClass } from '@ruostack/ui';
+import { Button } from '@ruostack/ui';
 
 /**
  * Top-bar notifications bell. Shows the unread count and a panel of the most
@@ -115,11 +115,11 @@ export function NotificationBell() {
 
   return (
     <div className="relative" ref={wrapRef}>
-      <button
+      <Button
         onClick={toggle}
         aria-label={unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'}
         aria-expanded={open}
-        className={buttonClass('ghost', 'md', 'relative text-sm')}
+        variant="ghost" className="relative text-sm"
       >
         <span aria-hidden>🔔</span>
         {unread > 0 && (
@@ -127,7 +127,7 @@ export function NotificationBell() {
             {unread > 9 ? '9+' : unread}
           </span>
         )}
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute right-0 z-40 mt-2 w-[340px] overflow-hidden rounded-xl border border-line bg-surface-2 shadow-e3">

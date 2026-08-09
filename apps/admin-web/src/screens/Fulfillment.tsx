@@ -2,21 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Button,
-  DataTable,
-  Drawer,
-  EmptyState,
-  Field,
-  PageHeader,
-  Tabs,
-  buttonClass,
-  cardClass,
-  inputClass,
-  labelClass,
-  pillClass,
-  type Column,
-} from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, labelClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -45,7 +31,7 @@ const TONE: Record<string, string> = {
 
 function FulfillmentBadge({ order }: { order: { status: string; blocker: string; exported_at: string | null } }) {
   const meta = FULFILLMENT_META[fulfillmentState(order)];
-  return <span className={pillClass(`${TONE[meta.tone]}`)} title={meta.label}>{meta.icon} {meta.label}</span>;
+  return <Badge title={meta.label}>{meta.icon} {meta.label}</Badge>;
 }
 
 const isPreShip = (o: Order) => o.status === 'ready_for_fulfillment' || o.status === 'processing';
@@ -204,23 +190,29 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
-      <div className={cardClass('w-full max-w-sm p-6')} onClick={(e) => e.stopPropagation()}>
+      <Card className="w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
         <h2 className="mb-1 text-lg font-semibold text-content">Mark shipped (manual)</h2>
         <p className="mb-4 text-xs text-content-muted">{order.brand_name} → {order.recipient.name}. Captures {dollars(order.wallet_charge_cents)} from the brand's wallet. Use only when ShipStation's shipnotify didn't arrive.</p>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
         <Field label="Carrier">
-          <select className={inputClass()} value={carrier} onChange={(e) => setCarrier(e.target.value)}>
-            <option>USPS</option><option>UPS</option><option>FedEx</option>
-          </select>
+          <Select
+            value={carrier}
+            onValueChange={setCarrier}
+            options={[
+              { value: 'USPS', label: 'USPS' },
+              { value: 'UPS', label: 'UPS' },
+              { value: 'FedEx', label: 'FedEx' },
+            ]}
+          />
         </Field>
         <Field label="Tracking number">
-          <input className={inputClass()} value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
+          <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" />
         </Field>
         <div className="mt-4 flex justify-end gap-2">
-          <button className={buttonClass('ghost', 'md')} onClick={onClose}>Cancel</button>
-          <button className={buttonClass('primary', 'md')} disabled={!tracking || busy} onClick={ship}>{busy ? '…' : 'Capture & ship'}</button>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button disabled={!tracking} loading={busy} onClick={ship}>Capture & ship</Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -296,7 +288,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
       title={`Edit order · ${order.brand_name}`}
       onOpenChange={(o) => { if (!o) onClose(); }}
       footer={
-        <button className={buttonClass('primary', 'md', 'w-full')} disabled={!valid || busy || !detail} onClick={save}>{busy ? '…' : 'Save changes (re-prices wallet)'}</button>
+        <Button className="w-full" disabled={!valid || !detail} loading={busy} onClick={save}>Save changes (re-prices wallet)</Button>
       }
     >
       {!detail ? (
@@ -325,10 +317,13 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
             </div>
             {lines.map((l, i) => (
               <div key={i} className="mb-2 flex items-center gap-2">
-                <select className={inputClass('flex-1')} value={l.product_id} onChange={(e) => setLine(i, { product_id: e.target.value })}>
-                  {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <input className={inputClass('w-16')} type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
+                <Select
+                  className="flex-1"
+                  value={l.product_id}
+                  onValueChange={(v) => setLine(i, { product_id: v })}
+                  options={catalog.map((p) => ({ value: p.id, label: p.name }))}
+                />
+                <Input className="w-16" type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, +e.target.value) })} />
                 <button className="text-content-faint hover:text-danger" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>✕</button>
               </div>
             ))}
@@ -336,20 +331,20 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
 
           <div className="space-y-2">
             <span className={labelClass()}>Ship to</span>
-            <input className={inputClass()} placeholder="Recipient name" value={r.recipient_name} onChange={(e) => setR({ ...r, recipient_name: e.target.value })} />
-            <input className={inputClass()} placeholder="Email (optional)" value={r.recipient_email} onChange={(e) => setR({ ...r, recipient_email: e.target.value })} />
-            <input className={inputClass()} placeholder="Phone (optional)" value={r.recipient_phone} onChange={(e) => setR({ ...r, recipient_phone: e.target.value })} />
-            <input className={inputClass()} placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
-            <input className={inputClass()} placeholder="Address line 2 (optional)" value={r.address2} onChange={(e) => setR({ ...r, address2: e.target.value })} />
+            <Input placeholder="Recipient name" value={r.recipient_name} onChange={(e) => setR({ ...r, recipient_name: e.target.value })} />
+            <Input placeholder="Email (optional)" value={r.recipient_email} onChange={(e) => setR({ ...r, recipient_email: e.target.value })} />
+            <Input placeholder="Phone (optional)" value={r.recipient_phone} onChange={(e) => setR({ ...r, recipient_phone: e.target.value })} />
+            <Input placeholder="Address line 1" value={r.address1} onChange={(e) => setR({ ...r, address1: e.target.value })} />
+            <Input placeholder="Address line 2 (optional)" value={r.address2} onChange={(e) => setR({ ...r, address2: e.target.value })} />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <input className={inputClass()} placeholder="City" value={r.city} onChange={(e) => setR({ ...r, city: e.target.value })} />
-              <input className={inputClass()} placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
-              <input className={inputClass()} placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />
+              <Input placeholder="City" value={r.city} onChange={(e) => setR({ ...r, city: e.target.value })} />
+              <Input placeholder="State" value={r.state} onChange={(e) => setR({ ...r, state: e.target.value })} />
+              <Input placeholder="ZIP" value={r.zip} onChange={(e) => setR({ ...r, zip: e.target.value })} />
             </div>
           </div>
 
           <Field label="Shipping service code (optional override)">
-            <input className={inputClass()} placeholder="leave blank to auto-rate" value={service} onChange={(e) => setService(e.target.value)} />
+            <Input placeholder="leave blank to auto-rate" value={service} onChange={(e) => setService(e.target.value)} />
           </Field>
         </div>
       )}

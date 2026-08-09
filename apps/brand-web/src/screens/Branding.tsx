@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
-import { buttonClass, cardClass, inputClass, labelClass } from '@ruostack/ui';
+import { Button, Card, Input, labelClass } from '@ruostack/ui';
 
 interface Me {
   brand: {
@@ -109,7 +109,7 @@ export function Branding() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Logo */}
-        <div className={cardClass('p-5')}>
+        <Card className="p-5">
           <h2 className="mb-3 text-lg font-semibold">Logo</h2>
           <div className="mb-4 flex items-center gap-4">
             <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-lg border border-line bg-surface-3 dark:border-line">
@@ -120,10 +120,10 @@ export function Branding() {
               )}
             </div>
             <div className="flex flex-col gap-2">
-              <button className={buttonClass('primary', 'md')} disabled={busy} onClick={() => fileRef.current?.click()}>
+              <Button disabled={busy} onClick={() => fileRef.current?.click()}>
                 {logoUrl ? 'Replace logo' : 'Upload logo'}
-              </button>
-              {logoUrl && <button className={buttonClass('ghost', 'md', 'text-xs')} disabled={busy} onClick={removeLogo}>Remove</button>}
+              </Button>
+              {logoUrl && <Button variant="ghost" className="text-xs" disabled={busy} onClick={removeLogo}>Remove</Button>}
             </div>
             <input
               ref={fileRef}
@@ -134,22 +134,22 @@ export function Branding() {
             />
           </div>
           <p className="text-2xs text-content-faint">PNG, JPEG, WebP, or SVG. Up to 512 KB. Square works best.</p>
-        </div>
+        </Card>
 
         {/* Colors */}
-        <div className={cardClass('p-5')}>
+        <Card className="p-5">
           <h2 className="mb-3 text-lg font-semibold">Brand colors</h2>
           <div className="space-y-3">
             <ColorField label="Primary" value={primary} onChange={setPrimary} />
             <ColorField label="Accent" value={accent} onChange={setAccent} />
           </div>
-          <button className={buttonClass('primary', 'md', 'mt-4')} disabled={busy || !colorsDirty} onClick={saveColors}>Save colors</button>
-        </div>
+          <Button className="mt-4" disabled={busy || !colorsDirty} onClick={saveColors}>Save colors</Button>
+        </Card>
       </div>
 
       {/* Preview */}
       <h2 className="mb-2 mt-6 text-sm uppercase tracking-[0.12em] text-content-faint">Preview</h2>
-      <div className={cardClass('overflow-hidden')}>
+      <Card className="overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4" style={{ backgroundColor: accent }}>
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-8 w-8 rounded object-contain" />
@@ -166,7 +166,7 @@ export function Branding() {
             Primary button
           </button>
         </div>
-      </div>
+      </Card>
       <p className="mt-3 text-2xs text-content-faint">
         Colors are saved to your brand and used on customer-facing surfaces. The portal chrome keeps the shared theme for now.
       </p>
@@ -185,8 +185,8 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
       />
       <div className="flex-1">
         <span className={labelClass('mb-1 block')}>{label}</span>
-        <input
-          className={inputClass('font-mono')}
+        <Input
+          className="font-mono"
           value={value}
           spellCheck={false}
           onChange={(e) => onChange(e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`)}

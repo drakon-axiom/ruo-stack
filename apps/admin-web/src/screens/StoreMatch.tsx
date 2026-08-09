@@ -2,17 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import {
-  Button,
-  DataTable,
-  EmptyState,
-  InlineAlert,
-  PageHeader,
-  Select,
-  Tabs,
-  cardClass,
-  type Column,
-} from '@ruostack/ui';
+import { Button, Card, DataTable, EmptyState, InlineAlert, PageHeader, Select, Tabs, type Column } from '@ruostack/ui';
 
 interface NoMatchOrder {
   id: string;
@@ -113,7 +103,7 @@ export function StoreMatch() {
         orders.length === 0 ? <EmptyState title="All clear" hint="No unmatched store orders." /> : (
           <div className="space-y-3">
             {orders.map((o) => (
-              <div key={o.id} className={cardClass('p-4')}>
+              <Card key={o.id} className="p-4">
                 <div className="mb-2 flex items-center justify-between text-sm">
                   <div><span className="text-content">{o.brand_name}</span> · {o.recipient.name} · {o.recipient.city}, {o.recipient.state}</div>
                   <div className="font-mono text-2xs text-content-faint">{o.external_order_id}</div>
@@ -148,7 +138,7 @@ export function StoreMatch() {
                     );
                   })}
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )
