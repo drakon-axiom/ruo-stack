@@ -48,7 +48,11 @@ for (const root of ROOTS) {
       for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
         const value = m[1] ?? m[2] ?? '';
 
-        for (const token of value.split(/[\s${}]+/)) {
+        // Split on quotes and ternary punctuation too, not just whitespace and
+        // interpolation: inside a template literal a class often appears as
+        // `${cond ? 'btn-ghost' : 'btn'}`, and leaving the quote attached to
+        // the token made those references invisible to this check.
+        for (const token of value.split(/[\s${}'"`?:()]+/)) {
           if (LEGACY.has(token)) {
             console.log(`${file}:${i + 1}  ${token}`);
             hits++;

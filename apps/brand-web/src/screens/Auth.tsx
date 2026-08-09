@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { signupBrand, ApiError } from '../lib/api.js';
-import { Card, InlineAlert, buttonClass, inputClass } from '@ruostack/ui';
+import { Card, InlineAlert, Logo, buttonClass, inputClass } from '@ruostack/ui';
 
 /* Auth shell. This used to be light-only (the old "light auth, dark app"
  * pattern) and still carried a hard-coded white card and slate text, so in dark
@@ -20,11 +20,8 @@ function AuthShell({
   return (
     <div className="grid min-h-screen place-items-center bg-canvas px-4 py-10">
       <Card className="w-full max-w-sm p-7">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent-solid text-lg font-black text-white">
-            R
-          </span>
-          <span className="text-xl font-bold text-content">RUOStack</span>
+        <div className="mb-6">
+          <Logo variant="full" className="text-accent" />
         </div>
         <h1 className="mb-1 text-xl font-bold text-content">{title}</h1>
         <p className="mb-5 text-sm text-content-muted">Research-use-only fulfillment platform.</p>

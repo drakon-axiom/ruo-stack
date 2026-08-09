@@ -8,6 +8,7 @@ import { CommandPalette } from './CommandPalette.js';
 import { Toaster } from '../feedback/Toaster.js';
 import { TooltipProvider } from '../overlays/Tooltip.js';
 import { PanelLeftClose, PanelLeftOpen, Search } from '../icons.js';
+import { Logo } from '../brand/Logo.js';
 
 const COLLAPSE_KEY = 'ruostack_nav_collapsed';
 
@@ -46,13 +47,12 @@ export function AppShell({
     });
   }
 
-  const brand = (
-    <>
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-solid text-base font-black text-white">
-        R
-      </span>
-      {!collapsed && <span className="text-lg font-bold text-content">{brandName}</span>}
-    </>
+  // Collapsed to a rail there is only room for the mark; expanded shows the
+  // full lockup. brandName remains the accessible name in both cases.
+  const brand = collapsed ? (
+    <Logo variant="mark" className="h-8 w-auto text-accent" />
+  ) : (
+    <Logo variant="full" className="text-accent" />
   );
 
   return (
@@ -74,9 +74,7 @@ export function AppShell({
               )}
             </button>
 
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-accent-solid text-xs font-black text-white md:hidden">
-              R
-            </span>
+            <Logo variant="mark" className="h-7 w-auto text-accent md:hidden" />
             <span className="text-base font-bold md:hidden">{brandName}</span>
 
             <div className="ml-auto flex items-center gap-2">

@@ -30,6 +30,7 @@ export { Tooltip, TooltipProvider } from './overlays/Tooltip.js';
 export { DataTable, type Column, type DataTableProps } from './data/DataTable.js';
 export { Tabs, type TabDef } from './data/Tabs.js';
 export { Toolbar } from './data/Toolbar.js';
+export { Logo, type LogoProps } from './brand/Logo.js';
 export { PageHeader, type Crumb } from './nav/PageHeader.js';
 export { AppShell, type AppShellProps } from './nav/AppShell.js';
 export { Sidebar, type NavItem, type NavGroup } from './nav/Sidebar.js';
