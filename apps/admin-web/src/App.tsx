@@ -3,6 +3,7 @@ import { useAuth } from './lib/auth.js';
 import { Shell } from './components/Shell.js';
 import { Login } from './screens/Login.js';
 import { Catalog } from './screens/Catalog.js';
+import { CatalogImport } from './screens/CatalogImport.js';
 import { AdminUsers } from './screens/AdminUsers.js';
 import { AuditLog } from './screens/AuditLog.js';
 import { Fulfillment } from './screens/Fulfillment.js';
@@ -37,6 +38,7 @@ export function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/catalog" element={<Protected><Catalog /></Protected>} />
+      <Route path="/catalog/import" element={<Protected><CatalogImport /></Protected>} />
       <Route path="/admins" element={<Protected><AdminUsers /></Protected>} />
       <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
       <Route path="/overview" element={<Protected><Overview /></Protected>} />

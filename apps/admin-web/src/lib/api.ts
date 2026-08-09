@@ -22,7 +22,14 @@ export function clearTokens(): void {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    /** The parsed error body, for responses that carry more than a message
+     *  (the import's 409 hands back a freshly recomputed preview). */
+    public body?: unknown,
+  ) {
     super(message);
   }
 }
@@ -67,14 +74,16 @@ export async function api<T = unknown>(
   if (!res.ok) {
     let code = 'error';
     let message = res.statusText;
+    let payload: unknown;
     try {
       const j = await res.json();
+      payload = j;
       code = j.error ?? code;
       message = j.message ?? message;
     } catch {
       /* non-JSON */
     }
-    throw new ApiError(res.status, code, message);
+    throw new ApiError(res.status, code, message, payload);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -122,6 +131,22 @@ export function logout(): void {
     });
   }
   clearTokens();
+}
+
+/**
+ * Hand the browser a file we built locally (the import template, the import
+ * error report). Same blob mechanic as `apiDownload`, without a round trip —
+ * there is nothing on the server to fetch.
+ */
+export function downloadText(filename: string, text: string, type = 'text/csv;charset=utf-8'): void {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /**
