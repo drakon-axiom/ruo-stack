@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api.js';
 import { ManagedProducts, ProvisioningWizard } from '../components/ProvisioningWizard.js';
-import { Button, Input, buttonClass, cardClass, labelClass, pillClass } from '@ruostack/ui';
+import { Badge, Button, Card, Input, buttonClass, labelClass } from '@ruostack/ui';
 
 interface ManualSetup { webhook_url: string | null; webhook_secret: string; topics: string[] }
 interface Connection {
@@ -48,7 +48,7 @@ export function Store() {
       <p className="mb-5 text-sm text-content-muted">Connect your WooCommerce store. Orders flow into RUOStack automatically; tracking is written back when we ship.</p>
 
       {loading || !state ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
+        <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : !state.plan_allows ? (
         <Upsell />
       ) : state.connection ? (
@@ -58,19 +58,19 @@ export function Store() {
           {isOwner ? (
             <ProvisioningWizard />
           ) : (
-            <div className={cardClass('mt-4 p-6 text-sm text-content-muted')}>
+            <Card className="mt-4 p-6 text-sm text-content-muted">
               Only an owner can add products to your store or change shipping rates. You can still see what’s already
               synced below.
-            </div>
+            </Card>
           )}
           <ManagedProducts />
         </>
       ) : isOwner ? (
         <ConnectForm onConnected={(m) => { setManual(m); load(); }} />
       ) : (
-        <div className={cardClass('p-10 text-center text-content-muted')}>
+        <Card className="p-10 text-center text-content-muted">
           No store is connected yet. Ask an owner to connect it.
-        </div>
+        </Card>
       )}
 
       {manual && <ManualSetupCard setup={manual} onDismiss={() => setManual(null)} />}
@@ -101,7 +101,7 @@ function ShippingMarkup() {
 
   if (!cfg) return null;
   return (
-    <div className={cardClass('mt-4 max-w-xl space-y-3 p-6')}>
+    <Card className="mt-4 max-w-xl space-y-3 p-6">
       <div className="text-lg font-semibold">Shipping markup</div>
       <p className="text-xs text-content-muted">Optional profit added to the shipping price your customers see at checkout, on top of the live carrier rate. Your wallet is only charged the carrier rate plus our pick &amp; pack — the markup is yours.</p>
       <div className="flex items-center gap-2">
@@ -110,18 +110,18 @@ function ShippingMarkup() {
         <Button loading={busy} onClick={save}>Save</Button>
         {msg && <span className="text-xs text-content-muted">{msg}</span>}
       </div>
-    </div>
+    </Card>
   );
 }
 
 
 function Upsell() {
   return (
-    <div className={cardClass('flex flex-col items-center gap-2 px-6 py-14 text-center')}>
+    <Card className="flex flex-col items-center gap-2 px-6 py-14 text-center">
       <div className="text-lg font-semibold">Store connections are a Pro feature</div>
       <div className="max-w-md text-sm text-content-muted">Upgrade to Pro or Volume to connect your WooCommerce store and pull orders in automatically.</div>
       <Link to="/app/account" className={buttonClass('primary', 'md', 'mt-2')}>View plans</Link>
-    </div>
+    </Card>
   );
 }
 
@@ -145,7 +145,7 @@ function ConnectForm({ onConnected }: { onConnected: (m: ManualSetup | null) => 
   const valid = /^https?:\/\//.test(f.store_url) && f.consumer_key.length > 8 && f.consumer_secret.length > 8;
 
   return (
-    <div className={cardClass('max-w-xl space-y-4 p-6')}>
+    <Card className="max-w-xl space-y-4 p-6">
       <div>
         <div className="text-lg font-semibold">Connect WooCommerce</div>
         <p className="mt-1 text-xs text-content-muted">
@@ -163,7 +163,7 @@ function ConnectForm({ onConnected }: { onConnected: (m: ManualSetup | null) => 
       </div>
       <Button className="w-full" disabled={!valid || busy} onClick={connect}>{busy ? 'Verifying…' : 'Connect store'}</Button>
       <p className="text-center text-2xs text-content-faint">We verify the keys against your store and store them encrypted.</p>
-    </div>
+    </Card>
   );
 }
 
@@ -185,13 +185,13 @@ function Connected({ conn, onChanged }: { conn: Connection; onChanged: () => voi
   }
 
   return (
-    <div className={cardClass('max-w-xl space-y-4 p-6')}>
+    <Card className="max-w-xl space-y-4 p-6">
       <div className="flex items-start justify-between">
         <div>
           <div className="text-lg font-semibold">{conn.store_url}</div>
           <div className="mt-1 text-xs text-content-muted">WooCommerce · connected {new Date(conn.connected_at).toLocaleDateString()}</div>
         </div>
-        <span className={pillClass(`${STATUS_PILL[conn.status] ?? ''}`)}>{conn.status}</span>
+        <Badge >{conn.status}</Badge>
       </div>
 
       {conn.last_error && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{conn.last_error}</div>}
@@ -212,13 +212,13 @@ function Connected({ conn, onChanged }: { conn: Connection; onChanged: () => voi
         <Button variant="ghost" disabled={!!busy} onClick={test}>{busy === 'test' ? '…' : 'Test connection'}</Button>
         <Button variant="ghost" className="text-danger" disabled={!!busy} onClick={disconnect}>{busy === 'disconnect' ? '…' : 'Disconnect'}</Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
 function ManualSetupCard({ setup, onDismiss }: { setup: ManualSetup; onDismiss: () => void }) {
   return (
-    <div className={cardClass('mt-4 max-w-xl space-y-3 border-warning/40 p-6')}>
+    <Card className="mt-4 max-w-xl space-y-3 border-warning/40 p-6">
       <div className="text-base font-semibold text-warning">Finish setup: add the webhook in WooCommerce</div>
       <p className="text-xs text-content-muted">
         We couldn't auto-register the webhook (no public URL configured yet). In <span className="text-content">WooCommerce → Settings → Advanced → Webhooks</span>, add one webhook per topic below with this delivery URL + secret.
@@ -229,7 +229,7 @@ function ManualSetupCard({ setup, onDismiss }: { setup: ManualSetup; onDismiss: 
         <Row label="Topics" value={setup.topics.join(', ')} />
       </div>
       <Button variant="ghost" onClick={onDismiss}>Done</Button>
-    </div>
+    </Card>
   );
 }
 

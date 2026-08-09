@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FLAT_FALLBACK } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
-import { buttonClass, cardClass } from '@ruostack/ui';
+import { Card, buttonClass } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const SHIP = FLAT_FALLBACK.amountCents;
@@ -45,23 +45,23 @@ export function Shipping() {
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className={cardClass('p-4')}>
+        <Card className="p-4">
           <div className="text-3xl font-extrabold">{orders ? shippedThisMonth : '—'}</div>
           <div className="text-xs text-content-muted">Shipped this month</div>
-        </div>
-        <div className={cardClass('p-4')}>
+        </Card>
+        <Card className="p-4">
           <div className="text-3xl font-extrabold text-success">{orders ? delivered : '—'}</div>
           <div className="text-xs text-content-muted">Delivered (all time)</div>
-        </div>
-        <div className={cardClass('p-4')}>
+        </Card>
+        <Card className="p-4">
           <div className="text-3xl font-extrabold text-accent">{orders ? inProgress : '—'}</div>
           <div className="text-xs text-content-muted">In progress</div>
-        </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Carrier */}
-        <div className={cardClass('mt-5 p-5')}>
+        <Card className="mt-5 p-5">
           <h2 className="mb-1 text-lg font-semibold">Default carrier</h2>
           <div className="mb-3 flex items-baseline justify-between">
             <span className="text-xl font-bold">{FLAT_FALLBACK.carrier} Ground Advantage</span>
@@ -72,10 +72,10 @@ export function Shipping() {
             <li>· 2–5 business day delivery</li>
             <li>· Tracking on every shipment</li>
           </ul>
-        </div>
+        </Card>
 
         {/* Markup */}
-        <div className={cardClass('mt-5 p-5')}>
+        <Card className="mt-5 p-5">
           <h2 className="mb-1 text-lg font-semibold">Your shipping markup</h2>
           {markup.state === 'loading' ? (
             <div className="text-sm text-content-muted">Loading…</div>
@@ -94,11 +94,11 @@ export function Shipping() {
               </p>
             </>
           )}
-        </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className={cardClass('mt-4 p-5 text-sm text-content-muted')}>
+        <Card className="mt-4 p-5 text-sm text-content-muted">
           <h2 className="mb-2 text-lg font-semibold text-content">What's included</h2>
           <ul className="space-y-1">
             <li>· Pick &amp; pack under your brand</li>
@@ -106,8 +106,8 @@ export function Shipping() {
             <li>· Tracking written back to your store</li>
             <li>· Claims support for lost/damaged shipments</li>
           </ul>
-        </div>
-        <div className={cardClass('mt-4 p-5 text-sm text-content-muted')}>
+        </Card>
+        <Card className="mt-4 p-5 text-sm text-content-muted">
           <h2 className="mb-2 text-lg font-semibold text-content">How fulfillment works</h2>
           <ol className="list-decimal space-y-1 pl-5">
             <li>An order arrives (manually or from your store).</li>
@@ -115,15 +115,15 @@ export function Shipping() {
             <li>We ship it under your label and write tracking back.</li>
             <li>Your wallet is charged only when it ships.</li>
           </ol>
-        </div>
+        </Card>
       </div>
 
-      <div className={cardClass('mt-4 p-5')}>
+      <Card className="mt-4 p-5">
         <h2 className="mb-1 text-lg font-semibold">Custom return address</h2>
         <p className="text-sm text-content-muted">
           Branded return addresses on the shipping label are coming soon. For now, shipments use the RUOStack fulfillment return address.
         </p>
-      </div>
+      </Card>
     </>
   );
 }

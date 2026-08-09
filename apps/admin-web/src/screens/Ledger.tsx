@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, EmptyState, Input, KpiTile, PageHeader, Select, Tabs, cardClass, pillClass, type Column } from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, EmptyState, Input, KpiTile, PageHeader, Select, Tabs, type Column } from '@ruostack/ui';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3).
@@ -251,15 +251,15 @@ export function Ledger() {
 
       {/* ── Drift: the actionable face of the reconciliation worker ────────── */}
       {drift.length > 0 && (
-        <div className={cardClass('mb-5 p-4')}>
+        <Card className="mb-5 p-4">
           <div className="mb-2 text-base font-semibold">Reconciliation drift</div>
           <div className="space-y-2">
             {drift.map((d) => (
               <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <span className={pillClass(`mr-2 ${d.kind === 'shipped_not_captured' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-warning/40 bg-warning/10 text-warning'}`)}>
+                  <Badge tone="warning">
                     {d.kind === 'shipped_not_captured' ? 'not captured' : 'stale export'}
-                  </span>
+                  </Badge>
                   <span className="text-content">{d.brand_name}</span>
                   <span className="ml-2 text-content-muted">{d.detail}</span>
                   {d.at && <span className="ml-2 text-content-faint">{day(d.at)}</span>}
@@ -279,7 +279,7 @@ export function Ledger() {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Filters ───────────────────────────────────────────────────────── */}

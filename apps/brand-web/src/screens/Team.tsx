@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { brandRoleLabel, type BrandMemberRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
-import { Button, Input, Select, cardClass, pillClass } from '@ruostack/ui';
+import { Badge, Button, Card, Input, Select } from '@ruostack/ui';
 
 /**
  * Team (architecture §3.1). Invites are LINK-based: we mint a Supabase action
@@ -76,22 +76,22 @@ export function Team() {
       {link && <InviteLink email={link.email} url={link.url} onClose={() => setLink(null)} />}
 
       {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
+        <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : (
-        <div className={cardClass('divide-y divide-lline dark:divide-line')}>
+        <Card className="divide-y divide-lline dark:divide-line">
           {members.map((m) => (
             <div key={m.user_id} className="flex flex-wrap items-center gap-3 p-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-base font-medium">{m.full_name ?? m.email ?? 'Unknown'}</span>
-                  {m.is_you && <span className={pillClass('border-line bg-surface-3 text-content-muted')}>you</span>}
-                  <span className={pillClass(`${m.role === 'owner' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-line bg-surface-3 text-content-muted'}`)}>
+                  {m.is_you && <Badge>you</Badge>}
+                  <Badge>
                     {brandRoleLabel(m.role)}
-                  </span>
+                  </Badge>
                   {m.status === 'suspended' ? (
-                    <span className={pillClass('border-danger/40 bg-danger/10 text-danger')}>access revoked</span>
+                    <Badge tone="danger">access revoked</Badge>
                   ) : m.pending ? (
-                    <span className={pillClass('border-warning/40 bg-warning/10 text-warning')}>pending — hasn’t signed in</span>
+                    <Badge tone="warning">pending — hasn’t signed in</Badge>
                   ) : null}
                 </div>
                 <div className="mt-0.5 text-xs text-content-muted">{m.email}</div>
@@ -140,7 +140,7 @@ export function Team() {
               )}
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
       {inviting && (
@@ -177,7 +177,7 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/50 p-4" onClick={onClose}>
-      <div className={cardClass('w-full max-w-md p-5')} onClick={(e) => e.stopPropagation()}>
+      <Card className="w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 text-lg font-semibold">Invite a team member</div>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
 
@@ -209,7 +209,7 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (e
           <Button variant="ghost" className="flex-1" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button className="flex-1" onClick={submit} disabled={!email || !fullName} loading={busy}>Create invite</Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -228,7 +228,7 @@ function InviteLink({ email, url, onClose }: { email: string; url: string; onClo
   }
 
   return (
-    <div className={cardClass('mb-4 border-accent/40 p-4')}>
+    <Card className="mb-4 border-accent/40 p-4">
       <div className="mb-1 text-base font-semibold">Send this link to {email || 'your new team member'}</div>
       <p className="mb-3 text-xs text-content-muted">
         It lets them set a password and sign in. Treat it like a password — anyone with the link can claim the account.
@@ -239,6 +239,6 @@ function InviteLink({ email, url, onClose }: { email: string; url: string; onClo
         <Button onClick={copy}>{copied ? 'Copied' : 'Copy'}</Button>
         <Button variant="ghost" onClick={onClose}>Done</Button>
       </div>
-    </div>
+    </Card>
   );
 }

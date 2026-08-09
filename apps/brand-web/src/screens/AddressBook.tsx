@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
-import { Button, Input, cardClass } from '@ruostack/ui';
+import { Button, Card, Input } from '@ruostack/ui';
 
 export interface Address {
   id: string;
@@ -76,19 +76,19 @@ export function AddressBook() {
       </p>
 
       {!addresses ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
+        <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : addresses.length === 0 ? (
-        <div className={cardClass('flex flex-col items-center gap-3 px-6 py-16 text-center')}>
+        <Card className="flex flex-col items-center gap-3 px-6 py-16 text-center">
           <div className="text-lg font-semibold">No saved addresses yet</div>
           <div className="max-w-md text-sm text-content-muted">
             Add addresses you ship to often, or tick “Save this address” when placing an order.
           </div>
           <Button className="mt-1" onClick={() => setEditing('new')}>+ Add your first address</Button>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {addresses.map((a) => (
-            <div key={a.id} className={cardClass('flex flex-col px-4 py-3')}>
+            <Card key={a.id} className="flex flex-col px-4 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   {a.label && <div className="text-2xs font-semibold uppercase tracking-wide text-accent">{a.label}</div>}
@@ -108,7 +108,7 @@ export function AddressBook() {
                   {[a.recipient_email, a.recipient_phone].filter(Boolean).join(' · ')}
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -158,7 +158,7 @@ function AddressModal({ address, onClose, onSaved }: { address: Address | null; 
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
-      <div className={cardClass('w-full max-w-md p-5')} onClick={(e) => e.stopPropagation()}>
+      <Card className="w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{address ? 'Edit address' : 'Add address'}</h2>
           <button onClick={onClose} className="text-content-faint hover:text-content">✕</button>
@@ -178,7 +178,7 @@ function AddressModal({ address, onClose, onSaved }: { address: Address | null; 
           </div>
         </div>
         <Button className="mt-4 w-full" disabled={!valid} loading={busy} onClick={save}>{address ? 'Save changes' : 'Add address'}</Button>
-      </div>
+      </Card>
     </div>
   );
 }

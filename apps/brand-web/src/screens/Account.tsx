@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
-import { Badge, Button, Check, Input, buttonClass, cardClass, cn, labelClass } from '@ruostack/ui';
+import { Badge, Button, Card, Check, Input, buttonClass, cn, labelClass } from '@ruostack/ui';
 
 interface Me {
   profile: { id: string; full_name: string; name_last_changed_at: string | null; name_editable: boolean };
@@ -19,10 +19,10 @@ interface Me {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className={cardClass('mb-5 p-5')}>
+    <Card className="mb-5 p-5">
       <h2 className="mb-4 text-lg font-semibold">{title}</h2>
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -92,7 +92,7 @@ export function Account() {
     setErr(error?.message ?? '');
   }
 
-  if (!me) return <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>;
+  if (!me) return <Card className="p-10 text-center text-content-muted">Loading…</Card>;
 
   return (
     <>

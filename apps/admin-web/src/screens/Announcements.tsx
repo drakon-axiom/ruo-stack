@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ANNOUNCEMENT_TYPES, announcementTypeLabel, canWrite, type AnnouncementType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Select, Tabs, Textarea, cardClass, labelClass, pillClass, type Column } from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, KpiTile, PageHeader, Select, Tabs, Textarea, labelClass, type Column } from '@ruostack/ui';
 
 interface Announcement {
   id: string;
@@ -121,7 +121,7 @@ export function Announcements() {
       key: 'state',
       header: 'State',
       minWidth: 110,
-      cell: (a) => <span className={pillClass(STATE_STYLE[a.display_state])}>{a.display_state}</span>,
+      cell: (a) => <Badge >{a.display_state}</Badge>,
     },
     { key: 'publish', header: 'Publish', minWidth: 140, cell: (a) => fmt(a.publish_at) },
     { key: 'expires', header: 'Expires', minWidth: 140, cell: (a) => fmt(a.expires_at) },
@@ -192,7 +192,7 @@ export function Announcements() {
       </div>
 
       {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
+        <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : visible.length === 0 ? (
         <EmptyState
           title={rows.length === 0 ? 'No announcements yet' : 'Nothing matches that filter'}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { Button, cardClass, inputClass, labelClass } from '@ruostack/ui';
+import { Button, Card, inputClass, labelClass } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -42,21 +42,21 @@ export function Referrals() {
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className={cardClass('p-4')}>
+        <Card className="p-4">
           <div className="text-3xl font-extrabold">{data ? data.invited : '—'}</div>
           <div className="text-xs text-content-muted">Brands invited</div>
-        </div>
-        <div className={cardClass('p-4')}>
+        </Card>
+        <Card className="p-4">
           <div className="text-3xl font-extrabold">{data ? data.upgraded : '—'}</div>
           <div className="text-xs text-content-muted">Upgraded to paid</div>
-        </div>
-        <div className={cardClass('p-4')}>
+        </Card>
+        <Card className="p-4">
           <div className="text-3xl font-extrabold text-accent">{data ? dollars(data.earned_cents) : '—'}</div>
           <div className="text-xs text-content-muted">Wallet credit earned</div>
-        </div>
+        </Card>
       </div>
 
-      <div className={cardClass('mt-5 p-5')}>
+      <Card className="mt-5 p-5">
         <h2 className="mb-3 text-lg font-semibold">Your referral link</h2>
         <div className="mb-3">
           <span className={labelClass('mb-1 block')}>Referral code</span>
@@ -72,16 +72,16 @@ export function Referrals() {
             {data && <CopyButton value={shareLink} label="Copy link" />}
           </div>
         </div>
-      </div>
+      </Card>
 
-      <div className={cardClass('mt-5 p-5 text-sm text-content-muted')}>
+      <Card className="mt-5 p-5 text-sm text-content-muted">
         <h2 className="mb-2 text-lg font-semibold text-content">How it works</h2>
         <ol className="list-decimal space-y-1 pl-5">
           <li>Share your link with another brand or operator.</li>
           <li>They sign up through it — we tag their account to you automatically.</li>
           <li>When they move to a paid plan, you earn wallet credit toward fulfillment.</li>
         </ol>
-      </div>
+      </Card>
     </>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, cardClass, labelClass, pillClass, type Column } from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, labelClass, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -31,7 +31,7 @@ const TONE: Record<string, string> = {
 
 function FulfillmentBadge({ order }: { order: { status: string; blocker: string; exported_at: string | null } }) {
   const meta = FULFILLMENT_META[fulfillmentState(order)];
-  return <span className={pillClass(`${TONE[meta.tone]}`)} title={meta.label}>{meta.icon} {meta.label}</span>;
+  return <Badge title={meta.label}>{meta.icon} {meta.label}</Badge>;
 }
 
 const isPreShip = (o: Order) => o.status === 'ready_for_fulfillment' || o.status === 'processing';
@@ -190,7 +190,7 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
-      <div className={cardClass('w-full max-w-sm p-6')} onClick={(e) => e.stopPropagation()}>
+      <Card className="w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
         <h2 className="mb-1 text-lg font-semibold text-content">Mark shipped (manual)</h2>
         <p className="mb-4 text-xs text-content-muted">{order.brand_name} → {order.recipient.name}. Captures {dollars(order.wallet_charge_cents)} from the brand's wallet. Use only when ShipStation's shipnotify didn't arrive.</p>
         {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
@@ -212,7 +212,7 @@ function ShipModal({ order, onClose, onShipped }: { order: Order; onClose: () =>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button disabled={!tracking} loading={busy} onClick={ship}>Capture & ship</Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

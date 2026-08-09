@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { TYPE_ICON, relativeTime, type Notification } from '../components/NotificationBell.js';
-import { Button, cardClass, chipClass } from '@ruostack/ui';
+import { Button, Card, chipClass } from '@ruostack/ui';
 
 /**
  * Full notifications history. The bell panel shows the most recent few; this is
@@ -70,17 +70,17 @@ export function Notifications() {
       </div>
 
       {loading ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>Loading…</div>
+        <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : items.length === 0 ? (
-        <div className={cardClass('p-10 text-center text-content-muted')}>
+        <Card className="p-10 text-center text-content-muted">
           {unreadOnly ? 'Nothing unread. 🎉' : 'No notifications yet.'}
-        </div>
+        </Card>
       ) : (
         <div className="space-y-2">
           {items.map((n) => (
-            <div
+            <Card
               key={n.id}
-              className={cardClass(`flex items-start gap-3 p-4 ${n.read_at ? '' : 'border-accent/30'}`)}
+              className="border-accent/30"
             >
               <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent/10 text-base" aria-hidden>
                 {TYPE_ICON[n.type]}
@@ -96,7 +96,7 @@ export function Notifications() {
               {!n.read_at && (
                 <Button variant="ghost" className="shrink-0 text-xs" onClick={() => markRead(n)}>Mark read</Button>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}

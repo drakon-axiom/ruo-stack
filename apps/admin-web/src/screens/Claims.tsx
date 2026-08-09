@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { canWrite, canResolveClaim, claimTypeLabel, type ClaimType } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Badge, Button, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, cardClass, pillClass, type Column } from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -45,10 +45,10 @@ const COLUMNS: Column<ClaimRow>[] = [
     key: 'status',
     header: 'Status',
     cell: (c) => (
-      <span className={pillClass(STATUS_TONE[c.status] ?? '')}>
+      <Badge >
         {c.status.replace(/_/g, ' ')}
         {c.resolution ? ` \u00b7 ${c.resolution}` : ''}
-      </span>
+      </Badge>
     ),
   },
   {
@@ -141,7 +141,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
         <div className="space-y-4 text-sm">
           {err && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">{err}</div>}
           <div className="flex items-center gap-2">
-            <span className={pillClass(`${STATUS_TONE[c.status] ?? ''}`)}>{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</span>
+            <Badge >{c.status.replace(/_/g, ' ')}{c.resolution ? ` · ${c.resolution}` : ''}</Badge>
             {c.order.trackingNumber && <span className="font-mono text-2xs text-content-muted">{c.order.carrier} {c.order.trackingNumber}</span>}
           </div>
           <div className="text-content-muted">{c.order.recipientName} · {c.order.city}, {c.order.state} · order value {dollars(c.order.walletChargeCents)}</div>
@@ -161,7 +161,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
           )}
 
           {canResolve && c.status !== 'resolved' && (
-            <div className={cardClass('space-y-2 p-3')}>
+            <Card className="space-y-2 p-3">
               <div className="text-2xs uppercase tracking-[0.1em] text-content-faint">Resolve</div>
               <Field label="Resolution">
                 <Select
@@ -181,7 +181,7 @@ function ClaimDrawer({ id, writable, canResolve, creditOnly, onClose, onChanged 
               {res === 'reshipped' && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Platform-comped ($0) — uncheck to charge the brand's wallet</label>}
               <Field label="Reason"><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
               <Button className="w-full" disabled={busy || !reason || (res === 'credited' && !amount)} onClick={resolve}>Resolve claim</Button>
-            </div>
+            </Card>
           )}
         </div>
       )}
