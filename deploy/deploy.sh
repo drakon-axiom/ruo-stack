@@ -63,6 +63,12 @@ pnpm install --frozen-lockfile
 # left ahead of the deployed code. That ordering is a recorded project
 # decision, not an oversight here -- it is flagged for deliberate review
 # before the first production deploy.
+#
+# The db package's own script sources the repo-root .env (packages/db/package.json
+# `with-env`). It has to: the Prisma CLI only looks for .env beside the schema or
+# in its cwd, and there is no .env there -- so this step used to abort the whole
+# deploy on `Environment variable not found: DIRECT_URL` unless the operator
+# happened to have the URLs exported already.
 echo "==> applying database migrations"
 pnpm --filter @ruostack/db run deploy
 
