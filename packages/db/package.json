@@ -10,9 +10,11 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "migrate": "prisma migrate dev",
-    "deploy": "prisma migrate deploy",
-    "studio": "prisma studio",
+    "migrate": "pnpm run --silent with-env prisma migrate dev",
+    "deploy": "pnpm run --silent with-env prisma migrate deploy",
+    "status": "pnpm run --silent with-env prisma migrate status",
+    "studio": "pnpm run --silent with-env prisma studio",
+    "with-env": "set -a && . ../../.env && set +a && exec",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
