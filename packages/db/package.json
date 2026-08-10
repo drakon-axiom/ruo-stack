@@ -14,7 +14,7 @@
     "deploy": "pnpm run --silent with-env prisma migrate deploy",
     "status": "pnpm run --silent with-env prisma migrate status",
     "studio": "pnpm run --silent with-env prisma studio",
-    "with-env": "set -a && . ../../.env && set +a && exec",
+    "with-env": "set -a; [ -n \"$DIRECT_URL\" ] || { [ -f ../../.env ] && . ../../.env; }; set +a; exec",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
