@@ -53,4 +53,7 @@ export {
   PanelLeftOpen,
   Loader2,
   Lock,
+  Upload,
+  Download,
+  ArrowLeft,
 } from 'lucide-react';

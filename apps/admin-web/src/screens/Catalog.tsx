@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { canWrite } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, Lock, PageHeader, Plus, Select, StatusPill, Tabs, type Column } from '@ruostack/ui';
+import { Button, DataTable, Drawer, EmptyState, Field, Input, KpiTile, Lock, PageHeader, Plus, Select, StatusPill, Tabs, Upload, type Column } from '@ruostack/ui';
 
 interface Product {
   id: string;
@@ -77,6 +78,7 @@ const COLUMNS: Column<Product>[] = [
 ];
 
 export function Catalog() {
+  const navigate = useNavigate();
   const { claims } = useAuth();
   const writable = claims ? canWrite(claims.role, 'catalog') : false;
   const [products, setProducts] = useState<Product[]>([]);
@@ -131,6 +133,11 @@ export function Catalog() {
             <Button variant="ghost" onClick={() => setShowArchived((v) => !v)}>
               {showArchived ? 'Back to catalog' : 'View archived'}
             </Button>
+            {writable && !showArchived && (
+              <Button variant="ghost" icon={Upload} onClick={() => navigate('/catalog/import')}>
+                Import CSV
+              </Button>
+            )}
             {writable && !showArchived && (
               <Button onClick={() => setCreating(true)}>
                 + Create product

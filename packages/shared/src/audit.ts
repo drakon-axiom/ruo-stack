@@ -11,6 +11,7 @@ export const AUDIT_ACTIONS = {
   catalogArchived: 'catalog.archived',
   catalogUnarchived: 'catalog.unarchived',
   catalogDeleted: 'catalog.deleted',
+  catalogImported: 'catalog.imported', // one aggregate row per CSV import run
   skuStockChanged: 'sku.stock_changed',
   roleGranted: 'role.granted',
   roleRevoked: 'role.revoked',
