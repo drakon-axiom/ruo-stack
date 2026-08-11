@@ -2,10 +2,10 @@
 
 Date: 2026-08-10
 Status: prod instance provisioned and verified; guard and `with-env` fix landed
-in `9cc3e14`. Remaining: live Stripe/ShipStation credentials, DNS, and the
-go-live deploy — plus one open security gap, "KNOWN GAP: prod storage policies
-are unscoped" below, which must be closed before the Branding upload screen
-ships.
+in `9cc3e14`. Remaining: live Stripe/ShipStation credentials and the go-live
+deploy (DNS is already in place) — plus one open security gap, "KNOWN GAP: prod
+storage policies are unscoped" below, which must be closed before the Branding
+upload screen ships.
 
 ## Problem
 
@@ -128,8 +128,14 @@ bucket that does not exist there — dev's only bucket is `brand-logos` — scop
 never to have been applied to dev either. Cleaning them up is unrelated to the
 instance split and was left alone.
 
-DNS for the three prod hosts, live Stripe credentials, and prod ShipStation
-credentials are external inputs, not repo work.
+Live Stripe credentials and prod ShipStation credentials are external inputs, not
+repo work.
+
+DNS is already in place: all six hostnames — `app`/`backend` for both prod and
+dev, plus `ruostack.com` and `www` — resolve to `72.61.65.76`, the edge VPS's
+public IP. Note that this is *not* `EDGE_IP` in `env.<name>`; that is the edge's
+Tailscale address `100.99.76.10`, used for the private origin hop. The public IP
+appears in no config file, only in DNS.
 
 ## Prod `.env` composition
 

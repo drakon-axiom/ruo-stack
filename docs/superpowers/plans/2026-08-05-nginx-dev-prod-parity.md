@@ -26,6 +26,7 @@
 - **`envsubst` renders unset variables as the empty string**, producing a broken-but-plausible `root ;`. `render.sh` must validate required variables itself.
 - **Rendered output is gitignored.** After certbot runs, the deployed edge config legitimately diverges from the render.
 - **DNS points at the edge VPS's public IP, not this box.** As of 2026-08-05 no ruostack.io name resolves, and `ruostack.com` points to `72.61.65.76`, which is neither machine. Tasks 1–7 are completable and testable without DNS. Task 8 is blocked on it.
+  - **Update 2026-08-10:** `72.61.65.76` *is* the edge VPS — its public address, as distinct from its Tailscale address `100.99.76.10`. The original note was wrong to call it "neither machine". All six names (`app`/`backend` × prod/dev, plus `ruostack.com` and `www`) now resolve there, so this is no longer a blocker.
 - **The repo is not on the VPS.** Edge configs are rendered here and copied over by hand.
 
 ---

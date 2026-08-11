@@ -91,6 +91,11 @@ All four ports verified free on `acgserver02` as of 2026-08-05.
    neither machine. Certbot runs on the VPS and cannot issue until A records point
    there. This blocks TLS only — the HTTP path can be installed and tested first.
 
+   **Update 2026-08-10:** `72.61.65.76` is not "neither machine" — it is the edge
+   VPS's public IP, the counterpart to its Tailscale address `100.99.76.10`. All
+   four hostnames above now resolve to it, alongside `ruostack.com` and `www`, so
+   certbot is unblocked.
+
 6. **The repo is not on the VPS.** The edge config is rendered here and copied over;
    `nginx -t`, certbot, and reloads all happen on the VPS.
 

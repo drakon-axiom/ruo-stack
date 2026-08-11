@@ -15,6 +15,13 @@ next-env.d.ts
 .env
 .env*.local
 .env.local
+# Any .env sidecar -- backups (.env.p, .env.bak), per-env copies, scratch edits.
+# These carry the same secrets as .env but were not covered by the rules above,
+# so `git add -A` would stage them; a Stripe key reached a local commit that way
+# on 2026-08-10 and was caught only by GitHub push protection.
+**/.env.*
+# ...except the committed template, which holds placeholders only.
+!**/.env.example
 
 # supabase
 /supabase/.branches

@@ -3,12 +3,18 @@
 Two machines, joined by Tailscale.
 
 ```
-DNS -> edge VPS public IP
+DNS -> 72.61.65.76   (edge VPS public IP -- the only public address here)
    EDGE   srv1153350   100.99.76.10   nginx + certbot, TLS terminates, no app files
      |  Tailscale
    ORIGIN acgserver02  100.99.76.119  nginx serves SPA dist + proxies /api to loopback
                                       PM2 runs the API; dev and prod both live here
 ```
+
+The `100.x` addresses are Tailscale, and both `EDGE_IP` and `ORIGIN_IP` in
+`env.<name>` are deliberately Tailscale addresses: they describe the private hop
+(the edge's `proxy_pass` to the origin, and the origin's `allow` list). The
+public IP appears in no config file — the edge simply listens on `:80`/`:443` —
+so it is recorded here because DNS is the only place it is needed.
 
 ## Port map
 
