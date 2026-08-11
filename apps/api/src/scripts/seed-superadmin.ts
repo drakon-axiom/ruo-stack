@@ -1,6 +1,6 @@
 import { getPrisma } from '@ruostack/db';
-import { loadConfig } from '../config.js';
-import { hashPassword } from '../crypto.js';
+import { loadConfig } from '../config.ts';
+import { hashPassword } from '../crypto.ts';
 
 /**
  * Bootstrap the first super_admin (option a) — solves the empty-admin-table

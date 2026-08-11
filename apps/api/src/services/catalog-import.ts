@@ -13,8 +13,8 @@ import {
   type ImportRow,
   type ImportSummary,
 } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
-import { BadRequest } from '../errors.js';
+import { writeAudit } from '../audit.ts';
+import { BadRequest } from '../errors.ts';
 
 /**
  * CSV catalog import (docs/superpowers/specs/2026-08-09-catalog-csv-import-design.md).

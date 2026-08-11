@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LAPSE_GRACE_DAYS, effectivePlan, isLapsed } from '../../src/services/subscription.js';
+import { LAPSE_GRACE_DAYS, effectivePlan, isLapsed } from '../../src/services/subscription.ts';
 
 /**
  * Entitlement must survive a payment processor going quiet.

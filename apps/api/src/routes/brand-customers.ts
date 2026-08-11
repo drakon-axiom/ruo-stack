@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { getClients } from '../clients.js';
-import { requireBrand } from '../middleware/guards.js';
-import { foldCustomers } from '../services/customers.js';
+import { getClients } from '../clients.ts';
+import { requireBrand } from '../middleware/guards.ts';
+import { foldCustomers } from '../services/customers.ts';
 
 /**
  * Customers — a READ-ONLY CRM view derived from the brand's own orders. There is

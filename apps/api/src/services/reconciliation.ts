@@ -1,8 +1,8 @@
 import type { PrismaClient, WebhookEvent } from '@ruostack/db';
 import { AUDIT_ACTIONS, type NormalizedEvent } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
-import { dispatchStripeEvent } from '../routes/webhook.js';
-import { importWooOrder, type WooOrder } from './store-intake.js';
+import { writeAudit } from '../audit.ts';
+import { dispatchStripeEvent } from '../routes/webhook.ts';
+import { importWooOrder, type WooOrder } from './store-intake.ts';
 
 /**
  * Sync/reconcile worker (§8/§10): heal missed/failed webhooks and flag drift

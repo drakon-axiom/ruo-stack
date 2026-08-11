@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { appendEntry, getBalance } from '../../src/services/wallet.js';
-import { randomToken } from '../../src/crypto.js';
+import { appendEntry, getBalance } from '../../src/services/wallet.ts';
+import { randomToken } from '../../src/crypto.ts';
 
 // Wallet ledger correctness against the real DB. Self-skips unless RUN_DB_TESTS=1.
 const RUN = process.env.RUN_DB_TESTS === '1';

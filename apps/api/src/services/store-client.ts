@@ -5,7 +5,7 @@ import {
   type WooCreds,
   type WooProductInput,
   type WooProductUpdate,
-} from './woo.js';
+} from './woo.ts';
 
 /**
  * The narrow slice of a storefront the provisioning flow needs, behind an

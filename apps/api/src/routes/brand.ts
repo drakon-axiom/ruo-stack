@@ -8,11 +8,11 @@ import {
   BrandSignupSchema,
   wholesaleFieldFor,
 } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
-import { effectivePlan } from '../services/subscription.js';
-import { BadRequest, Conflict, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
+import { effectivePlan } from '../services/subscription.ts';
+import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
 const NAME_LOCK_DAYS = 7;
 const NAME_LOCK_MS = NAME_LOCK_DAYS * 24 * 60 * 60 * 1000;

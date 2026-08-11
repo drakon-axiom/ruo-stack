@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { getClients } from '../clients.js';
-import { requireBrand } from '../middleware/guards.js';
-import { NotFound } from '../errors.js';
-import { getFeed, getUnreadCount, markAllRead, markRead } from '../services/notifications.js';
+import { getClients } from '../clients.ts';
+import { requireBrand } from '../middleware/guards.ts';
+import { NotFound } from '../errors.ts';
+import { getFeed, getUnreadCount, markAllRead, markRead } from '../services/notifications.ts';
 
 /**
  * Brand Notifications inbox (architecture §1.3) — thin HTTP over

@@ -6,8 +6,8 @@ import {
   type ProvisioningAction,
   type ProvisioningState,
 } from '@ruostack/shared';
-import type { ProvisioningStoreClient } from './store-client.js';
-import { newWooProductInput, platformOwnedUpdate, type ProvisionProduct } from './store-provision.js';
+import type { ProvisioningStoreClient } from './store-client.ts';
+import { newWooProductInput, platformOwnedUpdate, type ProvisionProduct } from './store-provision.ts';
 
 /**
  * Pre-flight + commit (fulfillment plan §3, architecture §3.3).

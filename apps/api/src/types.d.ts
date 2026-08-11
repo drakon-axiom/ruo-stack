@@ -1,7 +1,7 @@
 import 'fastify';
 import type { BrandMemberRole } from '@ruostack/shared';
-import type { BrandPrincipal } from './auth/brand-token.js';
-import type { AdminPrincipal } from './auth/admin-jwt.js';
+import type { BrandPrincipal } from './auth/brand-token.ts';
+import type { AdminPrincipal } from './auth/admin-jwt.ts';
 
 declare module 'fastify' {
   interface FastifyRequest {

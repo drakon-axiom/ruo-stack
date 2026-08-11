@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customerKey, foldCustomers, shipToFrom, type CustomerOrderRow } from '../../src/services/customers.js';
+import { customerKey, foldCustomers, shipToFrom, type CustomerOrderRow } from '../../src/services/customers.ts';
 
 /**
  * The Customers rollup. This logic lived inline in the route handler and had no

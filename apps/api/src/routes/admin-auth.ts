@@ -2,11 +2,11 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { authenticator } from 'otplib';
 import { AdminLoginSchema, AdminMfaVerifySchema } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { loadConfig } from '../config.js';
-import { signAdminAccessToken } from '../auth/admin-jwt.js';
-import { decryptSecret, encryptSecret, hashToken, randomToken, verifyPassword } from '../crypto.js';
-import { BadRequest, Unauthorized } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { loadConfig } from '../config.ts';
+import { signAdminAccessToken } from '../auth/admin-jwt.ts';
+import { decryptSecret, encryptSecret, hashToken, randomToken, verifyPassword } from '../crypto.ts';
+import { BadRequest, Unauthorized } from '../errors.ts';
 
 const ENROLL_PURPOSE = 'admin_mfa_enroll';
 const ENROLL_TTL = 600; // 10 min to complete first-login enrollment

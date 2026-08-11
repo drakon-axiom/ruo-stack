@@ -26,7 +26,12 @@ export class StripeAdapter implements PaymentsAdapter {
   private readonly stripe: Stripe;
   private readonly webhookSecret: string;
 
-  constructor(private readonly config: StripeAdapterConfig) {
+  // Plain parameter, not a `private readonly` parameter property: this package
+  // is consumed as TypeScript source and Node strips its types at load time,
+  // which only handles erasable syntax. A parameter property emits an
+  // assignment, so it would fail to load in production. `this.config` was never
+  // read anyway -- both fields it needs are copied out below.
+  constructor(config: StripeAdapterConfig) {
     this.stripe = new Stripe(config.secretKey);
     this.webhookSecret = config.webhookSecret;
   }

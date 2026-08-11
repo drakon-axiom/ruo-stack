@@ -31,9 +31,12 @@ export class ShipStationRatesAdapter implements RatesAdapter {
   private readonly base = 'https://ssapi.shipstation.com';
   private readonly auth: string;
 
-  constructor(
-    private readonly cfg: { apiKey: string; apiSecret: string; carrierCodes?: string[] },
-  ) {
+  // Explicit field rather than a parameter property -- see the note in
+  // apps/api/src/errors.ts. `this.cfg` is still read (carrierCodes, below).
+  private readonly cfg: { apiKey: string; apiSecret: string; carrierCodes?: string[] };
+
+  constructor(cfg: { apiKey: string; apiSecret: string; carrierCodes?: string[] }) {
+    this.cfg = cfg;
     this.auth = 'Basic ' + Buffer.from(`${cfg.apiKey}:${cfg.apiSecret}`).toString('base64');
   }
 

@@ -27,7 +27,14 @@ module.exports = {
       // cwd pinned to this file's directory so dotenv resolves the repo-root
       // .env no matter where pm2 was invoked from.
       cwd: __dirname,
-      script: 'apps/api/dist/server.js',
+      // TypeScript source, not a build artifact. Node strips types at load time
+      // (>=22.18 / 24), and every workspace package this imports is consumed the
+      // same way. Emitting to dist/ was the old shape and it could not work:
+      // tsc compiled only apps/api's own sources, so the built server still
+      // imported @ruostack/{payments,email,shared} as raw TS -- which tsx
+      // resolved in dev and plain node could not, crashing on first boot.
+      // Running from source keeps dev and prod byte-identical.
+      script: 'apps/api/src/server.ts',
       // Single instance: the rate-quote sweeper, reconciliation, dunning, and
       // subscription-lapse workers all start unconditionally in
       // apps/api/src/server.ts, so a second instance doubles every sweep.

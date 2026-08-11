@@ -2,17 +2,17 @@ import type { FastifyInstance } from 'fastify';
 import type { BrandStoreConnection } from '@ruostack/db';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, CommitRequestSchema, PLANS, PreflightRequestSchema } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { loadConfig } from '../config.js';
-import { writeAudit } from '../audit.js';
-import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
-import { effectivePlan } from '../services/subscription.js';
-import { randomToken } from '../crypto.js';
-import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.js';
-import { buildProductCsv, type ProvisionProduct } from '../services/store-provision.js';
-import { wooStoreClient } from '../services/store-client.js';
-import { commit, preflight } from '../services/store-preflight.js';
-import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { loadConfig } from '../config.ts';
+import { writeAudit } from '../audit.ts';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
+import { effectivePlan } from '../services/subscription.ts';
+import { randomToken } from '../crypto.ts';
+import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.ts';
+import { buildProductCsv, type ProvisionProduct } from '../services/store-provision.ts';
+import { wooStoreClient } from '../services/store-client.ts';
+import { commit, preflight } from '../services/store-preflight.ts';
+import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.ts';
 
 /**
  * Brand store connection (WooCommerce). Gated on the plan's storeConnections

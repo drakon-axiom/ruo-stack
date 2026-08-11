@@ -1,8 +1,8 @@
 import type { CatalogProduct } from '@ruostack/db';
 import { AUDIT_ACTIONS, isStoreSellable } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { decryptStoreCreds, getProductIdBySku, updateProductStock } from '../services/woo.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { decryptStoreCreds, getProductIdBySku, updateProductStock } from '../services/woo.ts';
 
 /**
  * Stock push (fulfillment plan §3): when a catalog SKU's availability changes,

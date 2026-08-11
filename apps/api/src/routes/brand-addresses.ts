@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AddressCreateSchema, AddressUpdateSchema } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { requireBrand } from '../middleware/guards.js';
-import { NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { requireBrand } from '../middleware/guards.ts';
+import { NotFound } from '../errors.ts';
 
 /**
  * Address Book — saved ship-to addresses a brand curates to auto-fill the manual

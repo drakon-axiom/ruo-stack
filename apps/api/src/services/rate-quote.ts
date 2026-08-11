@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { PrismaClient } from '@ruostack/db';
 import type { PricedRateOption, ShippingPricing } from '@ruostack/shared';
-import { loadConfig } from '../config.js';
-import type { DerivedParcel } from './fulfillment-rules.js';
+import { loadConfig } from '../config.ts';
+import type { DerivedParcel } from './fulfillment-rules.ts';
 
 /**
  * RateQuote persistence (§9 quote-driven reserve). The rate proxy persists every

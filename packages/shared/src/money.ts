@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PAID_PLAN_KEYS } from './plans.js';
+import { PAID_PLAN_KEYS } from './plans.ts';
 
 /** Wallet ledger entry types (architecture §4.1). Phase 1 exercises deposit /
  * refund_credit / manual_adjustment; hold/capture arrive with the order pipe. */

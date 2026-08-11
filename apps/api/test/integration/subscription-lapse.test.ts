@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { LAPSE_GRACE_DAYS, effectivePlan, sweepLapsedSubscriptions, upsertSubscriptionState } from '../../src/services/subscription.js';
-import { randomToken } from '../../src/crypto.js';
+import { LAPSE_GRACE_DAYS, effectivePlan, sweepLapsedSubscriptions, upsertSubscriptionState } from '../../src/services/subscription.ts';
+import { randomToken } from '../../src/crypto.ts';
 
 /**
  * The lapse sweep against a real DB. The pure rule is covered in the unit test;

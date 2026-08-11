@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import { getClients } from '../clients.js';
-import { requireBrand } from '../middleware/guards.js';
-import { effectivePlan } from '../services/subscription.js';
-import { getWalletSummary } from '../services/wallet.js';
+import { getClients } from '../clients.ts';
+import { requireBrand } from '../middleware/guards.ts';
+import { effectivePlan } from '../services/subscription.ts';
+import { getWalletSummary } from '../services/wallet.ts';
 
 /**
  * Brand Overview — the portal home dashboard. Aggregates the brand's own orders +

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RateQuoteInput } from '@ruostack/shared';
-import { cacheKey } from '../../src/services/rate-cache.js';
+import { cacheKey } from '../../src/services/rate-cache.ts';
 
 const base: RateQuoteInput = {
   fromZip: '90001', toZip: '10001', toState: 'NY', toCountry: 'US',

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/server.js",
+    "start": "node src/server.ts",
     "seed:superadmin": "tsx src/scripts/seed-superadmin.ts",
     "cleanup:rate-quotes": "tsx src/scripts/cleanup-rate-quotes.ts",
     "test": "vitest run",

@@ -1,4 +1,4 @@
-import type { AdminRole } from './realm.js';
+import type { AdminRole } from './realm.ts';
 
 /**
  * Admin role-gate matrix (architecture §1.2). Enforced SERVER-SIDE on every

@@ -1,6 +1,6 @@
 import { isIP } from 'node:net';
 import { lookup } from 'node:dns/promises';
-import { BadRequest } from '../errors.js';
+import { BadRequest } from '../errors.ts';
 
 /**
  * SSRF egress guard for brand-supplied URLs (e.g. a WooCommerce `store_url`).

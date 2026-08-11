@@ -1,4 +1,4 @@
-import type { BrandMemberRole } from './realm.js';
+import type { BrandMemberRole } from './realm.ts';
 
 /**
  * Brand-side permission model (architecture §3.1).

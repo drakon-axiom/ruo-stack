@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { signAdminAccessToken, verifyAdminAccessToken } from '../../src/auth/admin-jwt.js';
-import { loadConfig } from '../../src/config.js';
-import { HttpError } from '../../src/errors.js';
+import { signAdminAccessToken, verifyAdminAccessToken } from '../../src/auth/admin-jwt.ts';
+import { loadConfig } from '../../src/config.ts';
+import { HttpError } from '../../src/errors.ts';
 
 // Critical invariant #1 (realm isolation), admin side: the admin credential is
 // signed with its OWN secret and must carry realm:'admin'. A brand-shaped token

@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, OrderEditSchema, OrderShipSchema } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { captureOrder, getWalletSummary } from '../services/wallet.js';
-import { applyOrderEdit } from '../services/order-edit.js';
-import { onOrderShipped } from '../hooks/order-shipped.js';
-import { BadRequest, Conflict, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { captureOrder, getWalletSummary } from '../services/wallet.ts';
+import { applyOrderEdit } from '../services/order-edit.ts';
+import { onOrderShipped } from '../hooks/order-shipped.ts';
+import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
 /**
  * Operator fulfillment console (architecture §1.3). Fulfillment itself happens in

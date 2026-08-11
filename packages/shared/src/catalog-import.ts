@@ -1,4 +1,4 @@
-import { buildCsv } from './csv.js';
+import { buildCsv } from './csv.ts';
 
 /**
  * The catalog CSV import contract, and all of its classification logic.

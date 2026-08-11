@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { resolveClaim } from '../../src/services/claims.js';
-import { HttpError } from '../../src/errors.js';
-import { randomToken } from '../../src/crypto.js';
+import { resolveClaim } from '../../src/services/claims.ts';
+import { HttpError } from '../../src/errors.ts';
+import { randomToken } from '../../src/crypto.ts';
 
 // Claim resolution must not double-ship: a second resolve of an already-resolved
 // claim is rejected and creates no additional reship order. Self-skips unless

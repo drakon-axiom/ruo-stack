@@ -1,9 +1,9 @@
 import type { OrderBlocker, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
-import { applyOrderEdit } from './order-edit.js';
-import { resolveSkus } from './sku-resolver.js';
-import { BadRequest, NotFound } from '../errors.js';
+import { writeAudit } from '../audit.ts';
+import { applyOrderEdit } from './order-edit.ts';
+import { resolveSkus } from './sku-resolver.ts';
+import { BadRequest, NotFound } from '../errors.ts';
 
 interface SourceItem {
   sku: string;

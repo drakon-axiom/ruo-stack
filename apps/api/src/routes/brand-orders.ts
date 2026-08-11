@@ -8,15 +8,15 @@ import {
   PLANS,
   wholesaleFieldFor,
 } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireBrand } from '../middleware/guards.js';
-import { effectivePlan } from '../services/subscription.js';
-import { getWalletSummary, lockBrandWallet } from '../services/wallet.js';
-import { applyOrderEdit } from '../services/order-edit.js';
-import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
-import { loadConfig } from '../config.js';
-import { BadRequest, Conflict, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireBrand } from '../middleware/guards.ts';
+import { effectivePlan } from '../services/subscription.ts';
+import { getWalletSummary, lockBrandWallet } from '../services/wallet.ts';
+import { applyOrderEdit } from '../services/order-edit.ts';
+import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.ts';
+import { loadConfig } from '../config.ts';
+import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
 /**
  * Brand order intake (manual-first). Orders are priced at the brand's tier

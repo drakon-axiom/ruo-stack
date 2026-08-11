@@ -1,5 +1,5 @@
 import { PrismaClient } from '@ruostack/db';
-import { deleteExpiredRateQuotes } from '../services/rate-quote.js';
+import { deleteExpiredRateQuotes } from '../services/rate-quote.ts';
 
 /**
  * One-shot expired-RateQuote cleanup, for an external scheduler (cron) when you'd

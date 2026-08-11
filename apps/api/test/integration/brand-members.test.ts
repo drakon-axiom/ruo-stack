@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { getPrisma } from '@ruostack/db';
 import { canBrandAccess, wouldOrphanBrand } from '@ruostack/shared';
-import { randomToken } from '../../src/crypto.js';
+import { randomToken } from '../../src/crypto.ts';
 
 /**
  * Brand team membership against a real DB. The HTTP layer can't be exercised

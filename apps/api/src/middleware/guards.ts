@@ -1,9 +1,9 @@
 import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { canBrandAccess, canView, canWrite, type BrandSurface, type Surface } from '@ruostack/shared';
-import { verifyBrandToken } from '../auth/brand-token.js';
-import { verifyAdminAccessToken } from '../auth/admin-jwt.js';
-import { getClients } from '../clients.js';
-import { Forbidden, Unauthorized } from '../errors.js';
+import { verifyBrandToken } from '../auth/brand-token.ts';
+import { verifyAdminAccessToken } from '../auth/admin-jwt.ts';
+import { getClients } from '../clients.ts';
+import { Forbidden, Unauthorized } from '../errors.ts';
 
 function bearer(req: FastifyRequest): string {
   const h = req.headers.authorization;

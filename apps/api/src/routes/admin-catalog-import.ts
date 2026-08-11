@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { MAX_IMPORT_BYTES } from '@ruostack/shared';
 import { z } from 'zod';
-import { getClients } from '../clients.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { BadRequest } from '../errors.js';
-import { buildPreview, commitImport, previewDigest } from '../services/catalog-import.js';
+import { getClients } from '../clients.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { BadRequest } from '../errors.ts';
+import { buildPreview, commitImport, previewDigest } from '../services/catalog-import.ts';
 
 /**
  * CSV catalog import. Two phases: preview classifies and writes nothing, commit

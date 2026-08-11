@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { getClients } from '../clients.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { runReconciliation, scanDrift } from '../services/reconciliation.js';
+import { getClients } from '../clients.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { runReconciliation, scanDrift } from '../services/reconciliation.ts';
 
 const MAX_WEBHOOK_ATTEMPTS = 5;
 

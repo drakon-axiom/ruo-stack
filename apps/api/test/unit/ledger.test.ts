@@ -5,7 +5,7 @@ import {
   summarizeByBrand,
   totalsFor,
   type LedgerEntry,
-} from '../../src/services/ledger.js';
+} from '../../src/services/ledger.ts';
 
 /**
  * Ledger aggregation — the numbers Finance reconciles against, so the arithmetic

@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { applyOrderEdit } from '../../src/services/order-edit.js';
-import { appendEntry } from '../../src/services/wallet.js';
-import { randomToken } from '../../src/crypto.js';
+import { applyOrderEdit } from '../../src/services/order-edit.ts';
+import { appendEntry } from '../../src/services/wallet.ts';
+import { randomToken } from '../../src/crypto.ts';
 
 // An order edit re-prices and re-reserves, but it must NOT clear a
 // needs_mapping / needs_address blocker just because funds now cover the order —

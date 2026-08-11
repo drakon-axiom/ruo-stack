@@ -7,11 +7,11 @@ import {
   AuditQuerySchema,
   AUDIT_ACTIONS,
 } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { Conflict, NotFound } from '../errors.js';
-import { hashPassword, randomToken } from '../crypto.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { Conflict, NotFound } from '../errors.ts';
+import { hashPassword, randomToken } from '../crypto.ts';
 
 /**
  * Admin Users & Roles (super_admin only) + the AuditLog viewer — the artifact

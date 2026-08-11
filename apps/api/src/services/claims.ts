@@ -1,8 +1,8 @@
 import type { Claim, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type ClaimResolution } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
-import { appendEntry, getWalletSummary } from './wallet.js';
-import { BadRequest, Conflict, NotFound } from '../errors.js';
+import { writeAudit } from '../audit.ts';
+import { appendEntry, getWalletSummary } from './wallet.ts';
+import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
 export interface ResolveInput {
   resolution: ClaimResolution;

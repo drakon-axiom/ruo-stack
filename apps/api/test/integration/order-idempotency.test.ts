@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma, Prisma } from '@ruostack/db';
-import { randomToken } from '../../src/crypto.js';
+import { randomToken } from '../../src/crypto.ts';
 
 // The unique index on (brand_id, source, external_order_id) is the DB backstop
 // for store-order idempotency. Self-skips unless RUN_DB_TESTS=1.

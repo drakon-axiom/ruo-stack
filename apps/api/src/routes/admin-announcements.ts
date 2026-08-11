@@ -7,10 +7,10 @@ import {
   announcementDisplayState,
 } from '@ruostack/shared';
 import { z } from 'zod';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { BadRequest, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { BadRequest, NotFound } from '../errors.ts';
 
 /**
  * Announcements admin (architecture §1.3) — authors the broadcasts that become

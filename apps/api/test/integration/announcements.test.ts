@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { getPrisma, type AdminRole } from '@ruostack/db';
-import { buildApp } from '../../src/app.js';
-import { signAdminAccessToken } from '../../src/auth/admin-jwt.js';
+import { buildApp } from '../../src/app.ts';
+import { signAdminAccessToken } from '../../src/auth/admin-jwt.ts';
 import { randomUUID } from 'node:crypto';
-import { hashToken, randomToken, hashPassword } from '../../src/crypto.js';
-import { getFeed, getUnreadCount, markAllRead, markRead } from '../../src/services/notifications.js';
+import { hashToken, randomToken, hashPassword } from '../../src/crypto.ts';
+import { getFeed, getUnreadCount, markAllRead, markRead } from '../../src/services/notifications.ts';
 
 // Announcements + the derived brand inbox, against a real migrated Postgres.
 // Self-skips unless RUN_DB_TESTS=1 (CI's db-tests job sets it).

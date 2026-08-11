@@ -1,7 +1,7 @@
 import type { BrandStoreConnection } from '@ruostack/db';
-import { loadConfig } from '../config.js';
-import { decryptSecret, encryptSecret } from '../crypto.js';
-import { assertPublicHttpUrl } from './ssrf-guard.js';
+import { loadConfig } from '../config.ts';
+import { decryptSecret, encryptSecret } from '../crypto.ts';
+import { assertPublicHttpUrl } from './ssrf-guard.ts';
 
 /**
  * WooCommerce REST connector. RUOStack is the hub: it pulls orders via webhook

@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, CLAIM_SLA_DAYS, ClaimOpenSchema, ClaimResolveSchema, canResolveClaim } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { resolveClaim } from '../services/claims.js';
-import { serializeClaim } from './brand-claims.js';
-import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { resolveClaim } from '../services/claims.ts';
+import { serializeClaim } from './brand-claims.ts';
+import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.ts';
 
 /**
  * Claims queue (§11): operator triage + resolution. States open → investigating →

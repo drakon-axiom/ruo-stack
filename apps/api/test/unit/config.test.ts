@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EnvSchema, parseTrustProxy } from '../../src/config.js';
+import { EnvSchema, parseTrustProxy } from '../../src/config.ts';
 
 // Critical invariant #6: the app refuses to start if a required secret is absent.
 describe('env validation', () => {

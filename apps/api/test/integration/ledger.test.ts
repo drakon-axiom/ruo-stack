@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { getPrisma, type AdminRole } from '@ruostack/db';
-import { buildApp } from '../../src/app.js';
-import { signAdminAccessToken } from '../../src/auth/admin-jwt.js';
-import { hashPassword, hashToken, randomToken } from '../../src/crypto.js';
-import { appendEntry } from '../../src/services/wallet.js';
+import { buildApp } from '../../src/app.ts';
+import { signAdminAccessToken } from '../../src/auth/admin-jwt.ts';
+import { hashPassword, hashToken, randomToken } from '../../src/crypto.ts';
+import { appendEntry } from '../../src/services/wallet.ts';
 
 // Ledger & Reconciliation surface. Self-skips unless RUN_DB_TESTS=1.
 const RUN = process.env.RUN_DB_TESTS === '1';

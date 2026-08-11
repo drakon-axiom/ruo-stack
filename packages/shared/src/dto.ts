@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ADMIN_ROLES } from './realm.js';
+import { ADMIN_ROLES } from './realm.ts';
 
 /** Shared API request schemas (validated with zod at the route boundary). */
 

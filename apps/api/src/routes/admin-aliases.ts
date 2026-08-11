@@ -2,11 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@ruostack/db';
 import { z } from 'zod';
 import { AUDIT_ACTIONS } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { remapStoreOrder } from '../services/store-remap.js';
-import { Conflict, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { remapStoreOrder } from '../services/store-remap.ts';
+import { Conflict, NotFound } from '../errors.ts';
 
 /**
  * Store-Match: SKU aliases + No-Match exception resolution (§3). A store order

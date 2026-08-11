@@ -1,5 +1,5 @@
 import type { BrandStoreConnection, PrismaClient } from '@ruostack/db';
-import { batchProducts, decryptStoreCreds, getProductIdBySku, type WooProductInput, type WooProductUpdate } from './woo.js';
+import { batchProducts, decryptStoreCreds, getProductIdBySku, type WooProductInput, type WooProductUpdate } from './woo.ts';
 
 /**
  * Product provisioning: seed the brand's WooCommerce store with products that

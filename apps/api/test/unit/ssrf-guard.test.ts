@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPublicHttpUrl, isPrivateAddress } from '../../src/services/ssrf-guard.js';
+import { assertPublicHttpUrl, isPrivateAddress } from '../../src/services/ssrf-guard.ts';
 
 describe('isPrivateAddress', () => {
   it('flags private / loopback / link-local / reserved ranges', () => {

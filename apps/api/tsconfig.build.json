@@ -1,8 +1,14 @@
 {
+  // Production-scoped typecheck, not an emit. pm2 runs apps/api/src/server.ts
+  // directly and Node strips the types at load time, so there is no dist/ to
+  // produce -- `pnpm build` exists to fail the deploy on a type error before
+  // anything is published. Emitting here is also impossible now:
+  // allowImportingTsExtensions (needed because this package and every workspace
+  // package it imports use .ts specifiers) requires noEmit.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist"
+    "noEmit": true
   },
   "include": ["src/**/*"],
   "exclude": ["test/**/*", "**/*.test.ts"]

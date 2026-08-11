@@ -4,7 +4,7 @@ import { StripeAdapter } from '@ruostack/payments';
 import { ConsoleEmailAdapter, ResendEmailAdapter } from '@ruostack/email';
 import type { PaymentsAdapter } from '@ruostack/shared';
 import type { EmailAdapter } from '@ruostack/shared';
-import { loadConfig, type AppConfig } from './config.js';
+import { loadConfig, type AppConfig } from './config.ts';
 
 /**
  * Shared singletons. The API is the only DB consumer (Prisma via the bypassrls

@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { AUDIT_ACTIONS, BRAND_MEMBER_ROLES, wouldOrphanBrand } from '@ruostack/shared';
 import { z } from 'zod';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
-import { BadRequest, Conflict, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
+import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
 /**
  * Brand team management (architecture §3.1 — "invite-staff UI lands later

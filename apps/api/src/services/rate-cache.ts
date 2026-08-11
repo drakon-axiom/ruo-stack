@@ -1,6 +1,6 @@
 import type { RateOption, RateQuoteInput } from '@ruostack/shared';
-import { loadConfig } from '../config.js';
-import { quoteRates } from './rates/index.js';
+import { loadConfig } from '../config.ts';
+import { quoteRates } from './rates/index.ts';
 
 /**
  * Short-TTL carrier-rate cache (§4): checkout must never hammer the rater. Caches

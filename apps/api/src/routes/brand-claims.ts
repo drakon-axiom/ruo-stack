@@ -2,10 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import type { Claim } from '@ruostack/db';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, CLAIM_SLA_DAYS, ClaimOpenSchema, claimEligibility } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireBrand } from '../middleware/guards.js';
-import { BadRequest, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireBrand } from '../middleware/guards.ts';
+import { BadRequest, NotFound } from '../errors.ts';
 
 /**
  * Brand-facing claims (§11): open a post-ship problem against an order and track

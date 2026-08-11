@@ -27,8 +27,16 @@ export class ShipStationV2RatesAdapter implements RatesAdapter {
   readonly source = 'shipstation';
   private readonly base = 'https://api.shipstation.com/v2';
   private carrierIds?: string[];
+  private readonly apiKey: string;
 
-  constructor(private readonly apiKey: string) {}
+  // Explicit field rather than a `private readonly` parameter property: this API
+  // runs from TypeScript source in production and Node strips its types at load
+  // time, which only handles erasable syntax. A parameter property emits an
+  // assignment, so it would fail to load. `erasableSyntaxOnly` in tsconfig.base
+  // fails the typecheck if one is reintroduced.
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
 
   private headers() {
     return { 'API-Key': this.apiKey, 'content-type': 'application/json' };

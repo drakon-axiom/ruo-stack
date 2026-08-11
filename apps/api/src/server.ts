@@ -1,10 +1,10 @@
-import { buildApp } from './app.js';
-import { loadConfig } from './config.js';
-import { getClients } from './clients.js';
-import { startRateQuoteSweeper } from './services/rate-quote.js';
-import { startReconciliationWorker } from './services/reconciliation.js';
-import { startDunningWorker } from './services/dunning.js';
-import { startSubscriptionLapseWorker } from './services/subscription.js';
+import { buildApp } from './app.ts';
+import { loadConfig } from './config.ts';
+import { getClients } from './clients.ts';
+import { startRateQuoteSweeper } from './services/rate-quote.ts';
+import { startReconciliationWorker } from './services/reconciliation.ts';
+import { startDunningWorker } from './services/dunning.ts';
+import { startSubscriptionLapseWorker } from './services/subscription.ts';
 
 async function main() {
   const cfg = loadConfig();

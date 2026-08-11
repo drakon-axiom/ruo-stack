@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildProductCsv, platformOwnedUpdate, type ProvisionProduct } from '../../src/services/store-provision.js';
+import { buildProductCsv, platformOwnedUpdate, type ProvisionProduct } from '../../src/services/store-provision.ts';
 
 /**
  * Fulfillment plan §3: "Updates are field-scoped: RUOStack only rewrites

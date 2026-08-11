@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { Prisma, type PlanTier, type PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type NormalizedEvent } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { loadConfig } from '../config.js';
-import { writeAudit } from '../audit.js';
-import { appendEntry } from '../services/wallet.js';
-import { upsertSubscriptionState } from '../services/subscription.js';
+import { getClients } from '../clients.ts';
+import { loadConfig } from '../config.ts';
+import { writeAudit } from '../audit.ts';
+import { appendEntry } from '../services/wallet.ts';
+import { upsertSubscriptionState } from '../services/subscription.ts';
 
 /** Map a Stripe price id to a plan tier (configured per-tier price ids). */
 function planForPrice(priceId?: string): PlanTier | undefined {

@@ -1,9 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
-    "types": ["node"],
-    "moduleResolution": "Bundler"
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "Bundler",
+    "erasableSyntaxOnly": true
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": [
+    "src/**/*",
+    "test/**/*"
+  ]
 }

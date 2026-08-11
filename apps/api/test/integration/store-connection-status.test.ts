@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { importWooOrder } from '../../src/services/store-intake.js';
-import { randomToken } from '../../src/crypto.js';
+import { importWooOrder } from '../../src/services/store-intake.ts';
+import { randomToken } from '../../src/crypto.ts';
 
 // A successful import must clear a transient `error` but never resurrect a
 // connection an admin deliberately `disabled`. Self-skips unless RUN_DB_TESTS=1.

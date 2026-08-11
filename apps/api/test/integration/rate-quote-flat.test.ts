@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
 import { FLAT_FALLBACK, priceOption, type ShippingPricing } from '@ruostack/shared';
-import { persistRateQuotes, findRateQuote, type CartItem } from '../../src/services/rate-quote.js';
-import { randomToken } from '../../src/crypto.js';
+import { persistRateQuotes, findRateQuote, type CartItem } from '../../src/services/rate-quote.ts';
+import { randomToken } from '../../src/crypto.ts';
 
 // The wallet reserves the quoted brand cost (amountCents). The flat fallback is
 // all-in, so its reserve must equal $12.99 — not $12.99 + pick-&-pack. Self-skips

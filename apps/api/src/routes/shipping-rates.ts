@@ -2,11 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { FLAT_FALLBACK, priceOption, type PricedRateOption } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { loadConfig } from '../config.js';
-import { effectivePlan } from '../services/subscription.js';
-import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.js';
-import { persistRateQuotes } from '../services/rate-quote.js';
+import { getClients } from '../clients.ts';
+import { loadConfig } from '../config.ts';
+import { effectivePlan } from '../services/subscription.ts';
+import { deriveParcel, loadShippingRules, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.ts';
+import { persistRateQuotes } from '../services/rate-quote.ts';
 
 /**
  * Checkout rate proxy (fulfillment plan §4). The RUOStack Shipping Method (a

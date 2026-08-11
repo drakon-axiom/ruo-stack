@@ -3,11 +3,11 @@ import { timingSafeEqual } from 'node:crypto';
 import { Prisma } from '@ruostack/db';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, shipstationStatus } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { loadConfig } from '../config.js';
-import { writeAudit } from '../audit.js';
-import { captureOrder, getWalletSummary } from '../services/wallet.js';
-import { onOrderShipped } from '../hooks/order-shipped.js';
+import { getClients } from '../clients.ts';
+import { loadConfig } from '../config.ts';
+import { writeAudit } from '../audit.ts';
+import { captureOrder, getWalletSummary } from '../services/wallet.ts';
+import { onOrderShipped } from '../hooks/order-shipped.ts';
 
 /**
  * ShipStation Custom Store endpoint (fulfillment). A single Web Endpoint that

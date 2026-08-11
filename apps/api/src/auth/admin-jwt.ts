@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import type { AdminRole } from '@ruostack/shared';
-import { loadConfig } from '../config.js';
-import { Unauthorized } from '../errors.js';
+import { loadConfig } from '../config.ts';
+import { Unauthorized } from '../errors.ts';
 
 /**
  * Hand-rolled admin identity (option a), kept OUT of the customer pool with its

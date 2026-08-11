@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { getClients } from '../clients.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { buildReport } from '../services/reporting.js';
+import { getClients } from '../clients.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { buildReport } from '../services/reporting.ts';
 
 /**
  * Admin Overview — platform health at a glance (architecture §1.3). Aggregates

@@ -1,11 +1,11 @@
 import type { Prisma, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type OrderEdit, wholesaleFieldFor } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
-import { effectivePlan } from './subscription.js';
-import { getWalletSummary, lockBrandWallet } from './wallet.js';
-import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
-import { loadConfig } from '../config.js';
-import { BadRequest, Conflict } from '../errors.js';
+import { writeAudit } from '../audit.ts';
+import { effectivePlan } from './subscription.ts';
+import { getWalletSummary, lockBrandWallet } from './wallet.ts';
+import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.ts';
+import { loadConfig } from '../config.ts';
+import { BadRequest, Conflict } from '../errors.ts';
 
 type OrderWithItems = Prisma.OrderGetPayload<{ include: { items: true } }>;
 

@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Prisma } from '@ruostack/db';
-import { getClients } from '../clients.js';
-import { importWooOrder, type WooOrder } from '../services/store-intake.js';
+import { getClients } from '../clients.ts';
+import { importWooOrder, type WooOrder } from '../services/store-intake.ts';
 
 /**
  * WooCommerce webhook receiver (inbound order intake). Own encapsulated scope so

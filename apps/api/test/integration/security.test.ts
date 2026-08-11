@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { getPrisma, Prisma, type AdminRole } from '@ruostack/db';
-import { buildApp } from '../../src/app.js';
-import { signAdminAccessToken } from '../../src/auth/admin-jwt.js';
-import { hashToken, randomToken, hashPassword } from '../../src/crypto.js';
+import { buildApp } from '../../src/app.ts';
+import { signAdminAccessToken } from '../../src/auth/admin-jwt.ts';
+import { hashToken, randomToken, hashPassword } from '../../src/crypto.ts';
 
 // These exercise the security spine against a REAL migrated Supabase Postgres.
 // They self-skip unless RUN_DB_TESTS=1 (so `pnpm test` is green offline). To run:

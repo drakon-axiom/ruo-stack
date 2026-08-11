@@ -1,8 +1,8 @@
 import type { Order } from '@ruostack/db';
 import { AUDIT_ACTIONS } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { decryptStoreCreds, pushTracking } from '../services/woo.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { decryptStoreCreds, pushTracking } from '../services/woo.ts';
 
 /**
  * On ship, write the tracking number back to the connected store so the brand's

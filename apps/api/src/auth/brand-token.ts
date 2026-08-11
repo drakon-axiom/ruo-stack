@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-import { loadConfig } from '../config.js';
-import { Unauthorized } from '../errors.js';
+import { loadConfig } from '../config.ts';
+import { Unauthorized } from '../errors.ts';
 
 /**
  * Verifies a Supabase-issued brand access token and reads the realm/brand_id

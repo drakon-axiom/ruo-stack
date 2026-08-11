@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { appendEntry, captureOrder, getWalletSummary } from '../../src/services/wallet.js';
-import { randomToken } from '../../src/crypto.js';
+import { appendEntry, captureOrder, getWalletSummary } from '../../src/services/wallet.ts';
+import { randomToken } from '../../src/crypto.ts';
 
 // Order ↔ wallet correctness (held/available + capture). Self-skips unless RUN_DB_TESTS=1.
 const RUN = process.env.RUN_DB_TESTS === '1';

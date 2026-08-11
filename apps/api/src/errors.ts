@@ -1,11 +1,16 @@
 /** Typed HTTP error carrying a status code + stable error code for the client. */
 export class HttpError extends Error {
-  constructor(
-    public readonly statusCode: number,
-    public readonly code: string,
-    message: string,
-  ) {
+  // Explicit fields rather than parameter properties: this API runs from
+  // TypeScript source and Node strips its types at load time, which handles
+  // erasable syntax only. `erasableSyntaxOnly` in apps/api/tsconfig.json fails
+  // the typecheck if a parameter property is reintroduced.
+  readonly statusCode: number;
+  readonly code: string;
+
+  constructor(statusCode: number, code: string, message: string) {
     super(message);
+    this.statusCode = statusCode;
+    this.code = code;
     this.name = 'HttpError';
   }
 }

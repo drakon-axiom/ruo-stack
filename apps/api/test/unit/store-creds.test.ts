@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from '../../src/config.js';
-import { encryptStoreCreds, decryptStoreCreds } from '../../src/services/woo.js';
+import { loadConfig } from '../../src/config.ts';
+import { encryptStoreCreds, decryptStoreCreds } from '../../src/services/woo.ts';
 
 // Store REST credentials must encrypt under STORE_CREDS_KEY, a secret distinct
 // from MFA_ENCRYPTION_KEY, so one key's compromise can't decrypt the other.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decryptSecret, encryptSecret, hashPassword, hashToken, verifyPassword } from '../../src/crypto.js';
+import { decryptSecret, encryptSecret, hashPassword, hashToken, verifyPassword } from '../../src/crypto.ts';
 
 const KEY = Buffer.alloc(32, 9).toString('base64');
 

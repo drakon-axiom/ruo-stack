@@ -1,6 +1,6 @@
 import type { Box, PrismaClient, ServiceMapping } from '@ruostack/db';
 import type { RateOption } from '@ruostack/shared';
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../config.ts';
 
 /**
  * Fulfillment rules engine (§6): box selection, billable weight, and service

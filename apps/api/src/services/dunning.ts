@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, PLANS, type EmailAdapter, type PlanKey } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
-import { upsertSubscriptionState } from './subscription.js';
+import { writeAudit } from '../audit.ts';
+import { upsertSubscriptionState } from './subscription.ts';
 
 /**
  * Membership dunning (§9 billing): a failed payment puts the subscription

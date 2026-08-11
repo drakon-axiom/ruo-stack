@@ -8,11 +8,11 @@ import {
   catalogDeleteBlocker,
 } from '@ruostack/shared';
 import { z } from 'zod';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { BadRequest, Conflict, NotFound } from '../errors.js';
-import { onCatalogStockChanged } from '../hooks/catalog-stock.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { BadRequest, Conflict, NotFound } from '../errors.ts';
+import { onCatalogStockChanged } from '../hooks/catalog-stock.ts';
 
 /**
  * Catalog Manager (architecture §1.2). CatalogProduct is the single source of

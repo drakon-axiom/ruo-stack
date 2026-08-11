@@ -1,8 +1,8 @@
 import type { RateOption, RateQuoteInput } from '@ruostack/shared';
-import { loadConfig } from '../../config.js';
-import { ComputedRatesAdapter } from './computed.js';
-import { ShipStationRatesAdapter } from './shipstation.js';
-import { ShipStationV2RatesAdapter } from './shipstation-v2.js';
+import { loadConfig } from '../../config.ts';
+import { ComputedRatesAdapter } from './computed.ts';
+import { ShipStationRatesAdapter } from './shipstation.ts';
+import { ShipStationV2RatesAdapter } from './shipstation-v2.ts';
 
 /**
  * Pick the rate source: ShipStation v1 (key + secret), ShipStation v2 (single

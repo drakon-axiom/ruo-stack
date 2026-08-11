@@ -7,13 +7,13 @@ import {
   type PricedRateOption,
   type ShippingPricing,
 } from '@ruostack/shared';
-import { loadConfig } from '../config.js';
-import { cachedQuoteRates } from './rate-cache.js';
-import { computeParcel, curateRates } from './fulfillment-rules.js';
+import { loadConfig } from '../config.ts';
+import { cachedQuoteRates } from './rate-cache.ts';
+import { computeParcel, curateRates } from './fulfillment-rules.ts';
 
 // Parcel + rules-engine helpers live in fulfillment-rules; re-exported so existing
 // importers keep a stable path.
-export { computeParcel, deriveParcel, loadShippingRules, orderBoxFields, selectBox, DEFAULT_ITEM_WEIGHT_OZ, type ParcelProduct, type DerivedParcel } from './fulfillment-rules.js';
+export { computeParcel, deriveParcel, loadShippingRules, orderBoxFields, selectBox, DEFAULT_ITEM_WEIGHT_OZ, type ParcelProduct, type DerivedParcel } from './fulfillment-rules.ts';
 
 export interface ShippingQuote {
   source: string; // 'flat' | 'computed' | 'shipstation' | 'fallback'

@@ -1,19 +1,19 @@
 import type { FastifyInstance } from 'fastify';
 import { AUDIT_ACTIONS } from '@ruostack/shared';
 import { z } from 'zod';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { BadRequest, NotFound } from '../errors.js';
-import { captureOrder } from '../services/wallet.js';
-import { scanDrift } from '../services/reconciliation.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { BadRequest, NotFound } from '../errors.ts';
+import { captureOrder } from '../services/wallet.ts';
+import { scanDrift } from '../services/reconciliation.ts';
 import {
   buildLedgerDetailCsv,
   buildLedgerSummaryCsv,
   summarizeByBrand,
   totalsFor,
   type LedgerEntry,
-} from '../services/ledger.js';
+} from '../services/ledger.ts';
 
 /**
  * Ledger & Reconciliation — the Finance surface (architecture §1.3, Gap 4.2).

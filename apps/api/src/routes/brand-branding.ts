@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AUDIT_ACTIONS } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
-import { BadRequest, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
+import { BadRequest, NotFound } from '../errors.ts';
 
 // Public bucket holding brand logos. Self-provisioned on first upload so there's
 // no manual Supabase setup step. Served from the storage domain (isolated from

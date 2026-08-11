@@ -1,13 +1,13 @@
 import type { BrandStoreConnection, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, wholesaleFieldFor } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
-import { effectivePlan } from './subscription.js';
-import { getWalletSummary, lockBrandWallet } from './wallet.js';
-import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.js';
-import { findRateQuote } from './rate-quote.js';
-import { resolveSkus } from './sku-resolver.js';
+import { writeAudit } from '../audit.ts';
+import { effectivePlan } from './subscription.ts';
+import { getWalletSummary, lockBrandWallet } from './wallet.ts';
+import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from './shipping.ts';
+import { findRateQuote } from './rate-quote.ts';
+import { resolveSkus } from './sku-resolver.ts';
 import { Prisma } from '@ruostack/db';
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../config.ts';
 
 interface WooLineItem {
   sku?: string;

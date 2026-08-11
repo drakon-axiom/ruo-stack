@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { randomToken } from '../../src/crypto.js';
-import { commit, preflight } from '../../src/services/store-preflight.js';
-import type { ProvisioningStoreClient, StoreProduct } from '../../src/services/store-client.js';
-import type { ProvisionProduct } from '../../src/services/store-provision.js';
+import { randomToken } from '../../src/crypto.ts';
+import { commit, preflight } from '../../src/services/store-preflight.ts';
+import type { ProvisioningStoreClient, StoreProduct } from '../../src/services/store-client.ts';
+import type { ProvisionProduct } from '../../src/services/store-provision.ts';
 
 // Pre-flight + commit against a real DB and a FAKE store. Self-skips unless
 // RUN_DB_TESTS=1. The fake is the point: it lets every branch (adopt, drift,

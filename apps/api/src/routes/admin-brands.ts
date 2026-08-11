@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, WalletAdjustSchema } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { writeAudit } from '../audit.js';
-import { requireAdmin } from '../middleware/guards.js';
-import { loadConfig } from '../config.js';
-import { effectivePlan, isLapsed, upsertSubscriptionState } from '../services/subscription.js';
-import { appendEntry, getWalletSummary } from '../services/wallet.js';
-import { BadRequest, NotFound } from '../errors.js';
+import { getClients } from '../clients.ts';
+import { writeAudit } from '../audit.ts';
+import { requireAdmin } from '../middleware/guards.ts';
+import { loadConfig } from '../config.ts';
+import { effectivePlan, isLapsed, upsertSubscriptionState } from '../services/subscription.ts';
+import { appendEntry, getWalletSummary } from '../services/wallet.ts';
+import { BadRequest, NotFound } from '../errors.ts';
 
 /**
  * Brand Manager (architecture §1.3) — per-brand operator ops. List/detail are

@@ -7,13 +7,13 @@ import {
   SubscribeSchema,
   WalletTopupSchema,
 } from '@ruostack/shared';
-import { getClients } from '../clients.js';
-import { loadConfig } from '../config.js';
-import { writeAudit } from '../audit.js';
-import { requireBrand, requireBrandSurface } from '../middleware/guards.js';
-import { BadRequest, NotFound } from '../errors.js';
-import { getWalletSummary } from '../services/wallet.js';
-import { effectivePlan, isLapsed } from '../services/subscription.js';
+import { getClients } from '../clients.ts';
+import { loadConfig } from '../config.ts';
+import { writeAudit } from '../audit.ts';
+import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
+import { BadRequest, NotFound } from '../errors.ts';
+import { getWalletSummary } from '../services/wallet.ts';
+import { effectivePlan, isLapsed } from '../services/subscription.ts';
 
 /**
  * Brand-facing money layer (Phase 1): Pro membership + prepaid wallet. Core never

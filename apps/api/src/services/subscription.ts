@@ -1,6 +1,6 @@
 import type { PrismaClient, PlanTier, SubscriptionState, SubscriptionStateStatus } from '@ruostack/db';
 import { AUDIT_ACTIONS, type PlanKey } from '@ruostack/shared';
-import { writeAudit } from '../audit.js';
+import { writeAudit } from '../audit.ts';
 
 /**
  * Membership state. Driven ONLY by billing webhooks — never by wallet flows

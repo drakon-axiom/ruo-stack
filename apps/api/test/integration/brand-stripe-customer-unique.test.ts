@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { getPrisma, Prisma } from '@ruostack/db';
-import { randomToken } from '../../src/crypto.js';
+import { randomToken } from '../../src/crypto.ts';
 
 // stripe_customer_id is the webhook tenant-lookup key; two brands must never
 // share one, or a billing event misattributes. NULLs stay distinct. Self-skips
