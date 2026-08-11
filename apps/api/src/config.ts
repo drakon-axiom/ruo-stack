@@ -121,7 +121,9 @@ export const EnvSchema = z.object({
   TRUST_PROXY: z.string().default('1'),
 
   // Bootstrap (seed:superadmin).
-  SEED_SUPERADMIN_EMAIL: z.string().email().optional(),
+  // Normalised like every other address (see EmailSchema in @ruostack/shared):
+  // the seeded row is looked up byte-exact at login.
+  SEED_SUPERADMIN_EMAIL: z.string().trim().toLowerCase().email().optional(),
   SEED_SUPERADMIN_PASSWORD: z.string().min(8).optional(),
 });
 

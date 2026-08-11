@@ -3,10 +3,27 @@ import { ADMIN_ROLES } from './realm.ts';
 
 /** Shared API request schemas (validated with zod at the route boundary). */
 
+/**
+ * Email, trimmed and lowercased before validation.
+ *
+ * Every lookup is `findUnique({ where: { email } })`, which is byte-exact, so an
+ * address that differs only in case simply does not match: the admin who typed
+ * `Scott.Hawks@axc.llc` got a 401 reading "Invalid credentials" with entirely
+ * correct credentials. iOS and Android autocapitalise the first letter of a text
+ * field by default, so that is the common path on mobile, and pasting an address
+ * routinely carries whitespace.
+ *
+ * Normalising here means both the API and the two SPAs inherit it at the route
+ * boundary. Use this for every stored or looked-up address -- writes must
+ * normalise as well as reads, or an admin invited as `Foo@x.com` is stored
+ * mixed-case and can never log in.
+ */
+export const EmailSchema = z.string().trim().toLowerCase().email();
+
 // ── Brand realm ──────────────────────────────────────────────────────────────
 export const BrandSignupSchema = z.object({
   full_name: z.string().min(1).max(120),
-  email: z.string().email(),
+  email: EmailSchema,
   password: z.string().min(8).max(200),
   brand_name: z.string().min(1).max(120),
   ref: z.string().trim().min(1).max(64).optional(), // referral code → stored as referred_by
@@ -25,7 +42,7 @@ export type BrandProfilePatch = z.infer<typeof BrandProfilePatchSchema>;
 
 // ── Admin realm ──────────────────────────────────────────────────────────────
 export const AdminLoginSchema = z.object({
-  email: z.string().email(),
+  email: EmailSchema,
   password: z.string().min(1).max(200),
   totp: z.string().regex(/^\d{6}$/).optional(), // required once MFA enrolled
 });
@@ -67,7 +84,7 @@ export type CatalogUpdate = z.infer<typeof CatalogUpdateSchema>;
 export const CatalogStockSchema = z.object({ status: CatalogStatusEnum });
 
 export const AdminCreateSchema = z.object({
-  email: z.string().email(),
+  email: EmailSchema,
   full_name: z.string().min(1).max(120),
   role: z.enum(ADMIN_ROLES),
 });

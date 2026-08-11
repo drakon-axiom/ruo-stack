@@ -6,6 +6,7 @@ import {
   BrandProfilePatchSchema,
   BrandRetailSchema,
   BrandSignupSchema,
+  EmailSchema,
   wholesaleFieldFor,
 } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
@@ -191,7 +192,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: requireBrand, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
     async (req) => {
       const { userId, brandId } = req.brand!;
-      const { email } = z.object({ email: z.string().email() }).parse(req.body);
+      const { email } = z.object({ email: EmailSchema }).parse(req.body);
 
       const current = await supabaseAdmin.auth.admin.getUserById(userId);
       const before = current.data.user?.email ?? null;

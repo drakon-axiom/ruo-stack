@@ -28,6 +28,17 @@ next-env.d.ts
 /supabase/.temp
 **/.env
 
+# editor swap/backup files. These carry the contents of whatever is being
+# edited, so a swap file for .env holds .env's secrets. nano names its swap
+# `..env.swp` for `.env`, which the `**/.env.*` rule above does NOT match --
+# the name starts with two dots. `git add -A` staged one on 2026-08-11.
+*.swp
+*.swo
+*.swn
+*~
+.*.sw?
+..*.sw?
+
 # misc
 .DS_Store
 *.pem

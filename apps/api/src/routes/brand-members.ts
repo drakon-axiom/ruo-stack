@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { AUDIT_ACTIONS, BRAND_MEMBER_ROLES, wouldOrphanBrand } from '@ruostack/shared';
+import { AUDIT_ACTIONS, BRAND_MEMBER_ROLES, EmailSchema, wouldOrphanBrand } from '@ruostack/shared';
 import { z } from 'zod';
 import { getClients } from '../clients.ts';
 import { writeAudit } from '../audit.ts';
@@ -26,7 +26,7 @@ import { BadRequest, Conflict, NotFound } from '../errors.ts';
  * derived from Supabase's `last_sign_in_at`, not stored.
  */
 const InviteSchema = z.object({
-  email: z.string().email(),
+  email: EmailSchema,
   full_name: z.string().min(1).max(120),
   role: z.enum(BRAND_MEMBER_ROLES).default('staff'),
 });
