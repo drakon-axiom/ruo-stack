@@ -2,8 +2,10 @@
 
 Date: 2026-08-10
 Status: prod instance provisioned and verified; guard and `with-env` fix landed
-in `9cc3e14`. Remaining: storage policies, live Stripe/ShipStation credentials,
-DNS, and the go-live deploy.
+in `9cc3e14`. Remaining: live Stripe/ShipStation credentials, DNS, and the
+go-live deploy — plus one open security gap, "KNOWN GAP: prod storage policies
+are unscoped" below, which must be closed before the Branding upload screen
+ships.
 
 ## Problem
 
@@ -70,9 +72,61 @@ access-token hook must be enabled before any real brand login.
 ### Manual residue
 
 Storage object policies (`supabase/storage_setup.sql`) must be applied through the
-dashboard **Storage → Policies**. Verified that `postgres` is *not* a member of
-`supabase_storage_admin`, so the Management API SQL endpoint cannot create them.
-Not on the go-live path — it matters only once the Branding upload screen ships.
+dashboard **Storage → Policies**. `storage.objects` is owned by
+`supabase_storage_admin`; `postgres` is not a member of it and cannot `SET ROLE`
+to it, from either the Management API SQL endpoint or the dashboard SQL Editor —
+both fail with `42501: permission denied to set role "supabase_storage_admin"`.
+There is no Management or Storage API endpoint for object policies. Granting
+`postgres` that membership would work but permanently widens the most privileged
+role on the production database, and was rejected as a fix.
+
+## KNOWN GAP: prod storage policies are unscoped
+
+**Prod `brand-logos` currently allows any authenticated user to INSERT and UPDATE
+anywhere in the bucket.** The per-brand folder restriction is missing.
+
+`pg_policies` on `nanixtzbmorpojnyverq` holds two policies whose entire expression
+is `bucket_id = 'brand-logos'`. The intended clause —
+`(storage.foldername(name))[1] IN (SELECT public.current_user_brand_ids()::text)`
+— is absent, so nothing confines a brand to its own prefix. Left as-is
+deliberately: the bucket is empty and nothing writes to it until the Branding
+upload screen ships, which is also when this becomes exploitable.
+
+Ruled out as causes, by direct check against prod:
+
+- `authenticated` *can* execute `public.current_user_brand_ids()`
+  (`has_function_privilege` → true).
+- The expression is valid SQL — it was created against a throwaway table inside a
+  transaction and rolled back; Postgres accepted it.
+
+The cause is the dashboard flow. Policies named with a trailing `_0` / `_1`
+suffix (prod has `brand_logo_write_own_prefi 15kep2a_0` and
+`brand_logo_update_own_prefix 15kep2a_0`) come from the storage policy **wizard**,
+which generates its own expression from a template and ignores any pasted one;
+it also truncated the first policy's name. The **"For full customization"** editor
+is the one that accepts a raw expression, and does not add suffixes.
+
+To close the gap: delete both wizard-created policies, then recreate via "For
+full customization" — INSERT with the clause as `WITH CHECK`, UPDATE with it as
+`USING`, both targeting `authenticated`, per `supabase/storage_setup.sql`. No
+SELECT policy is needed; the bucket is `public: true`. Verify with
+
+```sql
+select policyname, cmd, coalesce(qual,'') || coalesce(with_check,'') as expr
+from pg_policies where schemaname='storage' and tablename='objects';
+```
+
+and confirm every row's `expr` contains `current_user_brand_ids` — counting
+policies is not sufficient, which is how the first attempt was mistakenly
+accepted.
+
+### Related drift: dev's storage policies
+
+Dev (`kcgqabbiihtfxczhpyfs`) carries four policies referencing a **`brand-assets`**
+bucket that does not exist there — dev's only bucket is `brand-logos` — scoped by
+`auth.uid()` rather than by brand. They are inert, and `storage_setup.sql` appears
+never to have been applied to dev either. Cleaning them up is unrelated to the
+instance split and was left alone.
 
 DNS for the three prod hosts, live Stripe credentials, and prod ShipStation
 credentials are external inputs, not repo work.
