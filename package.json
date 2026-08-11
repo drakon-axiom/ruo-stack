@@ -19,6 +19,7 @@
     "db:status": "pnpm --filter @ruostack/db run status",
     "seed:superadmin": "pnpm --filter @ruostack/api seed:superadmin",
     "test": "pnpm -r test",
+    "test:scripts": "deploy/check-env-ref.test.sh && packages/db/with-env.test.sh",
     "test:e2e": "playwright test",
     "lint:stripe-guard": "node scripts/check-stripe-imports.mjs",
     "lint:contrast": "node scripts/check-contrast.mjs",

@@ -56,6 +56,14 @@ jobs:
       - name: CI script references
         run: pnpm lint:ci-scripts
 
+      # deploy/check-env-ref.sh pins each environment to one Supabase project,
+      # and packages/db/with-env.sh feeds the Prisma CLI without sourcing the
+      # secrets file. Neither runs in any other job — db:deploy below takes the
+      # exported-env path — so without this they would only ever be exercised
+      # on the origin box, during a deploy.
+      - name: Deploy guard and with-env scripts
+        run: pnpm test:scripts
+
       - name: Generate Prisma client
         run: pnpm db:generate
 

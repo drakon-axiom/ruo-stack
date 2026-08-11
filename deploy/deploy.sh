@@ -51,6 +51,13 @@ for var in BRAND_ROOT ADMIN_ROOT; do
   esac
 done
 
+# Still guarding before any build: the checkout guard above proves this is the
+# right *directory*, not that its .env points at the right *database*. Until
+# 2026-08-10 dev and prod shared one Supabase project, so there was nothing to
+# check; now a stale or half-edited .env would migrate the wrong one silently.
+[[ -n "${SUPABASE_REF:-}" ]] || { echo "deploy: $ENV_FILE has empty SUPABASE_REF" >&2; exit 1; }
+"$ROOT/deploy/check-env-ref.sh" "$ROOT/.env" "$SUPABASE_REF"
+
 echo "==> deploying $ENV_NAME from $ROOT"
 
 cd "$ROOT"
@@ -64,11 +71,12 @@ pnpm install --frozen-lockfile
 # decision, not an oversight here -- it is flagged for deliberate review
 # before the first production deploy.
 #
-# The db package's own script sources the repo-root .env (packages/db/package.json
-# `with-env`). It has to: the Prisma CLI only looks for .env beside the schema or
-# in its cwd, and there is no .env there -- so this step used to abort the whole
-# deploy on `Environment variable not found: DIRECT_URL` unless the operator
-# happened to have the URLs exported already.
+# The db package supplies its own connection vars (packages/db/with-env.sh). It
+# has to: the Prisma CLI only looks for .env beside the schema or in its cwd, and
+# there is no .env there -- so this step used to abort the whole deploy on
+# `Environment variable not found: DIRECT_URL` unless the operator happened to
+# have the URLs exported already. That script reads the two keys out of the
+# repo-root .env without sourcing it, and exports nothing else.
 echo "==> applying database migrations"
 pnpm --filter @ruostack/db run deploy
 
