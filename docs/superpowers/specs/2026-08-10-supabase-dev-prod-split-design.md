@@ -1,7 +1,9 @@
 # Supabase dev/prod instance split — design
 
 Date: 2026-08-10
-Status: approved; provisioning pass in progress
+Status: prod instance provisioned and verified; guard and `with-env` fix landed
+in `9cc3e14`. Remaining: storage policies, live Stripe/ShipStation credentials,
+DNS, and the go-live deploy.
 
 ## Problem
 
@@ -100,7 +102,7 @@ Carried over as **placeholders**, to be replaced before go-live: `STRIPE_SECRET_
 and `STRIPE_WEBHOOK_SECRET` (currently test-mode), `STRIPE_PRO_PRICE_ID`,
 `STRIPE_VOLUME_PRICE_ID`, and the `SHIPSTATION_*` credentials.
 
-## Ref-pinning guard (follow-up pass)
+## Ref-pinning guard — implemented as `deploy/check-env-ref.sh`
 
 The failure this prevents: a prod deploy silently migrating dev, or a half-edited
 `.env` where `SUPABASE_URL` was swapped but `DIRECT_URL` was not. Care does not
@@ -120,7 +122,7 @@ does not inherit the evaluation hazard described below. It runs beside the exist
 `[[ -f "$ROOT/.env" ]]` preflight — before `pnpm install --frozen-lockfile`, per the
 script's own "Guard first, before any build" convention.
 
-## `with-env` hardening (follow-up pass)
+## `with-env` hardening — implemented as `packages/db/with-env.sh`
 
 `packages/db/package.json` currently has:
 
