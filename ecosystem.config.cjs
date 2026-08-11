@@ -35,6 +35,10 @@ module.exports = {
       // resolved in dev and plain node could not, crashing on first boot.
       // Running from source keeps dev and prod byte-identical.
       script: 'apps/api/src/server.ts',
+      // pm2 picks an interpreter from the file extension and maps .ts to bun,
+      // which is not installed. Node runs this file directly -- it strips the
+      // types itself -- so pin it rather than adding a transpiler.
+      interpreter: 'node',
       // Single instance: the rate-quote sweeper, reconciliation, dunning, and
       // subscription-lapse workers all start unconditionally in
       // apps/api/src/server.ts, so a second instance doubles every sweep.
