@@ -1,11 +1,11 @@
 # Supabase dev/prod instance split — design
 
 Date: 2026-08-10
-Status: prod instance provisioned and verified; guard and `with-env` fix landed
-in `9cc3e14`. Remaining: live Stripe/ShipStation credentials and the go-live
-deploy (DNS is already in place) — plus one open security gap, "KNOWN GAP: prod
-storage policies are unscoped" below, which must be closed before the Branding
-upload screen ships.
+Status: **live**. Prod instance provisioned and verified, guard and `with-env`
+fix landed in `9cc3e14`, the API packaging bug fixed in `c0f743a`, and storage
+policies correctly scoped as of 2026-08-11. All four hostnames serve over TLS.
+Remaining: live Stripe and prod ShipStation credentials — prod still carries
+test-mode Stripe keys, so any checkout runs in test mode.
 
 ## Problem
 
@@ -71,54 +71,68 @@ access-token hook must be enabled before any real brand login.
 
 ### Manual residue
 
-Storage object policies (`supabase/storage_setup.sql`) must be applied through the
-dashboard **Storage → Policies**. `storage.objects` is owned by
-`supabase_storage_admin`; `postgres` is not a member of it and cannot `SET ROLE`
-to it, from either the Management API SQL endpoint or the dashboard SQL Editor —
-both fail with `42501: permission denied to set role "supabase_storage_admin"`.
-There is no Management or Storage API endpoint for object policies. Granting
-`postgres` that membership would work but permanently widens the most privileged
-role on the production database, and was rejected as a fix.
+None on the database side. Every step above, including the storage policies, runs
+through the Management API SQL endpoint as `postgres`. See "Storage policies"
+below for the one statement that had to be removed to make that true.
 
-## KNOWN GAP: prod storage policies are unscoped
+External inputs only: DNS (already in place), live Stripe credentials, and prod
+ShipStation credentials.
 
-**Prod `brand-logos` currently allows any authenticated user to INSERT and UPDATE
-anywhere in the bucket.** The per-brand folder restriction is missing.
+## Storage policies — RESOLVED 2026-08-11
 
-`pg_policies` on `nanixtzbmorpojnyverq` holds two policies whose entire expression
-is `bucket_id = 'brand-logos'`. The intended clause —
-`(storage.foldername(name))[1] IN (SELECT public.current_user_brand_ids()::text)`
-— is absent, so nothing confines a brand to its own prefix. Left as-is
-deliberately: the bucket is empty and nothing writes to it until the Branding
-upload screen ships, which is also when this becomes exploitable.
+Prod `brand-logos` now carries exactly the two policies in
+`supabase/storage_setup.sql`, both scoped per brand:
 
-Ruled out as causes, by direct check against prod:
-
-- `authenticated` *can* execute `public.current_user_brand_ids()`
-  (`has_function_privilege` → true).
-- The expression is valid SQL — it was created against a throwaway table inside a
-  transaction and rolled back; Postgres accepted it.
-
-The cause is the dashboard flow. Policies named with a trailing `_0` / `_1`
-suffix (prod has `brand_logo_write_own_prefi 15kep2a_0` and
-`brand_logo_update_own_prefix 15kep2a_0`) come from the storage policy **wizard**,
-which generates its own expression from a template and ignores any pasted one;
-it also truncated the first policy's name. The **"For full customization"** editor
-is the one that accepts a raw expression, and does not add suffixes.
-
-To close the gap: delete both wizard-created policies, then recreate via "For
-full customization" — INSERT with the clause as `WITH CHECK`, UPDATE with it as
-`USING`, both targeting `authenticated`, per `supabase/storage_setup.sql`. No
-SELECT policy is needed; the bucket is `public: true`. Verify with
-
-```sql
-select policyname, cmd, coalesce(qual,'') || coalesce(with_check,'') as expr
-from pg_policies where schemaname='storage' and tablename='objects';
+```
+brand_logo_write_own_prefix  : INSERT : authenticated
+brand_logo_update_own_prefix : UPDATE : authenticated
 ```
 
-and confirm every row's `expr` contains `current_user_brand_ids` — counting
-policies is not sufficient, which is how the first attempt was mistakenly
-accepted.
+Verified: total 2, scoped-by-brand 2, **unscoped 0**, no wizard leftovers.
+
+### What went wrong, so it is not repeated
+
+The file could not be applied *anywhere* because it opened with
+`SET ROLE supabase_storage_admin;`. `postgres` is not a member of that role, so
+that one statement fails with `42501: permission denied to set role` from the
+Management API, the dashboard SQL editor, and psql alike. The `SET ROLE` line has
+been removed — `postgres` can `CREATE POLICY` on `storage.objects` directly,
+which is all the file ever needed, and the whole file now applies through the
+Management API SQL endpoint and is idempotent.
+
+That was misdiagnosed at first: the `SET ROLE` failure was read as "policies
+cannot be created programmatically at all", and the work was handed to the
+dashboard. It should have been read as "this one statement is unnecessary".
+A direct `CREATE POLICY` was never attempted until it worked first try.
+
+The dashboard detour then made things worse. Storage → Policies has a **wizard**
+that generates its own expression from a template and silently discards a pasted
+one; it produced two policies whose entire expression was `bucket_id =
+'brand-logos'`, i.e. every authenticated user could write to every brand's
+folder, plus a stray SELECT policy. Policies named with a trailing `_0` / `_1`
+suffix come from that wizard; the "For full customization" editor is the one that
+takes a raw expression.
+
+Ruled out early, by direct check, and worth not re-checking: `authenticated`
+*can* execute `public.current_user_brand_ids()`, and the expression compiles
+(created against a throwaway table in a transaction, then rolled back).
+
+### Verifying
+
+Assert on the *expression*, not the policy count — counting is how the broken
+first attempt was mistakenly accepted:
+
+```sql
+with p as (
+  select coalesce(qual,'') || coalesce(with_check,'') as expr
+  from pg_policies where schemaname='storage' and tablename='objects'
+)
+select (select count(*) from p) as total,
+       (select count(*) from p where expr like '%current_user_brand_ids%') as scoped,
+       (select count(*) from p where expr not like '%current_user_brand_ids%') as unscoped;
+```
+
+`unscoped` must be 0. No SELECT policy is needed; the bucket is `public: true`.
 
 ### Related drift: dev's storage policies
 
