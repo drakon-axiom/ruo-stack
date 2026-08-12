@@ -97,11 +97,26 @@ describe.skipIf(!RUN)('catalog export (DB integration)', () => {
   });
 
   it('excludes archived products unless asked, matching the list route', async () => {
+    // created[0] is the one about to be archived; created[1] stays live. Counts
+    // alone can't tell "the archived one is filtered out" from "the filter never
+    // reached the query" -- both scenarios return 1 row here -- so this asserts
+    // which SKU is in each file, not just how many rows it has.
+    const archivedSku = `RUO-EX${tag}-0`;
+    const liveSku = `RUO-EX${tag}-1`;
     await prisma.catalogProduct.update({ where: { id: created[0]! }, data: { archived: true } });
+
     const normal = await get(`/api/admin/catalog/export.csv?search=EX${tag}`);
     const archived = await get(`/api/admin/catalog/export.csv?search=EX${tag}&archived=true`);
-    expect(parseCsv(normal.body).rows.length).toBe(1);
-    expect(parseCsv(archived.body).rows.length).toBe(1);
+    const normalSkus = parseCsv(normal.body).rows.map((r) => r[0]);
+    const archivedSkus = parseCsv(archived.body).rows.map((r) => r[0]);
+
+    expect(normalSkus).toContain(liveSku);
+    expect(normalSkus).not.toContain(archivedSku);
+    expect(archivedSkus).toContain(archivedSku);
+    expect(archivedSkus).not.toContain(liveSku);
+    expect(normalSkus.length).toBe(1);
+    expect(archivedSkus.length).toBe(1);
+
     await prisma.catalogProduct.update({ where: { id: created[0]! }, data: { archived: false } });
   });
 
@@ -122,6 +137,9 @@ describe.skipIf(!RUN)('catalog export (DB integration)', () => {
     const after = row!.after as Record<string, unknown>;
     expect(after.shape).toBe('full');
     expect(after.rows).toBe(1);
-    expect((after.filters as Record<string, unknown>).status).toBe('soon');
+    const filters = after.filters as Record<string, unknown>;
+    expect(filters.status).toBe('soon');
+    expect(filters.search).toBe(`EX${tag}`);
+    expect(filters.archived).toBe(false);
   });
 });
