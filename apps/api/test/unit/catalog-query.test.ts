@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalogListWhere, CatalogListQuery } from '../../src/services/catalog-query.ts';
+import { catalogListWhere, CatalogListQuery, escapeLikeTerm } from '../../src/services/catalog-query.ts';
 
 describe('catalogListWhere', () => {
   it('hides archived products unless explicitly asked for', () => {
@@ -33,5 +33,32 @@ describe('catalogListWhere', () => {
 
   it('rejects an over-long search term', () => {
     expect(() => CatalogListQuery.parse({ search: 'x'.repeat(121) })).toThrow();
+  });
+
+  describe('escapeLikeTerm', () => {
+    it('escapes a percent sign so it is not treated as a LIKE wildcard', () => {
+      expect(escapeLikeTerm('10%')).toBe('10\\%');
+    });
+
+    it('escapes an underscore so it does not match any single character', () => {
+      expect(escapeLikeTerm('a_b')).toBe('a\\_b');
+    });
+
+    it('escapes a literal backslash before it can combine with an escaped char', () => {
+      expect(escapeLikeTerm('a\\b')).toBe('a\\\\b');
+    });
+
+    it('leaves a term with no special characters untouched', () => {
+      expect(escapeLikeTerm('bpc')).toBe('bpc');
+    });
+  });
+
+  it('escapes wildcard characters in the search term before building the OR clause', () => {
+    const where = catalogListWhere({ search: '10%' });
+    expect(where.OR).toEqual([
+      { name: { contains: '10\\%', mode: 'insensitive' } },
+      { canonicalSku: { contains: '10\\%', mode: 'insensitive' } },
+      { compound: { contains: '10\\%', mode: 'insensitive' } },
+    ]);
   });
 });

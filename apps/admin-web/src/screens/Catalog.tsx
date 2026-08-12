@@ -112,12 +112,17 @@ export function Catalog() {
     [products],
   );
 
+  // Trimmed once and reused for both the visible table and the export query,
+  // so a trailing/leading space can't make the table show nothing while the
+  // export (sent with the trimmed term) still matches rows.
+  const trimmedSearch = search.trim();
+
   const visible = products
     .filter((p) => filter === 'all' || p.status === filter)
     .filter((p) =>
-      !search
+      !trimmedSearch
         ? true
-        : [p.name, p.canonicalSku, p.compound].some((s) => s.toLowerCase().includes(search.toLowerCase())),
+        : [p.name, p.canonicalSku, p.compound].some((s) => s.toLowerCase().includes(trimmedSearch.toLowerCase())),
     );
 
   // The file matches the visible table: same status tab, search box and archived
@@ -125,16 +130,27 @@ export function Catalog() {
   function exportQuery(): string {
     const params = new URLSearchParams();
     if (filter !== 'all') params.set('status', filter);
-    if (search.trim()) params.set('search', search.trim());
+    if (trimmedSearch) params.set('search', trimmedSearch);
     if (showArchived) params.set('archived', 'true');
     return params.toString();
   }
 
+  // Stamp the filename here so it's the one and only place that names the
+  // file — apiDownload's `a.download` always wins over the server's
+  // Content-Disposition header, so a name minted server-side never reaches
+  // disk. Shape stays in the name so the round-trippable file and the
+  // read-only snapshot never get mixed up.
+  function exportStamp(d: Date): string {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}`;
+  }
+
   function exportCsv(shape: 'import' | 'full') {
+    setErr('');
     const q = exportQuery();
     apiDownload(
       `/api/admin/catalog/export.csv?shape=${shape}${q ? `&${q}` : ''}`,
-      `ruostack-catalog-${shape}.csv`,
+      `ruostack-catalog-${shape}-${exportStamp(new Date())}.csv`,
     ).catch((e) => setErr(e instanceof ApiError ? e.message : 'Export failed'));
   }
 
@@ -152,9 +168,11 @@ export function Catalog() {
             <Button variant="ghost" onClick={() => setShowArchived((v) => !v)}>
               {showArchived ? 'Back to catalog' : 'View archived'}
             </Button>
-            <Button variant="ghost" icon={Download} onClick={() => exportCsv('import')}>
-              Export CSV
-            </Button>
+            {!showArchived && (
+              <Button variant="ghost" icon={Download} onClick={() => exportCsv('import')}>
+                Export CSV
+              </Button>
+            )}
             <Button
               variant="ghost"
               icon={Download}
@@ -204,6 +222,14 @@ export function Catalog() {
       </div>
 
       {err && <div className="mb-4"><InlineAlert tone="danger">{err}</InlineAlert></div>}
+
+      <div className="mb-4">
+        <InlineAlert tone="info">
+          {showArchived
+            ? '“Export snapshot” is a read-only report — it cannot be re-imported.'
+            : '“Export snapshot” is a read-only report — it cannot be re-imported. Use “Export CSV” for a file you can edit and bring back in.'}
+        </InlineAlert>
+      </div>
 
       {visible.length > MAX_IMPORT_ROWS && (
         <div className="mb-4">

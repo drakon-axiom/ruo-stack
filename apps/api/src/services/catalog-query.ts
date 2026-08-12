@@ -20,16 +20,34 @@ export const CatalogListQuery = z.object({
 
 export type CatalogListQueryInput = z.infer<typeof CatalogListQuery>;
 
+/**
+ * Prisma's `contains` compiles to a plain `ILIKE '%term%'` and does not escape
+ * `%` or `_` in the term -- both are LIKE wildcards to Postgres, and Prisma
+ * gives no way to attach a custom ESCAPE clause to `contains`. So a search for
+ * "10%" would match anything containing "10", and a search containing "_"
+ * would match any single character in that position -- silently widening the
+ * result (and therefore the export) past what the operator typed.
+ *
+ * Escape with a backslash, which Postgres's LIKE/ILIKE honours as the escape
+ * character by default (verified against the project's Postgres instance).
+ * The backslash itself must be escaped first, or escaping "%" into "\%" would
+ * introduce a backslash that then got re-escaped.
+ */
+export function escapeLikeTerm(term: string): string {
+  return term.replace(/[\\%_]/g, '\\$&');
+}
+
 export function catalogListWhere(q: CatalogListQueryInput): Prisma.CatalogProductWhereInput {
+  const search = q.search ? escapeLikeTerm(q.search) : undefined;
   return {
     archived: q.archived === 'true',
     ...(q.status ? { status: q.status } : {}),
-    ...(q.search
+    ...(search
       ? {
           OR: [
-            { name: { contains: q.search, mode: 'insensitive' } },
-            { canonicalSku: { contains: q.search, mode: 'insensitive' } },
-            { compound: { contains: q.search, mode: 'insensitive' } },
+            { name: { contains: search, mode: 'insensitive' } },
+            { canonicalSku: { contains: search, mode: 'insensitive' } },
+            { compound: { contains: search, mode: 'insensitive' } },
           ],
         }
       : {}),

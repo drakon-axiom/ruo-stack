@@ -161,7 +161,18 @@ export async function apiDownload(path: string, filename: string, retry = true):
 
   const res = await fetch(`${API_BASE}${path}`, { headers });
   if (res.status === 401 && retry && (await refresh())) return apiDownload(path, filename, false);
-  if (!res.ok) throw new ApiError(res.status, 'download_failed', 'Download failed');
+  if (!res.ok) {
+    let code = 'download_failed';
+    let message = 'Download failed';
+    try {
+      const j = await res.json();
+      code = j.error ?? code;
+      message = j.message ?? message;
+    } catch {
+      /* non-JSON */
+    }
+    throw new ApiError(res.status, code, message);
+  }
 
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
