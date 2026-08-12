@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import {
   AUDIT_ACTIONS,
   CatalogCreateSchema,
-  CatalogStatusEnum,
   CatalogStockSchema,
   CatalogUpdateSchema,
   catalogDeleteBlocker,
@@ -13,6 +12,7 @@ import { writeAudit } from '../audit.ts';
 import { requireAdmin } from '../middleware/guards.ts';
 import { BadRequest, Conflict, NotFound } from '../errors.ts';
 import { onCatalogStockChanged } from '../hooks/catalog-stock.ts';
+import { catalogListWhere, CatalogListQuery } from '../services/catalog-query.ts';
 
 /**
  * Catalog Manager (architecture §1.2). CatalogProduct is the single source of
@@ -25,28 +25,9 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
 
   // List / search / filter — view for support+finance, write for ops+super.
   app.get('/api/admin/catalog', { preHandler: requireAdmin('catalog', 'view') }, async (req) => {
-    const q = z
-      .object({
-        status: CatalogStatusEnum.optional(),
-        search: z.string().max(120).optional(),
-        // Archived products are retired: hidden unless explicitly asked for.
-        archived: z.enum(['true', 'false']).optional(),
-      })
-      .parse(req.query);
+    const q = CatalogListQuery.parse(req.query);
     const products = await prisma.catalogProduct.findMany({
-      where: {
-        archived: q.archived === 'true',
-        ...(q.status ? { status: q.status } : {}),
-        ...(q.search
-          ? {
-              OR: [
-                { name: { contains: q.search, mode: 'insensitive' } },
-                { canonicalSku: { contains: q.search, mode: 'insensitive' } },
-                { compound: { contains: q.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
+      where: catalogListWhere(q),
       orderBy: { createdAt: 'desc' },
     });
     return { products };
