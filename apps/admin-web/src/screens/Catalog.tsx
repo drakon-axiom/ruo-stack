@@ -135,7 +135,7 @@ export function Catalog() {
     apiDownload(
       `/api/admin/catalog/export.csv?shape=${shape}${q ? `&${q}` : ''}`,
       `ruostack-catalog-${shape}.csv`,
-    ).catch(() => setErr('Export failed'));
+    ).catch((e) => setErr(e instanceof ApiError ? e.message : 'Export failed'));
   }
 
   return (
