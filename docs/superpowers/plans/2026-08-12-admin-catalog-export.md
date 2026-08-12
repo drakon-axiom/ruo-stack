@@ -507,7 +507,7 @@ Remove the now-unused inline zod object. Leave every other route in the file unt
 Run: `pnpm --filter @ruostack/api exec vitest run && pnpm typecheck`
 Expected: all suites PASS, typecheck clean. The list route's behaviour is unchanged by construction — the helper is a verbatim extraction.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/api/src/services/catalog-query.ts apps/api/test/unit/catalog-query.test.ts apps/api/src/routes/admin-catalog.ts
@@ -527,15 +527,7 @@ git commit -m "Extract the catalog filter into one definition shared by list and
 - Consumes: `buildCatalogExportCsv`, `exportFilename`, `type ExportShape` (Task 1); `catalogListWhere`, `CatalogListQuery` (Task 2); `writeAudit` from `../audit.ts`; `AUDIT_ACTIONS` from `@ruostack/shared`; `requireAdmin` from `../middleware/guards.ts`.
 - Produces: `GET /api/admin/catalog/export.csv`.
 
-- [ ] **Step 1: Add the audit action**
-
-In `packages/shared/src/audit.ts`, directly below the `catalogImported` line:
-
-```ts
-  catalogExported: 'catalog.exported', // one aggregate row per CSV export run
-```
-
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 1: Write the failing test**
 
 Append to `apps/api/test/unit/catalog-export.test.ts`:
 
@@ -553,14 +545,20 @@ describe('export audit action', () => {
 });
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [ ] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @ruostack/api exec vitest run test/unit/catalog-export.test.ts`
 Expected: FAIL — `AUDIT_ACTIONS.catalogExported` is undefined.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [ ] **Step 3: Add the audit action**
 
-The Step 1 edit already satisfies it.
+In `packages/shared/src/audit.ts`, directly below the `catalogImported` line:
+
+```ts
+  catalogExported: 'catalog.exported', // one aggregate row per CSV export run
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @ruostack/api exec vitest run test/unit/catalog-export.test.ts`
 Expected: PASS.
@@ -881,12 +879,19 @@ In the `PageHeader` `action` div, immediately before the existing "Import CSV" b
             <Button variant="ghost" icon={Download} onClick={() => exportCsv('import')}>
               Export CSV
             </Button>
-            <Button variant="ghost" icon={Download} onClick={() => exportCsv('full')}>
+            <Button
+              variant="ghost"
+              icon={Download}
+              title="Full snapshot including status, published and archived. For reporting — it cannot be re-imported."
+              onClick={() => exportCsv('full')}
+            >
               Export snapshot
             </Button>
 ```
 
 Both are outside the `writable &&` guard: exporting needs only `catalog:view`, which anyone on this screen already has.
+
+The `title` on the snapshot button is load-bearing, not decoration: the mistake operators will actually make is round-tripping the snapshot and meeting `forbidden_column` with no idea why, so the one-way nature has to be visible at the point of use.
 
 - [ ] **Step 4: Add the over-ceiling warning**
 
@@ -904,31 +909,14 @@ Immediately above the table, render:
 
 The export still emits every matching row — truncating would produce a file that looks complete and re-imports "successfully" while silently dropping products.
 
-- [ ] **Step 5: Make the snapshot's one-way nature visible**
-
-Give the snapshot button a title attribute so the distinction is available at the point of use, not only in docs:
-
-```tsx
-            <Button
-              variant="ghost"
-              icon={Download}
-              title="Full snapshot including status, published and archived. For reporting — it cannot be re-imported."
-              onClick={() => exportCsv('full')}
-            >
-              Export snapshot
-            </Button>
-```
-
-Replace the plain snapshot button from Step 3 with this version.
-
-- [ ] **Step 6: Verify**
+- [ ] **Step 5: Verify**
 
 Run: `pnpm typecheck && pnpm --filter @ruostack/admin-web build`
 Expected: typecheck clean, build succeeds.
 
 Then in the browser against dev: filter the catalog to one status, click **Export CSV**, and confirm the downloaded file contains only the visible rows and its header is the 17 import columns. Click **Export snapshot** and confirm the header additionally has `status`, `is_published`, `archived`, `id`, `created_at`, `updated_at`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/admin-web/src/screens/Catalog.tsx
