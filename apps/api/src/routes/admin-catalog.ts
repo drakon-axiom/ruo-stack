@@ -13,6 +13,7 @@ import { requireAdmin } from '../middleware/guards.ts';
 import { BadRequest, Conflict, NotFound } from '../errors.ts';
 import { onCatalogStockChanged } from '../hooks/catalog-stock.ts';
 import { catalogListWhere, CatalogListQuery } from '../services/catalog-query.ts';
+import { buildCatalogExportCsv, exportFilename } from '../services/catalog-export.ts';
 
 /**
  * Catalog Manager (architecture §1.2). CatalogProduct is the single source of
@@ -31,6 +32,50 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
       orderBy: { createdAt: 'desc' },
     });
     return { products };
+  });
+
+  /**
+   * Catalog as CSV. Shaped after GET /api/admin/ledger/export.csv, including the
+   * `.csv` suffix -- which also keeps this path away from `/:id` below, whose
+   * param is a UUID.
+   *
+   * `shape=import` emits exactly IMPORT_COLUMNS and feeds straight back into the
+   * importer. `shape=full` adds lifecycle and identity columns and is therefore
+   * NOT re-importable: FORBIDDEN_COLUMNS rejects it on the way back in, by design.
+   *
+   * Rows match the visible table -- same filters as the list route, via the same
+   * helper -- because the workflow this exists for is: filter, export, edit the
+   * prices, re-import.
+   */
+  app.get('/api/admin/catalog/export.csv', { preHandler: requireAdmin('catalog', 'view') }, async (req, reply) => {
+    const q = CatalogListQuery.extend({ shape: z.enum(['import', 'full']).default('import') }).parse(req.query);
+    const products = await prisma.catalogProduct.findMany({
+      where: catalogListWhere(q),
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const csv = buildCatalogExportCsv(products, q.shape);
+    const name = exportFilename(q.shape, new Date());
+
+    // One aggregate row per run, mirroring catalog.imported: who exported what,
+    // in which shape, and under which filters.
+    await writeAudit(prisma, {
+      actorType: 'admin',
+      actorId: req.admin!.adminUserId,
+      action: AUDIT_ACTIONS.catalogExported,
+      targetType: 'catalog_export',
+      after: {
+        shape: q.shape,
+        rows: products.length,
+        filters: { status: q.status ?? null, search: q.search ?? null, archived: q.archived === 'true' },
+      },
+      ip: req.ip,
+    });
+
+    return reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="${name}"`)
+      .send(csv);
   });
 
   app.get('/api/admin/catalog/:id', { preHandler: requireAdmin('catalog', 'view') }, async (req) => {

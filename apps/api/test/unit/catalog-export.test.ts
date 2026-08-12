@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyRow, dollarsToCents, IMPORT_COLUMNS, parseCsv, type ExistingProduct, type ImportColumn } from '@ruostack/shared';
+import { AUDIT_ACTIONS, classifyRow, dollarsToCents, IMPORT_COLUMNS, parseCsv, type ExistingProduct, type ImportColumn } from '@ruostack/shared';
 import {
   buildCatalogExportCsv,
   centsToDollars,
@@ -153,5 +153,15 @@ describe('exportFilename', () => {
     const at = new Date('2026-08-12T16:42:00Z');
     expect(exportFilename('import', at)).toBe('ruostack-catalog-import-20260812-1642.csv');
     expect(exportFilename('full', at)).toBe('ruostack-catalog-full-20260812-1642.csv');
+  });
+});
+
+describe('export audit action', () => {
+  // A bulk read of every wholesale price is a data-egress event, and this
+  // system treats its append-only audit log as a critical invariant. Note the
+  // ledger export writes no audit row -- that is a gap there, not a precedent.
+  it('has a distinct action from the import', () => {
+    expect(AUDIT_ACTIONS.catalogExported).toBe('catalog.exported');
+    expect(AUDIT_ACTIONS.catalogExported).not.toBe(AUDIT_ACTIONS.catalogImported);
   });
 });
