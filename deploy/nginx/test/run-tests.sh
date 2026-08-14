@@ -75,16 +75,93 @@ assert_contains "$O_DEV" 'try_files $uri $uri/ /index.html' "\$uri survives in o
 
 echo "== edge -> origin routing =="
 
-assert_contains "$E_DEV" "http://100.99.76.119:8901" "dev edge brand -> origin :8901"
-assert_contains "$E_DEV" "http://100.99.76.119:8902" "dev edge admin -> origin :8902"
-assert_contains "$E_PRD" "http://100.99.76.119:8911" "prod edge brand -> origin :8911"
-assert_contains "$E_PRD" "http://100.99.76.119:8912" "prod edge admin -> origin :8912"
+# Addressed via the upstream block now, not inline in proxy_pass -- see
+# "edge -> origin connection reuse" below for why.
+assert_contains "$E_DEV" "server 100.99.76.119:8901;" "dev edge brand -> origin :8901"
+assert_contains "$E_DEV" "server 100.99.76.119:8902;" "dev edge admin -> origin :8902"
+assert_contains "$E_PRD" "server 100.99.76.119:8911;" "prod edge brand -> origin :8911"
+assert_contains "$E_PRD" "server 100.99.76.119:8912;" "prod edge admin -> origin :8912"
 
 # The edge must never reach the API directly -- only origin nginx may.
 for f in "$E_DEV" "$E_PRD"; do
   assert_absent "$f" ":3901" "edge does not address the API port in $(basename "$f")"
   assert_absent "$f" ":3911" "edge does not address the prod API port in $(basename "$f")"
 done
+
+echo "== edge -> origin connection reuse =="
+
+# nginx only keeps a connection cache for a NAMED upstream carrying `keepalive`.
+# `proxy_pass http://<ip>:<port>` opens a fresh TCP connection per request even
+# with proxy_http_version 1.1 + `Connection ""` set -- those are necessary but
+# not sufficient. The edge->origin hop is ~53ms of Tailscale RTT (measured
+# 2026-08-12), so an unpooled proxy_pass adds a full handshake to every asset
+# and every API call. This is the assertion that would have caught it.
+for f in "$E_DEV" "$E_PRD"; do
+  assert_absent "$f" "proxy_pass http://100.99.76.119:" \
+    "edge proxies via a named upstream, never a literal address in $(basename "$f")"
+done
+
+assert_contains "$E_DEV" "upstream ruostack_edge_brand_dev"  "dev edge brand upstream block"
+assert_contains "$E_DEV" "upstream ruostack_edge_admin_dev"  "dev edge admin upstream block"
+assert_contains "$E_PRD" "upstream ruostack_edge_brand_prod" "prod edge brand upstream block"
+assert_contains "$E_PRD" "upstream ruostack_edge_admin_prod" "prod edge admin upstream block"
+
+# Upstream names must be env-unique: the edge VPS serves dev and prod hostnames
+# from the same nginx, so a shared name would collide at load time.
+assert_absent "$E_DEV" "_prod"  "dev edge upstreams do not borrow prod names"
+assert_absent "$E_PRD" "_dev"   "prod edge upstreams do not borrow dev names"
+
+# Counted per upstream block: dev has brand+admin, prod adds landing. A single
+# assert_contains would stay green with keepalive dropped from one of them.
+assert_count "$E_DEV" "keepalive 32;" 2 "dev edge pools connections in both upstreams"
+assert_count "$E_PRD" "keepalive 32;" 3 "prod edge pools connections in all three upstreams"
+
+# Both halves of the HTTP/1.1 keepalive contract, per proxying location.
+assert_count "$E_DEV" "proxy_http_version 1.1;"          4 "dev edge sets HTTP/1.1 in every proxying location"
+assert_count "$E_DEV" 'proxy_set_header   Connection        "";' 4 "dev edge clears Connection in every proxying location"
+assert_count "$E_PRD" "proxy_http_version 1.1;"          5 "prod edge sets HTTP/1.1 in every proxying location"
+assert_count "$E_PRD" 'proxy_set_header   Connection        "";' 5 "prod edge clears Connection in every proxying location"
+
+echo "== edge asset cache =="
+
+# Hashed, immutable filenames -- the edge can serve them without touching the
+# origin at all. A new build emits new names, so the cache self-invalidates and
+# never needs purging. This keeps the "edge holds no application files"
+# invariant (deploy.sh:3): the cache is transient, not a deploy artifact.
+assert_contains "$E_DEV" "proxy_cache_path /var/cache/nginx/ruostack-dev"  "dev edge declares a cache path"
+assert_contains "$E_PRD" "proxy_cache_path /var/cache/nginx/ruostack-prod" "prod edge declares a cache path"
+assert_contains "$E_DEV" "keys_zone=ruostack_edge_dev:"  "dev edge cache zone is env-unique"
+assert_contains "$E_PRD" "keys_zone=ruostack_edge_prod:" "prod edge cache zone is env-unique"
+
+# Exactly the two SPA hosts cache assets; the landing block does not.
+assert_count "$E_DEV" "location /assets/"           2 "dev edge caches assets for brand + admin"
+assert_count "$E_PRD" "location /assets/"           2 "prod edge caches assets for brand + admin only"
+# Padded to match the template's alignment, which also keeps this from counting
+# the "proxy_cache" mentioned in the header comment.
+assert_count "$E_DEV" "proxy_cache            ruostack_edge_dev;"  2 "dev edge binds the zone in both asset locations"
+assert_count "$E_PRD" "proxy_cache            ruostack_edge_prod;" 2 "prod edge binds the zone in both asset locations"
+
+# Only /assets/ may be cached. index.html is no-store at the origin so the SPA
+# shell stays revalidated and a deploy is visible immediately; caching the
+# catch-all location would strand users on a stale shell. Counted against the
+# two asset locations asserted above -- a third occurrence means some other
+# location started caching.
+for f in "$E_DEV" "$E_PRD"; do
+  assert_count "$f" "proxy_cache_valid" 2 "cache directives confined to /assets/ in $(basename "$f")"
+done
+
+# proxy_set_header is inherited only when the location declares NONE of its own,
+# and these live at LOCATION level (not server), so a new /assets/ block starts
+# with an empty set. Without an explicit Host the origin sees $proxy_host, misses
+# its server_name, and 403s on the allow/deny guard. Count: one per proxying
+# location (dev 2 + 2 assets = 4; prod adds landing = 5).
+assert_count "$E_DEV" 'proxy_set_header   Host              $host;' 4 "dev edge sets Host in every proxying location"
+assert_count "$E_PRD" 'proxy_set_header   Host              $host;' 5 "prod edge sets Host in every proxying location"
+
+# The trust boundary applies to the asset locations too -- see the
+# X-Forwarded-For section below.
+assert_count "$E_DEV" 'X-Forwarded-For   $remote_addr;' 4 "dev edge overwrites XFF in every proxying location"
+assert_count "$E_PRD" 'X-Forwarded-For   $remote_addr;' 5 "prod edge overwrites XFF in every proxying location"
 
 echo "== origin =="
 
@@ -208,11 +285,14 @@ echo "== nginx syntax =="
 
 # nginx -t binds listeners and opens log files, so rewrite listen directives to a
 # loopback high port and redirect logs into the scratch dir to run as non-root.
+# proxy_cache_path is rewritten for the same reason: nginx -t creates the
+# directory, and /var/cache/nginx is root-owned.
 for f in "$O_DEV" "$E_DEV" "$O_PRD" "$E_PRD"; do
   work="$(mktemp -d)"; mkdir -p "$work/logs" "$work/tmp"
   sed -E -e '/^[[:space:]]*listen[[:space:]]+\[::\]/d' \
          -e 's|^([[:space:]]*)listen[^;]*;|\1listen 127.0.0.1:8801;|' \
          -e 's|/var/log/nginx/|logs/|' \
+         -e 's|/var/cache/nginx/[^[:space:]]*|tmp/cache|' \
          "$f" > "$work/server.conf"
   cp "$NGINX_DIR/origin-shared.conf" "$work/shared.conf"
   cp "$HERE/harness.conf" "$work/nginx.conf"

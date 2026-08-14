@@ -2,6 +2,15 @@
 # Marketing site edge -- ${LANDING_HOST} (+ www) -> origin
 # :${LANDING_ORIGIN_PORT}. Production only.
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Pools connections over the Tailscale hop -- see edge.conf.template for why a
+# named upstream is required for `keepalive` to do anything. No asset cache
+# here: the marketing site is not a hashed-filename build.
+upstream ${EDGE_LANDING_UPSTREAM} {
+    server ${ORIGIN_IP}:${LANDING_ORIGIN_PORT};
+    keepalive 32;
+}
+
 server {
     listen 80;
     listen [::]:80;
@@ -13,7 +22,7 @@ server {
     error_log  /var/log/nginx/${LOG_PREFIX}-edge-landing-error.log;
 
     location / {
-        proxy_pass http://${ORIGIN_IP}:${LANDING_ORIGIN_PORT};
+        proxy_pass http://${EDGE_LANDING_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;

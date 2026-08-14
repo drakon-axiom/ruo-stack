@@ -31,7 +31,8 @@ set +a
 # envsubst renders an unset variable as the empty string, which would silently
 # produce a broken-but-plausible `root ;`. Validate explicitly instead.
 REQUIRED=(BRAND_HOST ADMIN_HOST ORIGIN_IP EDGE_IP BRAND_ORIGIN_PORT
-          ADMIN_ORIGIN_PORT API_PORT API_UPSTREAM BRAND_ROOT ADMIN_ROOT LOG_PREFIX)
+          ADMIN_ORIGIN_PORT API_PORT API_UPSTREAM BRAND_ROOT ADMIN_ROOT LOG_PREFIX
+          EDGE_BRAND_UPSTREAM EDGE_ADMIN_UPSTREAM EDGE_CACHE_ZONE EDGE_CACHE_PATH)
 missing=()
 for var in "${REQUIRED[@]}"; do
   [[ -n "${!var:-}" ]] || missing+=("$var")
@@ -46,6 +47,8 @@ fi
 SUBST='${BRAND_HOST} ${ADMIN_HOST} ${ORIGIN_IP} ${EDGE_IP} ${BRAND_ORIGIN_PORT}'
 SUBST+=' ${ADMIN_ORIGIN_PORT} ${API_PORT} ${API_UPSTREAM} ${BRAND_ROOT}'
 SUBST+=' ${ADMIN_ROOT} ${LOG_PREFIX} ${LANDING_HOST} ${LANDING_ROOT} ${LANDING_ORIGIN_PORT}'
+SUBST+=' ${EDGE_BRAND_UPSTREAM} ${EDGE_ADMIN_UPSTREAM} ${EDGE_LANDING_UPSTREAM}'
+SUBST+=' ${EDGE_CACHE_ZONE} ${EDGE_CACHE_PATH}'
 
 mkdir -p "$HERE/out"
 ORIGIN_OUT="$HERE/out/origin.$ENV_NAME.conf"
@@ -55,7 +58,7 @@ envsubst "$SUBST" < "$HERE/origin.conf.template" > "$ORIGIN_OUT"
 envsubst "$SUBST" < "$HERE/edge.conf.template"   > "$EDGE_OUT"
 
 if [[ "${LANDING:-0}" == "1" ]]; then
-  for var in LANDING_HOST LANDING_ROOT LANDING_ORIGIN_PORT; do
+  for var in LANDING_HOST LANDING_ROOT LANDING_ORIGIN_PORT EDGE_LANDING_UPSTREAM; do
     if [[ -z "${!var:-}" ]]; then
       echo "render: LANDING=1 requires $var in env.$ENV_NAME" >&2
       exit 1

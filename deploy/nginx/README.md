@@ -73,6 +73,36 @@ It legitimately trusts the edge and extends the chain the edge established.
 
 Never make the two hops match. `test/run-tests.sh` asserts both forms.
 
+### Why the edge proxies through named upstreams
+
+The edge→origin hop is **~53 ms of Tailscale RTT**. nginx keeps a connection
+cache only for a *named* `upstream` carrying `keepalive`; `proxy_pass
+http://<ip>:<port>` opens a fresh TCP connection per request even with
+`proxy_http_version 1.1` and `Connection ""` set — those two make a connection
+*reusable* but do not supply the pool. The edge config originally had both of
+those and no upstream block, so every asset and every API call paid a full
+handshake across the tunnel. Measured: 20 requests opened 20 sockets before,
+2 pooled sockets after.
+
+Upstream names are env-suffixed (`ruostack_edge_brand_prod`, …) because this VPS
+serves the dev and prod hostnames from one nginx and duplicate upstream names
+fail at load. `test/run-tests.sh` asserts that no edge `proxy_pass` names a
+literal address.
+
+### Why the edge caches `/assets/`
+
+Vite emits content-hashed filenames and the origin marks them
+`immutable`, so the edge can answer them without crossing the tunnel at all. A
+deploy changes every hash, so the cache self-invalidates and never needs
+purging — which is what keeps *"the edge holds no application files"* true:
+this is a transient cache, not a published artifact, so `deploy.sh` still never
+touches the VPS.
+
+Only `/assets/` is cached. `index.html` is `no-store` at the origin so the SPA
+shell keeps revalidating and a deploy is visible immediately; caching the
+catch-all location would strand users on a stale shell. Responses carry
+`X-Cache-Status` for verification.
+
 ### Why `origin-shared.conf` is separate
 
 TLS terminates at the edge, so the Tailscale hop is plain HTTP and `$scheme` is
@@ -170,9 +200,20 @@ curl -H 'Host: app.dev.ruostack.io' http://100.99.76.119:8901/healthz
 scp deploy/nginx/out/edge.dev.conf srv1153350:/tmp/
 # then, on the VPS:
 sudo mkdir -p /var/www/certbot
+# Asset cache (EDGE_CACHE_PATH). nginx creates the level dirs itself but not the
+# root, and it must be writable by the worker user or every /assets/ request
+# falls back to the origin silently.
+sudo mkdir -p /var/cache/nginx/ruostack-dev
+sudo chown www-data: /var/cache/nginx/ruostack-dev
 sudo mv /tmp/edge.dev.conf /etc/nginx/sites-available/ruostack-edge.dev.conf
 sudo ln -sf /etc/nginx/sites-available/ruostack-edge.dev.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
+```
+
+Verify the cache is live — the second request must report `HIT`:
+
+```bash
+curl -sI https://app.dev.ruostack.io/assets/<hashed>.js | grep -i x-cache-status
 ```
 
 **7. TLS (on the VPS):**
@@ -235,6 +276,10 @@ curl -H 'Host: ruostack.com'    http://100.99.76.119:8913/
 ```bash
 scp deploy/nginx/out/edge.prod.conf srv1153350:/tmp/
 # then, on the VPS:
+# Asset cache (EDGE_CACHE_PATH) -- separate directory and keys_zone from dev, so
+# the two configs can be enabled on this VPS at the same time.
+sudo mkdir -p /var/cache/nginx/ruostack-prod
+sudo chown www-data: /var/cache/nginx/ruostack-prod
 sudo mv /tmp/edge.prod.conf /etc/nginx/sites-available/ruostack-edge.prod.conf
 sudo ln -sf /etc/nginx/sites-available/ruostack-edge.prod.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
