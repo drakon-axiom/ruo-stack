@@ -7,8 +7,51 @@
 # Terminates TLS and forwards whole hostnames to the origin box over Tailscale.
 # Holds no application files -- deploys never touch this machine.
 #
-# Compression and cache headers are deliberately set at the ORIGIN, not here,
-# so there is exactly one place to change them.
+# Compression and cache HEADERS are deliberately set at the ORIGIN, not here,
+# so there is exactly one place to change them. The proxy_cache below is a
+# different thing: it stores what the origin already marked immutable.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Origin upstreams.
+#
+# These exist for `keepalive`. nginx maintains a connection cache only for a
+# NAMED upstream -- `proxy_pass http://<ip>:<port>` opens a fresh TCP connection
+# per request even with proxy_http_version 1.1 and `Connection ""` set, because
+# those two only make the connection *reusable*, they do not provide the pool.
+# The edge->origin hop is ~53ms of Tailscale RTT, so the unpooled form charged a
+# full handshake to every asset and every API call.
+#
+# Names are env-suffixed: this VPS serves the dev and prod hostnames from one
+# nginx, and duplicate upstream names fail at load.
+# ─────────────────────────────────────────────────────────────────────────────
+upstream ${EDGE_BRAND_UPSTREAM} {
+    server ${ORIGIN_IP}:${BRAND_ORIGIN_PORT};
+    keepalive 32;
+}
+
+upstream ${EDGE_ADMIN_UPSTREAM} {
+    server ${ORIGIN_IP}:${ADMIN_ORIGIN_PORT};
+    keepalive 32;
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Edge asset cache.
+#
+# Vite emits content-hashed filenames under /assets/ and the origin marks them
+# `immutable`, so the edge can answer them outright instead of crossing the
+# Tailscale hop. A deploy changes the hashes, so the cache self-invalidates and
+# never needs purging -- which is what keeps the "edge holds no application
+# files" invariant (deploy/deploy.sh:3) intact: this is a transient cache, not a
+# published artifact.
+#
+# Only /assets/ is cached. index.html is `no-store` at the origin so the SPA
+# shell keeps revalidating and a deploy stays visible immediately.
+#
+# The directory must exist and be writable by nginx on the VPS:
+#   sudo mkdir -p ${EDGE_CACHE_PATH} && sudo chown www-data: ${EDGE_CACHE_PATH}
+# ─────────────────────────────────────────────────────────────────────────────
+proxy_cache_path ${EDGE_CACHE_PATH} levels=1:2 keys_zone=${EDGE_CACHE_ZONE}:10m
+                 max_size=512m inactive=30d use_temp_path=off;
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ${BRAND_HOST} -> origin :${BRAND_ORIGIN_PORT}
@@ -29,8 +72,35 @@ server {
 
     client_max_body_size 2m;
 
+    # Hashed, immutable bundles -- served from the edge cache, no origin hop.
+    # Every proxy_set_header below is REPEATED from `location /` on purpose: nginx
+    # inherits them only when a location declares none of its own, and they are
+    # set at LOCATION level here, not server level. An /assets/ block without them
+    # would send Host: $proxy_host, miss the origin's server_name, and hit the
+    # origin's `deny all` guard.
+    location /assets/ {
+        proxy_pass http://${EDGE_BRAND_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Connection        "";
+        proxy_read_timeout 60s;
+
+        proxy_cache            ${EDGE_CACHE_ZONE};
+        proxy_cache_valid      200 30d;
+        # One request populates the entry; the rest wait for it rather than
+        # stampeding the origin after a deploy changes every filename.
+        proxy_cache_lock       on;
+        proxy_cache_use_stale  error timeout updating http_500 http_502 http_503 http_504;
+        # The origin sends `Vary: Accept-Encoding` (gzip_vary on), so gzip and
+        # identity are stored as separate entries automatically.
+        add_header X-Cache-Status $upstream_cache_status always;
+    }
+
     location / {
-        proxy_pass http://${ORIGIN_IP}:${BRAND_ORIGIN_PORT};
+        proxy_pass http://${EDGE_BRAND_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
@@ -71,8 +141,26 @@ server {
     # allow 203.0.113.0/24;
     # deny  all;
 
+    # See the brand block for why every header is repeated here.
+    location /assets/ {
+        proxy_pass http://${EDGE_ADMIN_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Connection        "";
+        proxy_read_timeout 60s;
+
+        proxy_cache            ${EDGE_CACHE_ZONE};
+        proxy_cache_valid      200 30d;
+        proxy_cache_lock       on;
+        proxy_cache_use_stale  error timeout updating http_500 http_502 http_503 http_504;
+        add_header X-Cache-Status $upstream_cache_status always;
+    }
+
     location / {
-        proxy_pass http://${ORIGIN_IP}:${ADMIN_ORIGIN_PORT};
+        proxy_pass http://${EDGE_ADMIN_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;

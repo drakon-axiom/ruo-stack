@@ -1,6 +1,7 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { getClients } from './clients.ts';
+import { warmJwks } from './auth/brand-token.ts';
 import { startRateQuoteSweeper } from './services/rate-quote.ts';
 import { startReconciliationWorker } from './services/reconciliation.ts';
 import { startDunningWorker } from './services/dunning.ts';
@@ -15,6 +16,14 @@ async function main() {
     app.log.error(err);
     process.exit(1);
   }
+  // Fetch the Supabase JWKS now so the first brand request does not pay for it
+  // (~457ms, measured). Deliberately not awaited before listen(): the warm-up
+  // never throws, and holding the port closed on a Supabase round-trip would
+  // trade a slow first request for a slow boot.
+  void warmJwks().then((ok) => {
+    if (ok) app.log.info('jwks: key set warmed at boot');
+    else app.log.warn('jwks: warm-up failed; first brand request will fetch it');
+  });
   // Background: sweep expired rate quotes (their validity is short; this just
   // keeps the table from accumulating dead rows).
   startRateQuoteSweeper(
