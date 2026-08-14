@@ -1,27 +1,41 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/auth.js';
 import { Shell } from './components/Shell.js';
 import { Login } from './screens/Login.js';
-import { Catalog } from './screens/Catalog.js';
-import { CatalogImport } from './screens/CatalogImport.js';
-import { AdminUsers } from './screens/AdminUsers.js';
-import { AuditLog } from './screens/AuditLog.js';
-import { Fulfillment } from './screens/Fulfillment.js';
-import { ShippingRules } from './screens/ShippingRules.js';
-import { StoreMatch } from './screens/StoreMatch.js';
-import { Exceptions } from './screens/Exceptions.js';
-import { Claims } from './screens/Claims.js';
-import { Reporting } from './screens/Reporting.js';
-import { Overview } from './screens/Overview.js';
-import { Brands } from './screens/Brands.js';
-import { Announcements } from './screens/Announcements.js';
-import { Ledger } from './screens/Ledger.js';
 import { EmptyState, PageHeader } from '@ruostack/ui';
+
+// Login stays in the entry chunk -- it is the first thing an unauthenticated
+// operator renders. Every screen below is its own chunk; see the equivalent
+// comment in apps/brand-web/src/App.tsx for the reasoning.
+const AdminUsers = lazy(() => import('./screens/AdminUsers.js').then((m) => ({ default: m.AdminUsers })));
+const Announcements = lazy(() => import('./screens/Announcements.js').then((m) => ({ default: m.Announcements })));
+const AuditLog = lazy(() => import('./screens/AuditLog.js').then((m) => ({ default: m.AuditLog })));
+const Brands = lazy(() => import('./screens/Brands.js').then((m) => ({ default: m.Brands })));
+const Catalog = lazy(() => import('./screens/Catalog.js').then((m) => ({ default: m.Catalog })));
+const CatalogImport = lazy(() => import('./screens/CatalogImport.js').then((m) => ({ default: m.CatalogImport })));
+const Claims = lazy(() => import('./screens/Claims.js').then((m) => ({ default: m.Claims })));
+const Exceptions = lazy(() => import('./screens/Exceptions.js').then((m) => ({ default: m.Exceptions })));
+const Fulfillment = lazy(() => import('./screens/Fulfillment.js').then((m) => ({ default: m.Fulfillment })));
+const Ledger = lazy(() => import('./screens/Ledger.js').then((m) => ({ default: m.Ledger })));
+const Overview = lazy(() => import('./screens/Overview.js').then((m) => ({ default: m.Overview })));
+const Reporting = lazy(() => import('./screens/Reporting.js').then((m) => ({ default: m.Reporting })));
+const ShippingRules = lazy(() => import('./screens/ShippingRules.js').then((m) => ({ default: m.ShippingRules })));
+const StoreMatch = lazy(() => import('./screens/StoreMatch.js').then((m) => ({ default: m.StoreMatch })));
+
+/** Fills the content area while a route's chunk downloads; Shell stays painted. */
+function ScreenFallback() {
+  return <div className="grid place-items-center py-24 text-sm text-content-muted">Loading…</div>;
+}
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { claims } = useAuth();
   if (!claims) return <Navigate to="/login" replace />;
-  return <Shell>{children}</Shell>;
+  return (
+    <Shell>
+      <Suspense fallback={<ScreenFallback />}>{children}</Suspense>
+    </Shell>
+  );
 }
 
 function ComingSoon({ title }: { title: string }) {

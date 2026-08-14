@@ -1,32 +1,57 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/auth.js';
 import { Shell } from './components/Shell.js';
 import { Signup, Login, Forgot, Reset } from './screens/Auth.js';
-import { Account } from './screens/Account.js';
-import { Catalog } from './screens/Catalog.js';
-import { Wallet } from './screens/Wallet.js';
-import { Orders } from './screens/Orders.js';
-import { Store } from './screens/Store.js';
-import { ActionRequired } from './screens/ActionRequired.js';
-import { Tracking } from './screens/Tracking.js';
-import { Claims } from './screens/Claims.js';
-import { Overview } from './screens/Overview.js';
-import { Profit } from './screens/Profit.js';
-import { Referrals } from './screens/Referrals.js';
-import { Coas } from './screens/Coas.js';
-import { Shipping } from './screens/Shipping.js';
-import { Branding } from './screens/Branding.js';
-import { Customers } from './screens/Customers.js';
-import { AddressBook } from './screens/AddressBook.js';
-import { Notifications } from './screens/Notifications.js';
-import { Team } from './screens/Team.js';
 import { Card } from '@ruostack/ui';
+
+// The auth screens above stay in the entry chunk: they are what a logged-out
+// visitor renders first, so splitting them would just add a round-trip in front
+// of the login form.
+//
+// Every /app screen below is a separate chunk. Statically importing all 22 put
+// them in one 716 kB bundle that every visitor downloaded in full before React
+// could boot -- including the 21 screens they were not navigating to.
+//
+// Written out rather than generated: React.lazy needs a default export and
+// these are named, and a static `import('./screens/X.js')` literal is what lets
+// Rollup see the chunk boundary at build time.
+const Account = lazy(() => import('./screens/Account.js').then((m) => ({ default: m.Account })));
+const ActionRequired = lazy(() => import('./screens/ActionRequired.js').then((m) => ({ default: m.ActionRequired })));
+const AddressBook = lazy(() => import('./screens/AddressBook.js').then((m) => ({ default: m.AddressBook })));
+const Branding = lazy(() => import('./screens/Branding.js').then((m) => ({ default: m.Branding })));
+const Catalog = lazy(() => import('./screens/Catalog.js').then((m) => ({ default: m.Catalog })));
+const Claims = lazy(() => import('./screens/Claims.js').then((m) => ({ default: m.Claims })));
+const Coas = lazy(() => import('./screens/Coas.js').then((m) => ({ default: m.Coas })));
+const Customers = lazy(() => import('./screens/Customers.js').then((m) => ({ default: m.Customers })));
+const Notifications = lazy(() => import('./screens/Notifications.js').then((m) => ({ default: m.Notifications })));
+const Orders = lazy(() => import('./screens/Orders.js').then((m) => ({ default: m.Orders })));
+const Overview = lazy(() => import('./screens/Overview.js').then((m) => ({ default: m.Overview })));
+const Profit = lazy(() => import('./screens/Profit.js').then((m) => ({ default: m.Profit })));
+const Referrals = lazy(() => import('./screens/Referrals.js').then((m) => ({ default: m.Referrals })));
+const Shipping = lazy(() => import('./screens/Shipping.js').then((m) => ({ default: m.Shipping })));
+const Store = lazy(() => import('./screens/Store.js').then((m) => ({ default: m.Store })));
+const Team = lazy(() => import('./screens/Team.js').then((m) => ({ default: m.Team })));
+const Tracking = lazy(() => import('./screens/Tracking.js').then((m) => ({ default: m.Tracking })));
+const Wallet = lazy(() => import('./screens/Wallet.js').then((m) => ({ default: m.Wallet })));
+
+/**
+ * Shown while a route's chunk downloads. This sits INSIDE Shell, so the sidebar,
+ * header, and tabs are already painted around it -- navigation never blanks out.
+ */
+function ScreenFallback() {
+  return <div className="grid place-items-center py-24 text-sm text-content-muted">Loading…</div>;
+}
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   if (loading) return <div className="grid min-h-screen place-items-center bg-canvas text-content-muted">Loading…</div>;
   if (!session) return <Navigate to="/login" replace />;
-  return <Shell>{children}</Shell>;
+  return (
+    <Shell>
+      <Suspense fallback={<ScreenFallback />}>{children}</Suspense>
+    </Shell>
+  );
 }
 
 function ComingSoon({ title }: { title: string }) {
