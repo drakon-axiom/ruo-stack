@@ -20,9 +20,14 @@ async function main() {
   // (~457ms, measured). Deliberately not awaited before listen(): the warm-up
   // never throws, and holding the port closed on a Supabase round-trip would
   // trade a slow first request for a slow boot.
-  void warmJwks().then((ok) => {
-    if (ok) app.log.info('jwks: key set warmed at boot');
-    else app.log.warn('jwks: warm-up failed; first brand request will fetch it');
+  void warmJwks().then((r) => {
+    if (r.warmed) {
+      app.log.info(`jwks: key set warmed at boot (attempt ${r.attempts})`);
+    } else {
+      app.log.warn(
+        `jwks: warm-up failed after ${r.attempts} attempts (${r.error}); first brand request will fetch it`,
+      );
+    }
   });
   // Background: sweep expired rate quotes (their validity is short; this just
   // keeps the table from accumulating dead rows).
