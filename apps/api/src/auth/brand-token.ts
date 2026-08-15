@@ -45,6 +45,29 @@ function jwks() {
 }
 
 /**
+ * How many times the boot warm-up tries before giving up.
+ *
+ * One attempt is not enough. The first boot after a deploy timed out at jose's
+ * 5s default while the very same fetch took ~150-500ms moments later: cold
+ * modules, cold DNS and TLS, Prisma starting, and four background workers all
+ * land in the same window. That is exactly the boot where the warm-up matters
+ * most, so it retries past the contention instead of conceding to it.
+ *
+ * Raising jose's `timeoutDuration` would be the wrong lever -- it also governs
+ * request-path fetches, and a 15s hang on a user request is worse than a 5s one.
+ */
+export const JWKS_WARM_ATTEMPTS = 3;
+const JWKS_WARM_BACKOFF_MS = 1500;
+
+export interface JwksWarmResult {
+  warmed: boolean;
+  /** Attempts actually made, so a slow-but-recovered boot is visible in logs. */
+  attempts: number;
+  /** Failure reason, present only when `warmed` is false. */
+  error?: string;
+}
+
+/**
  * Fetch the key set at boot so the first authenticated request does not pay for
  * it. Call from server startup, not from a request path.
  *
@@ -53,18 +76,35 @@ function jwks() {
  * first request this avoids. On failure the key set is simply fetched lazily by
  * the first request, exactly as before.
  *
- * Returns whether the key set is now cached, so the caller can log it.
+ * Reports the reason on failure rather than swallowing it -- the first version
+ * discarded the error, and diagnosing a failed warm-up in production meant
+ * inferring the cause from the gap between two log timestamps.
  */
-export async function warmJwks(): Promise<boolean> {
-  try {
-    // `reload()` is in jose's exported type surface but marked @ignore; if a
-    // future release drops it, `pnpm typecheck` fails here rather than silently
-    // reverting to lazy fetching at runtime.
-    await jwks().reload();
-    return true;
-  } catch {
-    return false;
+export async function warmJwks(
+  opts: { attempts?: number; delayMs?: number } = {},
+): Promise<JwksWarmResult> {
+  const { attempts = JWKS_WARM_ATTEMPTS, delayMs = JWKS_WARM_BACKOFF_MS } = opts;
+  let error: string | undefined;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      // `reload()` is in jose's exported type surface but marked @ignore; if a
+      // future release drops it, `pnpm typecheck` fails here rather than silently
+      // reverting to lazy fetching at runtime.
+      await jwks().reload();
+      return { warmed: true, attempts: attempt };
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+      // Linear backoff, and none after the final attempt. jose's
+      // cooldownDuration only gates fetches after a SUCCESSFUL one, so a retry
+      // following a failure is never throttled.
+      if (attempt < attempts && delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+      }
+    }
   }
+
+  return { warmed: false, attempts, error };
 }
 
 async function verifySignature(token: string): Promise<JWTPayload> {
