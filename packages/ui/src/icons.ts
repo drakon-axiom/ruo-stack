@@ -43,6 +43,7 @@ export {
   Minus,
   Circle,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   ChevronLeft,
   Plus,
