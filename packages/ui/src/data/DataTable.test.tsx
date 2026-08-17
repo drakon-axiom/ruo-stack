@@ -112,3 +112,88 @@ describe('DataTable', () => {
     expect(onRowClick).toHaveBeenCalledWith(ROWS[0]);
   });
 });
+
+describe('DataTable selection', () => {
+  beforeEach(() => setDesktop(true));
+
+  const selectable = (over: Partial<Parameters<typeof DataTable<Row>>[0]> = {}) => (
+    <DataTable
+      caption="Recent orders"
+      columns={COLUMNS}
+      rows={ROWS}
+      rowKey={(r) => r.id}
+      selectable
+      selectedKeys={new Set<string>()}
+      onSelectionChange={() => {}}
+      selectionLabel={(r) => `Select ${r.name}`}
+      {...over}
+    />
+  );
+
+  it('adds no selection column unless asked', () => {
+    render(<DataTable caption="Recent orders" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(COLUMNS.length);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('renders a header checkbox and one per row when selectable', () => {
+    render(selectable());
+    expect(screen.getAllByRole('columnheader')).toHaveLength(COLUMNS.length + 1);
+    expect(screen.getByRole('checkbox', { name: 'Select all' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select M. Reyes' })).toBeInTheDocument();
+  });
+
+  it('reports the row key when a row is selected', async () => {
+    const onSelectionChange = vi.fn();
+    render(selectable({ onSelectionChange }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select M. Reyes' }));
+    expect(onSelectionChange).toHaveBeenCalledWith(new Set(['1']));
+  });
+
+  it('deselects a row that was already selected', async () => {
+    const onSelectionChange = vi.fn();
+    render(selectable({ selectedKeys: new Set(['1', '2']), onSelectionChange }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select M. Reyes' }));
+    expect(onSelectionChange).toHaveBeenCalledWith(new Set(['2']));
+  });
+
+  // The row is itself clickable (it opens the edit drawer). Selecting must not
+  // also navigate, or the checkbox is unusable.
+  it('does not fire onRowClick when the checkbox is clicked', async () => {
+    const onRowClick = vi.fn();
+    render(selectable({ onRowClick, onSelectionChange: () => {} }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select M. Reyes' }));
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('selects every rendered row from the header checkbox', async () => {
+    const onSelectionChange = vi.fn();
+    render(selectable({ onSelectionChange }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all' }));
+    expect(onSelectionChange).toHaveBeenCalledWith(new Set(['1', '2']));
+  });
+
+  it('clears the selection from the header checkbox when all are selected', async () => {
+    const onSelectionChange = vi.fn();
+    render(selectable({ selectedKeys: new Set(['1', '2']), onSelectionChange }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all' }));
+    expect(onSelectionChange).toHaveBeenCalledWith(new Set());
+  });
+
+  it('marks the header checkbox mixed on a partial selection', () => {
+    render(selectable({ selectedKeys: new Set(['1']) }));
+    expect(screen.getByRole('checkbox', { name: 'Select all' })).toHaveAttribute(
+      'aria-checked',
+      'mixed',
+    );
+  });
+
+  it('offers selection in card mode too', async () => {
+    setDesktop(false);
+    const onSelectionChange = vi.fn();
+    render(selectable({ onSelectionChange }));
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select M. Reyes' }));
+    expect(onSelectionChange).toHaveBeenCalledWith(new Set(['1']));
+  });
+});

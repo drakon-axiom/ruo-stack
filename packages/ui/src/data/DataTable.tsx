@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import { cn } from '../lib/cn.js';
 import { Card } from '../primitives/Card.js';
+import { Checkbox } from '../primitives/Checkbox.js';
 import { SkeletonRows } from '../primitives/Skeleton.js';
 import { useMediaQuery } from '../hooks/useMediaQuery.js';
 
@@ -30,10 +31,25 @@ export interface DataTableProps<T> {
   loading?: boolean;
   empty?: ReactNode;
   onRowClick?: (row: T) => void;
+  /** Adds a leading checkbox column (and per-card checkboxes on mobile). */
+  selectable?: boolean;
+  /** Controlled selection, keyed by `rowKey`. */
+  selectedKeys?: ReadonlySet<string>;
+  onSelectionChange?: (keys: Set<string>) => void;
+  /** Accessible name for a row's checkbox. Defaults to the row key, which is
+   *  unique but rarely meaningful — pass something human where you can. */
+  selectionLabel?: (row: T) => string;
 }
 
 const cellClass = <T,>(c: Column<T>) =>
   cn('px-4 py-3', c.align === 'right' && 'text-right', c.mono && 'font-mono tabular-nums');
+
+/** Stop a checkbox click from also triggering the row's own click/keyboard
+ *  handler — rows open the edit drawer, which would make selection unusable. */
+const swallow = {
+  onClick: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+  onKeyDown: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+};
 
 export function DataTable<T>({
   columns,
@@ -44,8 +60,33 @@ export function DataTable<T>({
   loading = false,
   empty,
   onRowClick,
+  selectable = false,
+  selectedKeys,
+  onSelectionChange,
+  selectionLabel,
 }: DataTableProps<T>) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
+
+  const selected = selectedKeys ?? new Set<string>();
+  const isSelected = (row: T) => selected.has(rowKey(row));
+  const labelFor = (row: T) => selectionLabel?.(row) ?? `Select ${rowKey(row)}`;
+
+  function toggleRow(row: T) {
+    const next = new Set(selected);
+    const key = rowKey(row);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    onSelectionChange?.(next);
+  }
+
+  // "All" means every row currently rendered — not every row that exists behind
+  // a filter or page. Clearing wins when everything visible is already checked.
+  const allSelected = rows.length > 0 && rows.every(isSelected);
+  const someSelected = !allSelected && rows.some(isSelected);
+
+  function toggleAll() {
+    onSelectionChange?.(allSelected ? new Set() : new Set(rows.map(rowKey)));
+  }
 
   if (loading) {
     return (
@@ -80,7 +121,19 @@ export function DataTable<T>({
             })}
             className={cn('p-4', onRowClick && 'cursor-pointer')}
           >
-            <div className="text-base font-semibold text-content">{primary.cell(row)}</div>
+            <div className="flex items-start gap-3">
+              {selectable && (
+                <span className="pt-0.5" {...swallow}>
+                  <Checkbox
+                    checked={isSelected(row)}
+                    onCheckedChange={() => toggleRow(row)}
+                    label={labelFor(row)}
+                    hideLabel
+                  />
+                </span>
+              )}
+              <div className="min-w-0 flex-1 text-base font-semibold text-content">{primary.cell(row)}</div>
+            </div>
 
             {meta.length > 0 && (
               <div className="mt-0.5 text-xs text-content-muted">
@@ -115,6 +168,17 @@ export function DataTable<T>({
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className="border-b border-line text-left">
+            {selectable && (
+              <th scope="col" className="w-px px-4 py-3">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onCheckedChange={toggleAll}
+                  label="Select all"
+                  hideLabel
+                />
+              </th>
+            )}
             {columns.map((c, i) => (
               <th
                 key={c.key}
@@ -123,7 +187,9 @@ export function DataTable<T>({
                 className={cn(
                   'px-4 py-3 text-2xs uppercase tracking-[0.1em] text-content-faint',
                   c.align === 'right' && 'text-right',
-                  // Pin the identity column while the rest scrolls sideways.
+                  // Pin the identity column while the rest scrolls sideways. The
+                  // checkbox column is deliberately NOT the pinned one — the SKU
+                  // is what an operator needs to keep in view while scrolling.
                   !isDesktop && i === 0 && 'sticky left-0 bg-surface-2',
                 )}
               >
@@ -146,8 +212,19 @@ export function DataTable<T>({
               className={cn(
                 'border-b border-line-subtle transition-colors duration-fast last:border-0',
                 onRowClick && 'cursor-pointer hover:bg-surface-3',
+                isSelected(row) && 'bg-accent/[0.06]',
               )}
             >
+              {selectable && (
+                <td className="w-px px-4 py-3" {...swallow}>
+                  <Checkbox
+                    checked={isSelected(row)}
+                    onCheckedChange={() => toggleRow(row)}
+                    label={labelFor(row)}
+                    hideLabel
+                  />
+                </td>
+              )}
               {columns.map((c, i) => (
                 <td
                   key={c.key}
