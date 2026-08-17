@@ -40,10 +40,16 @@ export function Select({
       </RS.Trigger>
 
       <RS.Portal>
+        {/* Bounded to the space actually on screen. Radix already sets
+         *  `overflow: hidden auto` on the viewport inline, so scrolling is not
+         *  what was missing — a height bound is. Without one, a long option list
+         *  grows to fit every item and runs off the bottom of the screen, where
+         *  it cannot be reached. `overflow-hidden` stays so the rounded corners
+         *  still clip the scrolling viewport inside. */}
         <RS.Content
           position="popper"
           sideOffset={4}
-          className="z-50 overflow-hidden rounded-[10px] border border-line bg-surface-2 shadow-e2"
+          className="z-50 max-h-[var(--radix-select-content-available-height)] overflow-hidden rounded-[10px] border border-line bg-surface-2 shadow-e2"
         >
           <RS.Viewport className="p-1">
             {options.map((o) => (
