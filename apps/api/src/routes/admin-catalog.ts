@@ -1,6 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   AUDIT_ACTIONS,
+  CatalogBulkSchema,
   CatalogCreateSchema,
   CatalogStockSchema,
   CatalogUpdateSchema,
@@ -10,10 +11,26 @@ import { z } from 'zod';
 import { getClients } from '../clients.ts';
 import { writeAudit } from '../audit.ts';
 import { requireAdmin } from '../middleware/guards.ts';
-import { BadRequest, Conflict, NotFound } from '../errors.ts';
-import { onCatalogStockChanged } from '../hooks/catalog-stock.ts';
+import { BadRequest, Conflict, HttpError, NotFound } from '../errors.ts';
+import { applyCatalogLifecycle, type LifecycleCtx } from '../services/catalog-lifecycle.ts';
 import { catalogListWhere, CatalogListQuery } from '../services/catalog-query.ts';
 import { buildCatalogExportCsv, exportFilename } from '../services/catalog-export.ts';
+
+/** One item's result in a bulk lifecycle run. */
+interface CatalogBulkOutcome {
+  id: string;
+  ok: boolean;
+  /** False when the product was already in the target state. */
+  changed: boolean;
+  /** Stable error code (e.g. `not_out_of_stock`), present only when `ok` is false. */
+  reason?: string;
+  message?: string;
+}
+
+const lifecycleCtx = (req: FastifyRequest): LifecycleCtx => ({
+  adminUserId: req.admin!.adminUserId,
+  ip: req.ip,
+});
 
 /**
  * Catalog Manager (architecture §1.2). CatalogProduct is the single source of
@@ -202,52 +219,16 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
   // Publish — locks the SKU, makes the product brand-visible. Audited.
   app.post('/api/admin/catalog/:id/publish', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
-    if (!existing) throw NotFound('Product not found');
-    if (existing.isPublished) return { ...existing }; // idempotent
-
-    const published = await prisma.$transaction(async (tx) => {
-      const p = await tx.catalogProduct.update({ where: { id }, data: { isPublished: true } });
-      await writeAudit(tx, {
-        actorType: 'admin',
-        actorId: req.admin!.adminUserId,
-        action: AUDIT_ACTIONS.catalogPublished,
-        targetType: 'catalog_product',
-        targetId: id,
-        before: { is_published: false, canonical_sku: existing.canonicalSku },
-        after: { is_published: true, canonical_sku: p.canonicalSku },
-        ip: req.ip,
-      });
-      return p;
-    });
-    return published;
+    const { product } = await applyCatalogLifecycle(prisma, id, 'publish', lifecycleCtx(req));
+    return product;
   });
 
-  // Stock toggle — audits + fires the (stubbed) Woo stock-push seam.
+  // Stock toggle — audits + fires the Woo stock-push seam.
   app.post('/api/admin/catalog/:id/stock', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const { status } = CatalogStockSchema.parse(req.body);
-    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
-    if (!existing) throw NotFound('Product not found');
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const p = await tx.catalogProduct.update({ where: { id }, data: { status } });
-      await writeAudit(tx, {
-        actorType: 'admin',
-        actorId: req.admin!.adminUserId,
-        action: AUDIT_ACTIONS.skuStockChanged,
-        targetType: 'catalog_product',
-        targetId: id,
-        before: { status: existing.status },
-        after: { status: p.status },
-        ip: req.ip,
-      });
-      return p;
-    });
-
-    // Seam: TODO(Phase 1) Woo stock push. No-op in Phase 0.
-    await onCatalogStockChanged(updated);
-    return updated;
+    const { product } = await applyCatalogLifecycle(prisma, id, 'set_stock', lifecycleCtx(req), status);
+    return product;
   });
 
   // Unpublish — pulls it from the brand catalog, order forms and provisioning.
@@ -258,27 +239,8 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
   // carry it, and unpublishing doesn't remove it from them.
   app.post('/api/admin/catalog/:id/unpublish', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
-    if (!existing) throw NotFound('Product not found');
-    if (!existing.isPublished) return { ...existing }; // idempotent
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const p = await tx.catalogProduct.update({ where: { id }, data: { isPublished: false, updatedBy: req.admin!.adminUserId } });
-      await writeAudit(tx, {
-        actorType: 'admin',
-        actorId: req.admin!.adminUserId,
-        action: AUDIT_ACTIONS.catalogUnpublished,
-        targetType: 'catalog_product',
-        targetId: id,
-        before: { is_published: true },
-        after: { is_published: false },
-        ip: req.ip,
-      });
-      return p;
-    });
-
-    await onCatalogStockChanged(updated);
-    return updated;
+    const { product } = await applyCatalogLifecycle(prisma, id, 'unpublish', lifecycleCtx(req));
+    return product;
   });
 
   // Archive — retire a product that can't be deleted because it has history.
@@ -286,35 +248,8 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
   // stores before it leaves the catalog; enforced here, not just in the UI.
   app.post('/api/admin/catalog/:id/archive', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
-    if (!existing) throw NotFound('Product not found');
-    if (existing.archived) return { ...existing }; // idempotent
-    if (existing.status !== 'out_of_stock') {
-      throw BadRequest(
-        'not_out_of_stock',
-        'Set the product to out-of-stock before archiving it, so brand stores stop selling it first',
-      );
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const p = await tx.catalogProduct.update({ where: { id }, data: { archived: true, updatedBy: req.admin!.adminUserId } });
-      await writeAudit(tx, {
-        actorType: 'admin',
-        actorId: req.admin!.adminUserId,
-        action: AUDIT_ACTIONS.catalogArchived,
-        targetType: 'catalog_product',
-        targetId: id,
-        before: { archived: false, status: existing.status, is_published: existing.isPublished },
-        after: { archived: true },
-        ip: req.ip,
-      });
-      return p;
-    });
-
-    // Belt and braces: it is already out_of_stock, but this makes the storefront
-    // state unambiguous and re-asserts it for any store that missed the earlier push.
-    await onCatalogStockChanged(updated);
-    return updated;
+    const { product } = await applyCatalogLifecycle(prisma, id, 'archive', lifecycleCtx(req));
+    return product;
   });
 
   // Restore from archive. Comes back OUT OF STOCK and unchanged otherwise — the
@@ -322,25 +257,48 @@ export async function adminCatalogRoutes(app: FastifyInstance): Promise<void> {
   // silently putting a product back on sale.
   app.post('/api/admin/catalog/:id/unarchive', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const existing = await prisma.catalogProduct.findUnique({ where: { id } });
-    if (!existing) throw NotFound('Product not found');
-    if (!existing.archived) return { ...existing }; // idempotent
+    const { product } = await applyCatalogLifecycle(prisma, id, 'unarchive', lifecycleCtx(req));
+    return product;
+  });
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const p = await tx.catalogProduct.update({ where: { id }, data: { archived: false, updatedBy: req.admin!.adminUserId } });
-      await writeAudit(tx, {
-        actorType: 'admin',
-        actorId: req.admin!.adminUserId,
-        action: AUDIT_ACTIONS.catalogUnarchived,
-        targetType: 'catalog_product',
-        targetId: id,
-        before: { archived: true },
-        after: { archived: false, status: p.status, is_published: p.isPublished },
-        ip: req.ip,
-      });
-      return p;
-    });
-    return updated;
+  /**
+   * Bulk lifecycle — the same five transitions over a selection from the catalog
+   * screen. Each item runs independently and reports its own outcome: `archive`
+   * is gated on out_of_stock, so a mixed selection legitimately half-succeeds and
+   * one refusal must not roll back the rest.
+   *
+   * Skips are returned, never swallowed. An operator reading "12 published" when
+   * 2 silently did nothing is the exact confusion FORBIDDEN_COLUMNS exists to
+   * prevent on the import side.
+   */
+  app.post('/api/admin/catalog/bulk', { preHandler: requireAdmin('catalog', 'write') }, async (req) => {
+    const { ids, action, status } = CatalogBulkSchema.parse(req.body);
+    const ctx = lifecycleCtx(req);
+    const results: CatalogBulkOutcome[] = [];
+
+    // Sequential on purpose: every item may fire a store push that fans out over
+    // each connected store, and the batch cap bounds the total. Parallelising
+    // here would hammer the Woo API from one request.
+    for (const id of ids) {
+      try {
+        const { changed } = await applyCatalogLifecycle(prisma, id, action, ctx, status);
+        results.push({ id, ok: true, changed });
+      } catch (err) {
+        if (err instanceof HttpError) {
+          results.push({ id, ok: false, changed: false, reason: err.code, message: err.message });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    return {
+      action,
+      applied: results.filter((r) => r.ok && r.changed).length,
+      unchanged: results.filter((r) => r.ok && !r.changed).length,
+      failed: results.filter((r) => !r.ok).length,
+      results,
+    };
   });
 
   // Hard delete — never-published drafts only. Anything with history is archived
