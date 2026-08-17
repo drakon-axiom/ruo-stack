@@ -39,6 +39,8 @@ export {
   Menu,
   X,
   Check,
+  // Indeterminate ("some, not all") state for a tri-state checkbox.
+  Minus,
   Circle,
   ChevronDown,
   ChevronRight,

@@ -83,6 +83,35 @@ export type CatalogUpdate = z.infer<typeof CatalogUpdateSchema>;
 
 export const CatalogStockSchema = z.object({ status: CatalogStatusEnum });
 
+/** The lifecycle actions the admin catalog exposes, one per single-item route. */
+export const CATALOG_BULK_ACTIONS = ['publish', 'unpublish', 'set_stock', 'archive', 'unarchive'] as const;
+export type CatalogBulkAction = (typeof CATALOG_BULK_ACTIONS)[number];
+
+/**
+ * Batch cap. Each item fires its own store push, so an unbounded list would fan
+ * out across the whole catalog in a single request — see the queue TODO in
+ * apps/api/src/hooks/catalog-stock.ts.
+ */
+export const CATALOG_BULK_MAX = 100;
+
+/**
+ * Bulk lifecycle request. `status` is required for `set_stock` and REJECTED for
+ * every other action — the same hazard FORBIDDEN_COLUMNS guards against on
+ * import: nobody should be able to send a status alongside an action that
+ * ignores it and walk away believing stock changed.
+ */
+export const CatalogBulkSchema = z
+  .object({
+    ids: z.array(z.string().uuid()).min(1).max(CATALOG_BULK_MAX),
+    action: z.enum(CATALOG_BULK_ACTIONS),
+    status: CatalogStatusEnum.optional(),
+  })
+  .refine((v) => (v.action === 'set_stock') === (v.status !== undefined), {
+    message: 'status is required for set_stock and not accepted for any other action',
+    path: ['status'],
+  });
+export type CatalogBulk = z.infer<typeof CatalogBulkSchema>;
+
 export const AdminCreateSchema = z.object({
   email: EmailSchema,
   full_name: z.string().min(1).max(120),
