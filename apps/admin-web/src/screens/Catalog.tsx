@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { canWrite, MAX_IMPORT_ROWS } from '@ruostack/shared';
 import { api, apiDownload, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Button, DataTable, Download, Drawer, EmptyState, Field, InlineAlert, Input, KpiTile, Lock, PageHeader, Plus, Select, StatusPill, Tabs, Upload, type Column } from '@ruostack/ui';
+import { Button, DataTable, Dialog, Download, Drawer, EmptyState, Field, InlineAlert, Input, KpiTile, Lock, PageHeader, Plus, Select, StatusPill, Tabs, Upload, type Column } from '@ruostack/ui';
 
 interface Product {
   id: string;
@@ -32,6 +32,23 @@ const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const toCents = (v: string) => Math.round(parseFloat(v || '0') * 100);
 
 type Filter = 'all' | 'in_stock' | 'soon' | 'out_of_stock';
+
+type BulkAction = 'publish' | 'unpublish' | 'set_stock' | 'archive' | 'unarchive';
+
+/** The three stock states, as bulk buttons. Mirrors CatalogStatus. */
+const STOCK_ACTIONS: [Filter, string][] = [
+  ['in_stock', 'In stock'],
+  ['soon', 'Soon'],
+  ['out_of_stock', 'Out of stock'],
+];
+
+interface BulkResponse {
+  action: BulkAction;
+  applied: number;
+  unchanged: number;
+  failed: number;
+  results: { id: string; ok: boolean; changed: boolean; reason?: string; message?: string }[];
+}
 
 // scroll mode: the three wholesale tiers only make sense read across, beside
 // the SKU they price.
@@ -90,6 +107,13 @@ export function Catalog() {
   // Archived products are retired — a separate view, not mixed into the live catalog.
   const [showArchived, setShowArchived] = useState(false);
   const [err, setErr] = useState('');
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState('');
+  // Destructive bulk actions confirm first: unpublishing pulls a product from
+  // every storefront that carries it, and doing that to 40 SKUs by misclick is
+  // not something a toast can undo.
+  const [confirming, setConfirming] = useState<null | { action: BulkAction; label: string; warning: string }>(null);
 
   async function load(archived = showArchived) {
     setLoading(true);
@@ -101,6 +125,17 @@ export function Catalog() {
     void load(showArchived);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived]);
+
+  /**
+   * Drop the selection whenever the visible set changes. Selection is keyed by
+   * id, so a row filtered out of view would otherwise stay selected and get
+   * swept into the next bulk action — the operator acting on rows they can no
+   * longer see.
+   */
+  useEffect(() => {
+    setSelected(new Set());
+    setBulkResult('');
+  }, [filter, search, showArchived]);
 
   const counts = useMemo(
     () => ({
@@ -143,6 +178,41 @@ export function Catalog() {
   function exportStamp(d: Date): string {
     const p = (n: number) => String(n).padStart(2, '0');
     return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}`;
+  }
+
+  /**
+   * Run one lifecycle action over the selection. The endpoint reports per item,
+   * so the summary names skips and refusals explicitly — reading "12 updated"
+   * when 2 silently did nothing is the confusion the CSV importer's forbidden
+   * columns exist to prevent, and it would be no better here.
+   */
+  async function runBulk(action: BulkAction, status?: Filter) {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    setErr('');
+    setBulkResult('');
+    try {
+      const res = await api<BulkResponse>('/api/admin/catalog/bulk', {
+        method: 'POST',
+        body: { ids: [...selected], action, ...(status ? { status } : {}) },
+      });
+
+      const parts = [`${res.applied} updated`];
+      if (res.unchanged > 0) parts.push(`${res.unchanged} already set`);
+      if (res.failed > 0) {
+        // Distinct reasons, so "8 refused" always says why.
+        const why = [...new Set(res.results.filter((r) => !r.ok).map((r) => r.message ?? r.reason ?? 'refused'))];
+        parts.push(`${res.failed} refused — ${why.join('; ')}`);
+      }
+      setBulkResult(parts.join(' · '));
+      setSelected(new Set());
+      await load(showArchived);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Bulk update failed');
+    } finally {
+      setBulkBusy(false);
+      setConfirming(null);
+    }
   }
 
   function exportCsv(shape: 'import' | 'full') {
@@ -222,6 +292,100 @@ export function Catalog() {
       </div>
 
       {err && <div className="mb-4"><InlineAlert tone="danger">{err}</InlineAlert></div>}
+      {bulkResult && <div className="mb-4"><InlineAlert tone="info">{bulkResult}</InlineAlert></div>}
+
+      {writable && selected.size > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-card border border-line bg-surface-2 px-4 py-3">
+          <span className="text-sm font-semibold text-content">
+            {selected.size} selected
+          </span>
+          <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+
+          {showArchived ? (
+            <Button size="sm" variant="ghost" disabled={bulkBusy} onClick={() => void runBulk('unarchive')}>
+              Restore
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="ghost" disabled={bulkBusy} onClick={() => void runBulk('publish')}>
+                Publish
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={bulkBusy}
+                onClick={() =>
+                  setConfirming({
+                    action: 'unpublish',
+                    label: 'Unpublish',
+                    warning:
+                      'They leave every brand catalog and order form, and storefronts already carrying them are pushed out-of-stock.',
+                  })
+                }
+              >
+                Unpublish
+              </Button>
+
+              <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+              <span className="text-2xs uppercase tracking-[0.1em] text-content-faint">Stock</span>
+              {STOCK_ACTIONS.map(([status, label]) => (
+                <Button
+                  key={status}
+                  size="sm"
+                  variant="ghost"
+                  disabled={bulkBusy}
+                  onClick={() => void runBulk('set_stock', status)}
+                >
+                  {label}
+                </Button>
+              ))}
+
+              <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={bulkBusy}
+                onClick={() =>
+                  setConfirming({
+                    action: 'archive',
+                    label: 'Archive',
+                    warning:
+                      'Only products already out-of-stock can be archived — anything still in stock or coming soon will be refused and left alone.',
+                  })
+                }
+              >
+                Archive
+              </Button>
+            </>
+          )}
+
+          <Button size="sm" variant="ghost" className="ml-auto" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
+
+      {confirming && (
+        <Dialog
+          open
+          onOpenChange={(v) => !v && setConfirming(null)}
+          title={`${confirming.label} ${selected.size} product${selected.size === 1 ? '' : 's'}?`}
+          description={confirming.warning}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirming(null)}>Cancel</Button>
+              <Button loading={bulkBusy} onClick={() => void runBulk(confirming.action)}>
+                {confirming.label}
+              </Button>
+            </div>
+          }
+        >
+          <p className="text-sm text-content-muted">
+            This applies to the {selected.size} selected product{selected.size === 1 ? '' : 's'}. Each one
+            is reported back individually, so anything refused is left untouched.
+          </p>
+        </Dialog>
+      )}
 
       <div className="mb-4">
         <InlineAlert tone="info">
@@ -249,6 +413,10 @@ export function Catalog() {
         rowKey={(p) => p.id}
         loading={loading}
         onRowClick={setEditing}
+        selectable={writable}
+        selectedKeys={selected}
+        onSelectionChange={setSelected}
+        selectionLabel={(p) => `Select ${p.canonicalSku}`}
         empty={
           <EmptyState
             title="No products"
