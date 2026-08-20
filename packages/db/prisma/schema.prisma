@@ -646,6 +646,7 @@ model SubscriptionState {
 
   brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
+  @@index([stripePriceId])
   @@map("subscription_state")
 }
 
