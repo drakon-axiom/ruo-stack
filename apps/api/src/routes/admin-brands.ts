@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { AUDIT_ACTIONS, WalletAdjustSchema } from '@ruostack/shared';
+import { AUDIT_ACTIONS, PLAN_KEYS, WalletAdjustSchema } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
 import { writeAudit } from '../audit.ts';
 import { requireAdmin } from '../middleware/guards.ts';
@@ -199,7 +199,7 @@ export async function adminBrandRoutes(app: FastifyInstance): Promise<void> {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = z
       .object({
-        plan: z.enum(['starter', 'pro', 'volume']),
+        plan: z.enum(PLAN_KEYS),
         // ISO date. Null = open-ended (comped); omitted is not the same thing.
         paid_through: z.string().datetime().nullable(),
         reason: z.string().min(1).max(300),

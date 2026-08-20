@@ -47,6 +47,15 @@ export interface ResolvedPlan {
   priceCents: number;
   /** null for starter (always) and for a paid tier with no active plan_price row. */
   stripePriceId: string | null;
+  /**
+   * The `plan_price.id` that `priceCents`/`stripePriceId` came from — the
+   * checkout quote token (Task 7). Wired onto the wire as
+   * `price_version_id` by `GET /api/brand/subscription` and
+   * `GET /api/admin/plans`; `POST /api/brand/billing/subscribe` accepts it
+   * back and refuses a stale one. null only when a paid tier has no active
+   * plan_price row at all (same condition as a null stripePriceId).
+   */
+  priceVersionId: string | null;
   capabilities: ResolvedPlanCapabilities;
 }
 
@@ -96,6 +105,7 @@ async function loadRegistry(db: PrismaClient): Promise<PlanRegistry> {
       // that case, same as today when the env var is unset.
       priceCents: activePrice?.priceCents ?? 0,
       stripePriceId: activePrice?.stripePriceId ?? null,
+      priceVersionId: activePrice?.id ?? null,
       capabilities: {
         storeConnections: row.storeConnections,
         maxOrdersPerMonth: row.maxOrdersPerMonth,

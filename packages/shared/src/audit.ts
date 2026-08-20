@@ -36,6 +36,9 @@ export const AUDIT_ACTIONS = {
   walletManualAdjustment: 'wallet.manual_adjustment',
   subscriptionCheckoutStarted: 'subscription.checkout_started',
   subscriptionStatusChanged: 'subscription.status_changed',
+  // Plan registry admin edits (Task 7): name/features/shippingCutoff only —
+  // price changes get their own action once Task 8 lands.
+  planUpdated: 'plan.updated',
   // Orders (Phase 1):
   orderCreated: 'order.created',
   orderUpdated: 'order.updated',

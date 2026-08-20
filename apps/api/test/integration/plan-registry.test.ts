@@ -248,6 +248,7 @@ describe('buyablePlanCatalog (brand-billing.ts) — drops unbuyable paid plans o
       paid: overrides.key !== 'starter',
       priceCents: 0,
       stripePriceId: null,
+      priceVersionId: null,
       capabilities: { storeConnections: false, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' },
       ...overrides,
     };
@@ -255,12 +256,14 @@ describe('buyablePlanCatalog (brand-billing.ts) — drops unbuyable paid plans o
 
   it('includes every tier when every paid tier has a configured active price', () => {
     const registry = {
-      starter: resolvedPlan({ key: 'starter', paid: false, priceCents: 0, stripePriceId: null }),
-      pro: resolvedPlan({ key: 'pro', paid: true, priceCents: 4900, stripePriceId: 'price_pro' }),
-      volume: resolvedPlan({ key: 'volume', paid: true, priceCents: 14900, stripePriceId: 'price_volume' }),
+      starter: resolvedPlan({ key: 'starter', paid: false, priceCents: 0, stripePriceId: null, priceVersionId: 'pv-starter' }),
+      pro: resolvedPlan({ key: 'pro', paid: true, priceCents: 4900, stripePriceId: 'price_pro', priceVersionId: 'pv-pro' }),
+      volume: resolvedPlan({ key: 'volume', paid: true, priceCents: 14900, stripePriceId: 'price_volume', priceVersionId: 'pv-volume' }),
     };
 
     expect(buyablePlanCatalog(registry).map((p) => p.key)).toEqual(['starter', 'pro', 'volume']);
+    // price_version_id passes through unchanged — the token the wire hands back.
+    expect(buyablePlanCatalog(registry).map((p) => p.price_version_id)).toEqual(['pv-starter', 'pv-pro', 'pv-volume']);
   });
 
   it('drops a paid tier with no active stripe price instead of showing it as a live $0 card', () => {
