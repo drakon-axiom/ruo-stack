@@ -41,6 +41,20 @@ export async function seedPaidPlan(tier: PaidPlanKey, priceId: string): Promise<
 
   const retrieved = await payments.retrievePrice(priceId);
 
+  // StripeAdapter.retrievePrice coerces a missing unit_amount to 0 (metered /
+  // tiered / graduated prices have no single `unit_amount`). A paid tier can
+  // never legitimately cost 0 — silently writing price_cents: 0, active: true
+  // would make Pro or Volume free for every new signup. Refuse loudly instead
+  // of writing it, same posture as the missing-env-var guard in seedPlans().
+  if (retrieved.unitAmountCents <= 0) {
+    throw new Error(
+      `[seed-plans] Refusing to seed "${tier}": Stripe price ${priceId} has unit_amount ${retrieved.unitAmountCents}c. ` +
+        `This is almost certainly a metered/tiered/graduated price with no flat unit_amount (retrievePrice() coerces a ` +
+        `missing unit_amount to 0) — seeding it would make a paid tier free. Point STRIPE_${tier.toUpperCase()}_PRICE_ID ` +
+        `at a standard recurring price with a fixed amount, or fix this check if that assumption is wrong.`,
+    );
+  }
+
   const displayCents = PLANS[tier].priceCents;
   if (displayCents !== retrieved.unitAmountCents) {
     console.warn(
