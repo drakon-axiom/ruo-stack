@@ -1,8 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   AUDIT_ACTIONS,
-  PLANS,
-  PLAN_LIST,
+  PLAN_KEYS,
   STATEMENT_DESCRIPTORS,
   SubscribeSchema,
   WalletTopupSchema,
@@ -14,6 +13,7 @@ import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
 import { BadRequest, NotFound } from '../errors.ts';
 import { getWalletSummary } from '../services/wallet.ts';
 import { effectivePlan, isLapsed } from '../services/subscription.ts';
+import { getPlanRegistry } from '../services/plan-registry.ts';
 
 /**
  * Brand-facing money layer (Phase 1): Pro membership + prepaid wallet. Core never
@@ -23,7 +23,6 @@ import { effectivePlan, isLapsed } from '../services/subscription.ts';
  */
 export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   const { prisma, payments, supabaseAdmin } = getClients();
-  const cfg = loadConfig();
 
   // Return URLs adapt to whichever origin the brand app was loaded from.
   function returnUrls(req: FastifyRequest, path: string) {
@@ -54,9 +53,12 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/brand/billing/subscribe', { preHandler: requireBrandSurface('billing') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const { plan } = SubscribeSchema.parse(req.body);
-    const priceEnv = PLANS[plan].stripePriceEnv!; // paid plans always have one
-    const priceId = cfg[priceEnv];
-    if (!priceId) throw BadRequest('plan_price_unconfigured', `${priceEnv} is not set`);
+    const registry = await getPlanRegistry(prisma);
+    // Same row the plan card's displayed price_cents comes from — the fix
+    // this whole plan exists to deliver: what's advertised and what Checkout
+    // charges can no longer diverge, because both are read from this one row.
+    const priceId = registry[plan].stripePriceId;
+    if (!priceId) throw BadRequest('plan_price_unconfigured', `No active Stripe price configured for plan "${plan}"`);
 
     const customerId = await ensureCustomer(brandId);
     const { successUrl, cancelUrl } = returnUrls(req, '/app/account');
@@ -93,6 +95,7 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
     const { brandId } = req.brand!;
     const sub = await prisma.subscriptionState.findUnique({ where: { brandId } });
     const current = effectivePlan(sub); // effective tier (paid while active/past_due)
+    const registry = await getPlanRegistry(prisma);
     const graceMs = loadConfig().DUNNING_GRACE_DAYS * 86_400_000;
     const graceEndsAt = sub?.pastDueSince ? new Date(sub.pastDueSince.getTime() + graceMs) : null;
     return {
@@ -116,14 +119,22 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
         sub?.status === 'expired' ||
         sub?.status === 'suspended' ||
         (sub ? isLapsed(sub) : false),
-      capabilities: PLANS[current].capabilities,
-      // The catalogue the plan-picker renders.
-      plans: PLAN_LIST.map((p) => ({
-        key: p.key,
-        name: p.name,
-        price_cents: p.priceCents,
-        paid: p.paid,
-        features: p.features,
+      capabilities: {
+        store_connections: registry[current].capabilities.storeConnections,
+        max_orders_per_month: registry[current].capabilities.maxOrdersPerMonth,
+        shipping: registry[current].capabilities.shipping,
+        shipping_cutoff: registry[current].capabilities.shippingCutoff,
+      },
+      // The catalogue the plan-picker renders — same DB rows as everything
+      // else on this response, so the advertised price_cents and the price
+      // Checkout charges (resolved from the same active plan_price row in
+      // POST /api/brand/billing/subscribe) can never disagree.
+      plans: PLAN_KEYS.map((key) => ({
+        key: registry[key].key,
+        name: registry[key].name,
+        price_cents: registry[key].priceCents,
+        paid: registry[key].paid,
+        features: registry[key].features,
       })),
     };
   });

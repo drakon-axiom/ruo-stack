@@ -5,7 +5,6 @@ import {
   OrderCreateSchema,
   OrderEditSchema,
   OrderQuoteSchema,
-  PLANS,
   wholesaleFieldFor,
 } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
@@ -15,6 +14,7 @@ import { effectivePlan } from '../services/subscription.ts';
 import { getWalletSummary, lockBrandWallet } from '../services/wallet.ts';
 import { applyOrderEdit } from '../services/order-edit.ts';
 import { deriveParcel, loadShippingRules, orderBoxFields, priceShipping, resolveShippingPricing, type ParcelProduct } from '../services/shipping.ts';
+import { getPlanRegistry } from '../services/plan-registry.ts';
 import { loadConfig } from '../config.ts';
 import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
@@ -43,15 +43,16 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
       select: { plan: true, status: true, currentPeriodEnd: true },
     });
     const plan = effectivePlan(sub);
+    const registry = await getPlanRegistry(prisma);
 
     // Starter plan: 20 orders / calendar month.
-    const cap = PLANS[plan].capabilities.maxOrdersPerMonth;
+    const cap = registry[plan].capabilities.maxOrdersPerMonth;
     if (cap !== null) {
       const used = await prisma.order.count({
         where: { brandId, createdAt: { gte: startOfMonth() }, status: { not: 'cancelled' } },
       });
       if (used >= cap) {
-        throw Conflict('order_cap_reached', `Your ${PLANS[plan].name} plan is limited to ${cap} orders/month — upgrade for more`);
+        throw Conflict('order_cap_reached', `Your ${registry[plan].name} plan is limited to ${cap} orders/month — upgrade for more`);
       }
     }
 
@@ -87,7 +88,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     const pricing = await resolveShippingPricing(prisma, brandId);
     const rules = await loadShippingRules(prisma);
     const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
-    const shipQuote = await priceShipping(plan, parcel, { toZip: body.zip, toState: body.state }, body.service_code, pricing, rules.mappings);
+    const shipQuote = await priceShipping(prisma, plan, parcel, { toZip: body.zip, toState: body.state }, body.service_code, pricing, rules.mappings);
     const shipping = shipQuote.chosen.amountCents; // brand cost = carrier + pick-&-pack
     const walletCharge = wholesaleTotal + shipping;
 
@@ -161,7 +162,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
     const pricing = await resolveShippingPricing(prisma, brandId);
     const rules = await loadShippingRules(prisma);
     const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
-    const q = await priceShipping(plan, parcel, { toZip: body.zip, toState: body.state }, undefined, pricing, rules.mappings);
+    const q = await priceShipping(prisma, plan, parcel, { toZip: body.zip, toState: body.state }, undefined, pricing, rules.mappings);
     return {
       plan,
       wholesale_cents: wholesale,

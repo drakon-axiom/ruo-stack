@@ -84,6 +84,13 @@ export const EnvSchema = z.object({
   SHIPPING_BOX_FILL_FACTOR: z.coerce.number().min(0.1).max(1).default(0.85),
   // Carrier-rate cache TTL (seconds) — short, so checkout never hammers the rater.
   RATE_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  // plan-registry.ts cache TTL (seconds). The API runs as a single PM2 fork
+  // (ecosystem.config.cjs:41-46, instances: 1, exec_mode: 'fork'), so
+  // explicit invalidatePlanRegistry() calls from admin plan writes are exact
+  // today — every request hits the same process. This TTL is the safety net
+  // for if that topology ever changes (multiple forks/instances), not the
+  // primary invalidation path.
+  PLAN_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   // RateQuote validity (seconds) — covers checkout → order-import; reserve uses it.
   RATE_QUOTE_TTL_SECONDS: z.coerce.number().int().positive().default(1800),
   // How often the API sweeps expired RateQuote rows. Default hourly.

@@ -1,7 +1,6 @@
 import type { PrismaClient, ServiceMapping } from '@ruostack/db';
 import {
   FLAT_FALLBACK,
-  PLANS,
   priceOption,
   type PlanKey,
   type PricedRateOption,
@@ -10,6 +9,7 @@ import {
 import { loadConfig } from '../config.ts';
 import { cachedQuoteRates } from './rate-cache.ts';
 import { computeParcel, curateRates } from './fulfillment-rules.ts';
+import { getPlanRegistry } from './plan-registry.ts';
 
 // Parcel + rules-engine helpers live in fulfillment-rules; re-exported so existing
 // importers keep a stable path.
@@ -44,6 +44,7 @@ export async function resolveShippingPricing(db: PrismaClient, brandId: string):
  * order can always be priced and checkout never blocks.
  */
 export async function priceShipping(
+  db: PrismaClient,
   plan: PlanKey,
   parcel: { weightOz: number; lengthIn: number; widthIn: number; heightIn: number },
   dest: { toZip: string; toState: string },
@@ -54,7 +55,8 @@ export async function priceShipping(
   const pp: ShippingPricing = pricing ?? { pickpackCents: loadConfig().SHIPPING_PICKPACK_FEE_CENTS, markupCents: 0 };
   const flat = priceOption(FLAT_FALLBACK, pp, true);
 
-  if (PLANS[plan].capabilities.shipping === 'flat') {
+  const registry = await getPlanRegistry(db);
+  if (registry[plan].capabilities.shipping === 'flat') {
     return { source: 'flat', options: [flat], chosen: flat };
   }
 

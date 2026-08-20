@@ -1,7 +1,8 @@
 import type { PrismaClient } from '@ruostack/db';
-import { AUDIT_ACTIONS, PLANS, type EmailAdapter, type PlanKey } from '@ruostack/shared';
+import { AUDIT_ACTIONS, type EmailAdapter, type PlanKey } from '@ruostack/shared';
 import { writeAudit } from '../audit.ts';
 import { upsertSubscriptionState } from './subscription.ts';
+import { getPlanRegistry } from './plan-registry.ts';
 
 /**
  * Membership dunning (§9 billing): a failed payment puts the subscription
@@ -37,12 +38,13 @@ export async function sweepDunning(prisma: PrismaClient, email: EmailAdapter, su
     where: { status: 'past_due' },
     select: { brandId: true, plan: true, pastDueSince: true, dunningNotifiedAt: true },
   });
+  const registry = await getPlanRegistry(prisma);
 
   let notified = 0;
   let expired = 0;
   for (const s of pastDue) {
     const to = await ownerEmail(prisma, supabase, s.brandId).catch(() => null);
-    const planName = PLANS[s.plan as PlanKey].name;
+    const planName = registry[s.plan as PlanKey].name;
 
     // 1. One payment-failed notice on first sight.
     if (!s.dunningNotifiedAt) {

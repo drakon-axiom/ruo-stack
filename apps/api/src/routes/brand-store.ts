@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { BrandStoreConnection } from '@ruostack/db';
 import { z } from 'zod';
-import { AUDIT_ACTIONS, CommitRequestSchema, PLANS, PreflightRequestSchema } from '@ruostack/shared';
+import { AUDIT_ACTIONS, CommitRequestSchema, PreflightRequestSchema } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
 import { loadConfig } from '../config.ts';
 import { writeAudit } from '../audit.ts';
 import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
 import { effectivePlan } from '../services/subscription.ts';
+import { getPlanRegistry } from '../services/plan-registry.ts';
 import { randomToken } from '../crypto.ts';
 import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.ts';
 import { buildProductCsv, type ProvisionProduct } from '../services/store-provision.ts';
@@ -31,7 +32,8 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
 
   async function planAllowsStore(brandId: string): Promise<boolean> {
     const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true, currentPeriodEnd: true } });
-    return PLANS[effectivePlan(sub)].capabilities.storeConnections;
+    const registry = await getPlanRegistry(prisma);
+    return registry[effectivePlan(sub)].capabilities.storeConnections;
   }
 
   async function requireConnection(brandId: string): Promise<BrandStoreConnection> {
