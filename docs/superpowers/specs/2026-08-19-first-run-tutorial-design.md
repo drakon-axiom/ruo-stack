@@ -86,27 +86,45 @@ profile: {
 No new GET endpoint. `Account.tsx:39` already calls `/api/brand/me`, so this is the established
 place for per-user state.
 
-**`POST /api/brand/onboarding/complete`** — new, idempotent:
+**`POST /api/brand/onboarding/complete`** — new, idempotent. The logic lives in a service
+function rather than inline in the route, because brand routes cannot be driven over HTTP in tests
+(see Testing) — a service function can be.
+
+New file `apps/api/src/services/onboarding.ts`, following the shape of the existing
+`services/subscription.ts` and `services/wallet.ts`:
 
 ```ts
-app.post('/api/brand/onboarding/complete', { preHandler: requireBrand }, async (req) => {
-  const { userId } = req.brand!;
-  const profile = await prisma.userProfile.findUnique({ where: { id: userId } });
+export async function completeOnboarding(prisma: PrismaClient, userId: string): Promise<Date> {
+  const profile = await prisma.userProfile.findUnique({
+    where: { id: userId },
+    select: { onboardingCompletedAt: true },
+  });
   if (!profile) throw NotFound('Account not found');
-  if (profile.onboardingCompletedAt) {
-    return { onboarding_completed_at: profile.onboardingCompletedAt };
-  }
+  if (profile.onboardingCompletedAt) return profile.onboardingCompletedAt;
   const updated = await prisma.userProfile.update({
     where: { id: userId },
     data: { onboardingCompletedAt: new Date() },
   });
-  return { onboarding_completed_at: updated.onboardingCompletedAt };
+  return updated.onboardingCompletedAt!;
+}
+```
+
+The route is a thin wrapper in `brand.ts`:
+
+```ts
+app.post('/api/brand/onboarding/complete', { preHandler: requireBrand }, async (req) => {
+  const at = await completeOnboarding(prisma, req.brand!.userId);
+  return { onboarding_completed_at: at };
 });
 ```
 
 The early return is what makes replay safe: a user who replays the tour from Account and dismisses
 it does not overwrite their original completion time, so the analytics value of the column
 survives.
+
+`requireBrand`, not `requireBrandSurface`. The surface gate distinguishes owner from staff on
+brand-wide resources; onboarding state is per-user, so a staff member must be able to dismiss
+their own tour.
 
 Not written to `AuditLog`. That table records sensitive brand actions — profile edits, member
 role changes, email changes. Dismissing a tour is not one, and adding it would dilute the audit
@@ -198,18 +216,30 @@ complete, so the explainer stays reachable indefinitely.
 
 ## Testing
 
-**API integration test** — `apps/api/test/integration/brand-onboarding.test.ts`:
+**Brand routes cannot be driven over HTTP in this repo.** A brand token is minted by Supabase and
+verified against its JWKS, so no test can produce a valid one — `brand-members.test.ts:7-11` says
+so explicitly, and `security.test.ts:154` only ever hits `/api/brand/me` to assert that a *wrong*
+token is rejected. Positive-path brand coverage is written against Prisma and the service layer
+instead. This is why `completeOnboarding` is a service function rather than inline route code.
 
-- `GET /api/brand/me` returns `onboarding_completed_at: null` for a fresh profile.
-- `POST /api/brand/onboarding/complete` sets the timestamp, and a subsequent `GET` reflects it.
-- Calling POST a second time returns the *original* timestamp unchanged — the idempotency
-  guarantee that makes replay safe.
-- Both routes reject an unauthenticated request.
+**API integration test** — `apps/api/test/integration/brand-onboarding.test.ts`, following the
+`brand-members.test.ts` shape (self-skips unless `RUN_DB_TESTS=1`, seeds its own brand + profile,
+cleans up in `afterAll`):
+
+- A freshly created `UserProfile` has `onboardingCompletedAt === null`.
+- `completeOnboarding(prisma, userId)` sets it, and a re-read reflects the same instant.
+- Calling `completeOnboarding` a second time returns the *original* timestamp unchanged — the
+  idempotency guarantee that makes replay safe.
+- `completeOnboarding` on an unknown user id throws `NotFound`.
+- `POST /api/brand/onboarding/complete` with no Authorization header is rejected (401/403), via
+  `app.inject` — the one thing that genuinely needs the HTTP layer, and the one thing it can do
+  without a real token.
 
 **No frontend unit tests.** `apps/brand-web` has no test runner today, and this change does not
-introduce one. The consequence is explicit: the first-run gating, the dismissal-persists path, and
-the stays-closed-on-second-login path are covered by manual QA only, and a regression in any of
-them will not be caught by `pnpm test`.
+introduce one. The consequence is explicit: slide navigation, the first-run gating, the
+dismissal-persists path, and the stays-closed-on-second-login path are covered by manual QA only,
+and a regression in any of them will not be caught by `pnpm test`. `pnpm typecheck` is the only
+automated gate on the three new frontend files.
 
 Manual QA checklist before merge:
 
