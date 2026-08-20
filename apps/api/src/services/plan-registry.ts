@@ -22,6 +22,13 @@ import { loadConfig } from '../config.ts';
  * process holding this cache. The TTL exists as a safety net in case that
  * topology ever changes (multiple forks/instances), not as the primary
  * invalidation path.
+ *
+ * NEVER pass a transaction client (the `tx` handed into `db.$transaction(async
+ * (tx) => ...)`) on a path that expects caching — `getPlanRegistry()` detects
+ * one and always resolves fresh, without joining the shared in-flight fetch
+ * or writing to the process-wide cache, specifically so an uncommitted (and
+ * possibly soon-to-be-rolled-back) read from inside a transaction can never
+ * get cached for every other request for the rest of the TTL.
  */
 
 export interface ResolvedPlanCapabilities {
@@ -98,7 +105,34 @@ async function loadRegistry(db: PrismaClient): Promise<PlanRegistry> {
     };
   }
 
-  return out;
+  // Freeze deeply: `cache.data` is handed to every caller BY REFERENCE for up
+  // to PLAN_CACHE_TTL_SECONDS, and its arrays (features, ...) would otherwise
+  // reach the wire (brand-billing.ts) unprotected. One `registry.pro.features
+  // .push(...)` anywhere downstream would poison every request for the rest
+  // of the TTL. Freezing turns that class of bug into an immediate TypeError
+  // (or a silent no-op in non-strict code) instead of shared, invisible drift.
+  return deepFreeze(out);
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const v of Object.values(value as Record<string, unknown>)) deepFreeze(v);
+  }
+  return value;
+}
+
+/**
+ * Best-effort detection of a Prisma interactive-transaction client. A real
+ * `PrismaClient` exposes `$connect`/`$disconnect`/`$on`/`$transaction`/
+ * `$extends`; Prisma's own `ITXClientDenyList` strips exactly those five off
+ * the client it hands into `db.$transaction(async (tx) => ...)`. Checking for
+ * `$transaction` is enough to tell the two apart — not airtight against a
+ * deliberately-shaped mock, but cheap, and it catches the dangerous case this
+ * guards against (see module doc comment).
+ */
+function isTransactionClient(db: PrismaClient): boolean {
+  return typeof (db as unknown as { $transaction?: unknown }).$transaction !== 'function';
 }
 
 /**
@@ -108,6 +142,17 @@ async function loadRegistry(db: PrismaClient): Promise<PlanRegistry> {
  */
 export async function getPlanRegistry(db: PrismaClient): Promise<PlanRegistry> {
   if (cache && cache.expiresAt > Date.now()) return cache.data;
+
+  if (isTransactionClient(db)) {
+    // Resolve fresh every time, outside the cache/in-flight machinery
+    // entirely: joining another caller's in-flight promise would return
+    // THEIR client's committed view instead of this transaction's own
+    // in-progress state, and caching this read would publish
+    // possibly-uncommitted rows to every other request for the rest of the
+    // TTL — including past a rollback.
+    return loadRegistry(db);
+  }
+
   if (inFlight) return inFlight;
 
   const myEpoch = epoch;

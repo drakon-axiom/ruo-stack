@@ -1,20 +1,26 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@ruostack/db';
 import { getPrisma } from '@ruostack/db';
-import { PLAN_KEYS } from '@ruostack/shared';
-import { getPlanRegistry, invalidatePlanRegistry } from '../../src/services/plan-registry.ts';
+import { PLAN_KEYS, PLANS } from '@ruostack/shared';
+import { getPlanRegistry, invalidatePlanRegistry, type ResolvedPlan } from '../../src/services/plan-registry.ts';
+import { buyablePlanCatalog } from '../../src/routes/brand-billing.ts';
 
 /**
  * plan-registry.ts is the switchover: every backend consumer that used to
- * read the `PLANS` constant now awaits `getPlanRegistry(db)`. Two groups of
- * tests here:
+ * read the `PLANS` constant now awaits `getPlanRegistry(db)`. Three groups
+ * of tests here:
  *
  * 1. Unit tests against a synthetic, in-memory `plan.findMany` — no real DB
  *    write, so no snapshot/restore is needed. These prove the registry's own
  *    contract: throws on a missing tier, never fabricates a price for an
- *    unconfigured paid plan, and the memoization/stampede-guard/invalidation
- *    behaviour.
- * 2. One DB-integration test (RUN_DB_TESTS=1) proving the exact invariant
+ *    unconfigured paid plan, resolves prices that disagree with plans.ts
+ *    (proving there's no fallback to it), the memoization/stampede-guard/
+ *    invalidation behaviour, that the resolved data is frozen, and that a
+ *    transaction-shaped client never pollutes the process-wide cache.
+ * 2. `buyablePlanCatalog` (brand-billing.ts) — the presentation-boundary
+ *    filter that keeps an unconfigured paid tier off the wire instead of
+ *    rendering a live $0 purchase card.
+ * 3. One DB-integration test (RUN_DB_TESTS=1) proving the exact invariant
  *    the original bug violated: the price a plan card displays and the
  *    price/stripe_price_id Checkout would charge come from the SAME active
  *    plan_price row. Strictly READ-ONLY against `plan`/`plan_price` — it
@@ -49,8 +55,31 @@ function fakeRow(overrides: Partial<FakeRow> & Pick<FakeRow, 'key'>): FakeRow {
 
 /** Builds a minimal fake DB whose `plan.findMany` answers from a fixed row
  *  set (ignoring the `include`/`where` shape callers pass, exactly like the
- *  real query would apply it) and counts how many times it was called. */
+ *  real query would apply it) and counts how many times it was called.
+ *  Deliberately carries a `$transaction` stub so `isTransactionClient()`
+ *  classifies it as a normal (cacheable) client, same as the real
+ *  PrismaClient — without this, every synthetic fake here would look like a
+ *  Prisma interactive-transaction client (which also lacks `$transaction`)
+ *  and the memoization/stampede tests below would silently stop caching. */
 function fakeDbFrom(rows: FakeRow[]): { db: PrismaClient; callCount: () => number } {
+  let calls = 0;
+  const db = {
+    plan: {
+      findMany: async () => {
+        calls++;
+        return rows;
+      },
+    },
+    $transaction: async () => undefined,
+  } as unknown as PrismaClient;
+  return { db, callCount: () => calls };
+}
+
+/** A client shaped like the one Prisma hands into `db.$transaction(async (tx)
+ *  => ...)` — no `$transaction` of its own (Prisma's `ITXClientDenyList`
+ *  strips it, along with `$connect`/`$disconnect`/`$on`/`$extends`, off the
+ *  callback client). Used to prove getPlanRegistry() never caches through it. */
+function fakeTxDbFrom(rows: FakeRow[]): { db: PrismaClient; callCount: () => number } {
   let calls = 0;
   const db = {
     plan: {
@@ -92,6 +121,26 @@ describe('plan registry (unit, synthetic data)', () => {
     expect(registry.pro.priceCents).toBe(0);
     // brand-billing.ts reads exactly this field to throw plan_price_unconfigured
     // at subscribe time — same behaviour as today when the env var is unset.
+  });
+
+  it('resolves priceCents/stripePriceId from the plan_price row even when they disagree with plans.ts — proves there is no fallback', async () => {
+    // 5900 is deliberately NOT plans.ts's Pro price (4900). Today Stripe and
+    // plans.ts happen to agree in this environment, so a regressed
+    // implementation reading `activePrice ? PLANS[key].priceCents : 0` would
+    // pass every other test in this file undetected — it would only produce
+    // a wrong number where the two sources actually differ, which is exactly
+    // what this fixture manufactures.
+    expect(5900).not.toBe(PLANS.pro.priceCents);
+    const { db } = fakeDbFrom([
+      fakeRow({ key: 'starter', prices: [{ priceCents: 0, stripePriceId: null }] }),
+      fakeRow({ key: 'pro', prices: [{ priceCents: 5900, stripePriceId: 'price_x' }] }),
+      fakeRow({ key: 'volume', prices: [{ priceCents: 14900, stripePriceId: 'price_y' }] }),
+    ]);
+
+    const registry = await getPlanRegistry(db);
+    expect(registry.pro.priceCents).toBe(5900);
+    expect(registry.pro.priceCents).not.toBe(PLANS.pro.priceCents);
+    expect(registry.pro.stripePriceId).toBe('price_x');
   });
 
   it('returns the same cached object on repeat calls within the TTL, issuing only one query', async () => {
@@ -138,6 +187,92 @@ describe('plan registry (unit, synthetic data)', () => {
     expect(callCount()).toBe(1);
     expect(x).toBe(y);
     expect(y).toBe(z);
+  });
+
+  it('the cached registry is deeply frozen — a downstream mutation cannot poison it for the rest of the TTL', async () => {
+    const { db } = fakeDbFrom([
+      fakeRow({ key: 'starter' }),
+      fakeRow({ key: 'pro', features: ['a feature'] }),
+      fakeRow({ key: 'volume' }),
+    ]);
+
+    const registry = await getPlanRegistry(db);
+    expect(Object.isFrozen(registry)).toBe(true);
+    expect(Object.isFrozen(registry.pro)).toBe(true);
+    expect(Object.isFrozen(registry.pro.capabilities)).toBe(true);
+    expect(Object.isFrozen(registry.pro.features)).toBe(true);
+    // ESM modules run in strict mode — mutating a frozen object throws
+    // rather than silently no-op'ing.
+    expect(() => registry.pro.features.push('injected')).toThrow(TypeError);
+  });
+
+  it('a transaction-shaped client (no $transaction of its own) resolves fresh every time and never populates the shared cache', async () => {
+    const rows = [
+      fakeRow({ key: 'starter', prices: [{ priceCents: 0, stripePriceId: null }] }),
+      fakeRow({ key: 'pro', prices: [{ priceCents: 4900, stripePriceId: 'price_pro' }] }),
+      fakeRow({ key: 'volume', prices: [{ priceCents: 14900, stripePriceId: 'price_volume' }] }),
+    ];
+    const { db: txDb, callCount: txCalls } = fakeTxDbFrom(rows);
+
+    const a = await getPlanRegistry(txDb);
+    const b = await getPlanRegistry(txDb);
+    expect(txCalls()).toBe(2); // no caching, no in-flight sharing — every call re-queries
+    expect(b).not.toBe(a);
+    expect(b).toEqual(a); // same data, just never the same cached object
+
+    // And it never wrote to the process-wide cache: the next NORMAL client
+    // call still has to query fresh (not "isn't the state a tx client saw").
+    const { db: normalDb, callCount: normalCalls } = fakeDbFrom(rows);
+    const c = await getPlanRegistry(normalDb);
+    const d = await getPlanRegistry(normalDb);
+    expect(normalCalls()).toBe(1); // second call served from cache, as normal
+    expect(d).toBe(c);
+  });
+});
+
+describe('buyablePlanCatalog (brand-billing.ts) — drops unbuyable paid plans off the wire', () => {
+  function resolvedPlan(overrides: Partial<ResolvedPlan> & Pick<ResolvedPlan, 'key'>): ResolvedPlan {
+    return {
+      name: overrides.key,
+      features: [],
+      paid: overrides.key !== 'starter',
+      priceCents: 0,
+      stripePriceId: null,
+      capabilities: { storeConnections: false, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' },
+      ...overrides,
+    };
+  }
+
+  it('includes every tier when every paid tier has a configured active price', () => {
+    const registry = {
+      starter: resolvedPlan({ key: 'starter', paid: false, priceCents: 0, stripePriceId: null }),
+      pro: resolvedPlan({ key: 'pro', paid: true, priceCents: 4900, stripePriceId: 'price_pro' }),
+      volume: resolvedPlan({ key: 'volume', paid: true, priceCents: 14900, stripePriceId: 'price_volume' }),
+    };
+
+    expect(buyablePlanCatalog(registry).map((p) => p.key)).toEqual(['starter', 'pro', 'volume']);
+  });
+
+  it('drops a paid tier with no active stripe price instead of showing it as a live $0 card', () => {
+    const registry = {
+      starter: resolvedPlan({ key: 'starter', paid: false, priceCents: 0, stripePriceId: null }),
+      pro: resolvedPlan({ key: 'pro', paid: true, priceCents: 0, stripePriceId: null }), // unconfigured
+      volume: resolvedPlan({ key: 'volume', paid: true, priceCents: 14900, stripePriceId: 'price_volume' }),
+    };
+
+    const catalog = buyablePlanCatalog(registry);
+    expect(catalog.map((p) => p.key)).toEqual(['starter', 'volume']);
+    expect(catalog.find((p) => p.key === 'pro')).toBeUndefined();
+  });
+
+  it('never drops starter, even though it is unpaid with no stripe price by design', () => {
+    const registry = {
+      starter: resolvedPlan({ key: 'starter', paid: false, priceCents: 0, stripePriceId: null }),
+      pro: resolvedPlan({ key: 'pro', paid: true, priceCents: 4900, stripePriceId: 'price_pro' }),
+      volume: resolvedPlan({ key: 'volume', paid: true, priceCents: 14900, stripePriceId: 'price_volume' }),
+    };
+
+    expect(buyablePlanCatalog(registry).some((p) => p.key === 'starter')).toBe(true);
   });
 });
 

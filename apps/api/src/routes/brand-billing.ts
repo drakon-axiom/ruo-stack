@@ -5,6 +5,7 @@ import {
   STATEMENT_DESCRIPTORS,
   SubscribeSchema,
   WalletTopupSchema,
+  type PlanKey,
 } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
 import { loadConfig } from '../config.ts';
@@ -13,7 +14,7 @@ import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
 import { BadRequest, NotFound } from '../errors.ts';
 import { getWalletSummary } from '../services/wallet.ts';
 import { effectivePlan, isLapsed } from '../services/subscription.ts';
-import { getPlanRegistry } from '../services/plan-registry.ts';
+import { getPlanRegistry, type ResolvedPlan } from '../services/plan-registry.ts';
 
 /**
  * Brand-facing money layer (Phase 1): Pro membership + prepaid wallet. Core never
@@ -21,6 +22,42 @@ import { getPlanRegistry } from '../services/plan-registry.ts';
  * funds are non-refundable (closed-loop). No ledger mutation happens here; the
  * wallet is only credited by the webhook receiver on confirmed payment.
  */
+
+/**
+ * The plan-picker catalogue: every tier a brand could actually subscribe to
+ * right now. Drops a paid tier whose active `plan_price` row has no
+ * `stripe_price_id` — unbuyable (Checkout would refuse it via
+ * `plan_price_unconfigured`, right above in this file) — instead of shipping
+ * it as a live, clickable "$0.00 — Choose X" card: `Account.tsx` prints
+ * `price_cents` unconditionally and wires the whole card to `onClick`, so an
+ * un-configured paid plan would otherwise advertise a real product for free
+ * and then 400 on click. An absent card can't be mispriced or clicked — the
+ * invariant becomes "every card shown is buyable at the price shown."
+ *
+ * Fixed at this presentation boundary, not inside `plan-registry.ts`
+ * itself — `getPlanRegistry()` still returns the raw, truthful state (used
+ * by orders/store/shipping/dunning, none of which should 5xx over a billing
+ * display gap). Unreachable today: the `plan_price_starter_free_ck` CHECK
+ * constraint forces a non-starter active row to carry a `stripe_price_id`.
+ * Becomes reachable once price rotation (Task 8) can leave a paid tier
+ * between an archived price and a not-yet-active new one.
+ */
+export function buyablePlanCatalog(registry: Record<PlanKey, ResolvedPlan>): {
+  key: PlanKey;
+  name: string;
+  price_cents: number;
+  paid: boolean;
+  features: string[];
+}[] {
+  return PLAN_KEYS.filter((key) => !registry[key].paid || registry[key].stripePriceId !== null).map((key) => ({
+    key: registry[key].key,
+    name: registry[key].name,
+    price_cents: registry[key].priceCents,
+    paid: registry[key].paid,
+    features: registry[key].features,
+  }));
+}
+
 export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
   const { prisma, payments, supabaseAdmin } = getClients();
 
@@ -128,14 +165,9 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
       // The catalogue the plan-picker renders — same DB rows as everything
       // else on this response, so the advertised price_cents and the price
       // Checkout charges (resolved from the same active plan_price row in
-      // POST /api/brand/billing/subscribe) can never disagree.
-      plans: PLAN_KEYS.map((key) => ({
-        key: registry[key].key,
-        name: registry[key].name,
-        price_cents: registry[key].priceCents,
-        paid: registry[key].paid,
-        features: registry[key].features,
-      })),
+      // POST /api/brand/billing/subscribe) can never disagree. Unbuyable
+      // paid tiers are dropped rather than shown at $0 — see buyablePlanCatalog.
+      plans: buyablePlanCatalog(registry),
     };
   });
 
