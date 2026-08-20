@@ -192,7 +192,9 @@ All tables get `ENABLE`/`FORCE ROW LEVEL SECURITY` with no policies, matching `m
 
 House style: `docs/superpowers/plans/2026-08-19-first-run-tutorial.md`. One commit each, sentence-case imperative, no `feat:`/`fix:` prefix. Failing test first. Migrations hand-numbered — the last is `00000000000029_onboarding_completed_at`.
 
-> **Ordering is a safety constraint.** Task 2 (`proration_behavior`) must land before any code can update a live subscription. Do not reorder.
+> **Ordering is a safety constraint.** Task 2 (`proration_behavior`) must land before any code can update a live subscription. Do not reorder that dependency.
+>
+> **Execution order is `2 → 9 → 3 → 4 → 5 → 1 → 6 → 7 → 8 → 10 → 11 → 12`**, not the numeric order below. Task 1 deletes `PLANS` while its five consumers are still reading it, so running it first would leave Tasks 1-4 on a broken build. Build the registry, rewire the consumers, then retire the constant once nothing reads it. Task 9 moves up because Tasks 4 and 8 need the fake adapter to test without touching live Stripe. Numbering below is kept as written so task briefs stay stable.
 
 **Task 1 — Reshape the shared plan vocabulary**
 `packages/shared/src/plans.ts`, `money.ts:2`. Delete `PLANS`/`PLAN_LIST`/`priceCents`/`stripePriceEnv`/`paid`/`capabilities.wholesale`. Add `PLAN_SEED`, `planLabel()`, `SHIPPING_MODES`, `ResolvedPlan`, Zod schemas. Keep `wholesaleFieldFor` untouched.
