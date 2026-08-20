@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
-import { PLAN_SEED } from '@ruostack/shared';
 import type { RetrievedPrice } from '@ruostack/shared';
 import { getClients, resetClientsForTest, setClientsForTest } from '../../src/clients.ts';
 import { FakePaymentsAdapter } from '../FakePaymentsAdapter.ts';
@@ -8,14 +7,19 @@ import { seedPaidPlan, seedStarterPlan } from '../../src/scripts/seed-plans.ts';
 import { randomToken } from '../../src/crypto.ts';
 
 // Proves Task 4's central rule: the seeded price comes from Stripe
-// (payments.retrievePrice()), never from the plans.ts display constant. The
+// (payments.retrievePrice()), never from any local display constant. The
 // fake is programmed to return an amount that deliberately differs from
-// PLAN_SEED.pro.priceCents / PLAN_SEED.volume.priceCents so the assertions can tell
-// the two apart — if the seed ever regressed to reading plans.ts, this test
-// would fail. Runs against the real (shared) database; self-skips unless
-// RUN_DB_TESTS=1.
+// seed-plans.ts's private, unexported HISTORICAL_DISPLAY_CENTS (4900 / 14900
+// — mirrored below since that constant isn't exported for a test to import;
+// `@ruostack/shared` exports no plan price at all) so the assertions can
+// tell the two apart — if the seed ever regressed to reading a hardcoded
+// display price, this test would fail. Runs against the real (shared)
+// database; self-skips unless RUN_DB_TESTS=1.
 const RUN = process.env.RUN_DB_TESTS === '1';
 const prisma = getPrisma();
+// Mirrors seed-plans.ts's private HISTORICAL_DISPLAY_CENTS — kept in sync by
+// hand since that constant is deliberately not exported (see comment above).
+const HISTORICAL_DISPLAY_CENTS = { pro: 4900, volume: 14900 } as const;
 
 /** Programmable fake: retrievePrice() answers from a map keyed by price id,
  *  instead of FakePaymentsAdapter's fixed always-0 stub. */
@@ -38,7 +42,7 @@ describe.skipIf(!RUN)('seed-plans (DB integration)', () => {
   const suffix = randomToken(6);
   const FAKE_PRO_PRICE_ID = `price_seedtest_pro_${suffix}`;
   const FAKE_VOLUME_PRICE_ID = `price_seedtest_volume_${suffix}`;
-  // Deliberately different from plans.ts (4900 / 14900) — the whole point.
+  // Deliberately different from HISTORICAL_DISPLAY_CENTS (4900 / 14900) — the whole point.
   const FAKE_PRO_CENTS = 5137;
   const FAKE_VOLUME_CENTS = 15373;
   const FAKE_PRO_PRODUCT = `prod_seedtest_pro_${suffix}`;
@@ -60,8 +64,8 @@ describe.skipIf(!RUN)('seed-plans (DB integration)', () => {
   let originalVolumeActive: { id: string; priceCents: number; stripePriceId: string | null } | null;
 
   beforeAll(async () => {
-    expect(FAKE_PRO_CENTS).not.toBe(PLAN_SEED.pro.priceCents);
-    expect(FAKE_VOLUME_CENTS).not.toBe(PLAN_SEED.volume.priceCents);
+    expect(FAKE_PRO_CENTS).not.toBe(HISTORICAL_DISPLAY_CENTS.pro);
+    expect(FAKE_VOLUME_CENTS).not.toBe(HISTORICAL_DISPLAY_CENTS.volume);
 
     const [pro, volume] = await Promise.all([
       prisma.plan.findUniqueOrThrow({ where: { key: 'pro' } }),
@@ -134,13 +138,13 @@ describe.skipIf(!RUN)('seed-plans (DB integration)', () => {
     await prisma.$disconnect();
   });
 
-  it('seeds price_cents from the payments adapter (Stripe), not from plans.ts', async () => {
+  it('seeds price_cents from the payments adapter (Stripe), not from a local display constant', async () => {
     await seedPaidPlan('pro', FAKE_PRO_PRICE_ID);
 
     const row = await prisma.planPrice.findUnique({ where: { stripePriceId: FAKE_PRO_PRICE_ID } });
     expect(row).not.toBeNull();
     expect(row!.priceCents).toBe(FAKE_PRO_CENTS);
-    expect(row!.priceCents).not.toBe(PLAN_SEED.pro.priceCents); // the assertion that proves the rule
+    expect(row!.priceCents).not.toBe(HISTORICAL_DISPLAY_CENTS.pro); // the assertion that proves the rule
     expect(row!.active).toBe(true);
     expect(row!.plan).toBe('pro');
 
@@ -154,7 +158,7 @@ describe.skipIf(!RUN)('seed-plans (DB integration)', () => {
     const row = await prisma.planPrice.findUnique({ where: { stripePriceId: FAKE_VOLUME_PRICE_ID } });
     expect(row).not.toBeNull();
     expect(row!.priceCents).toBe(FAKE_VOLUME_CENTS);
-    expect(row!.priceCents).not.toBe(PLAN_SEED.volume.priceCents);
+    expect(row!.priceCents).not.toBe(HISTORICAL_DISPLAY_CENTS.volume);
     expect(row!.active).toBe(true);
 
     const plan = await prisma.plan.findUniqueOrThrow({ where: { key: 'volume' } });

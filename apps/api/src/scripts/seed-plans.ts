@@ -1,5 +1,5 @@
 import { getPrisma } from '@ruostack/db';
-import { PLAN_SEED, PAID_PLAN_KEYS, type PaidPlanKey } from '@ruostack/shared';
+import { PAID_PLAN_KEYS, type PaidPlanKey } from '@ruostack/shared';
 import { loadConfig } from '../config.ts';
 import { getClients } from '../clients.ts';
 
@@ -7,12 +7,13 @@ import { getClients } from '../clients.ts';
  * Seeds `plan_price` (and `plan.stripe_product_id`) from Stripe — the moment
  * the new source of truth gets its initial values.
  *
- * THE PRICE COMES FROM STRIPE, NOT FROM plans.ts. `plans.ts#PLAN_SEED[tier].priceCents`
- * is the value migration 00000000000030 seeded with and has drifted from Stripe
- * before (that drift is the bug this migration closes); only Stripe actually
- * charges anyone. We read the configured price id, call `payments.retrievePrice()`,
- * and write exactly what Stripe returns. Any disagreement with `PLAN_SEED` is
- * logged loudly — it is the symptom, not noise.
+ * THE PRICE COMES FROM STRIPE, NOT FROM ANY LOCAL CONSTANT. We read the
+ * configured price id, call `payments.retrievePrice()`, and write exactly
+ * what Stripe returns. `HISTORICAL_DISPLAY_CENTS` below is checked only to
+ * log a discrepancy — it is the symptom of the original bug (a price
+ * constant that drifted from Stripe with no type error and no failing
+ * test), not a source of truth. It is not exported from `@ruostack/shared`;
+ * this script is its only reader.
  *
  * Idempotent — safe to re-run:
  *  - Paid tiers upsert on `plan_price.stripe_price_id` (unique). A second run
@@ -27,6 +28,18 @@ import { getClients } from '../clients.ts';
 const PRICE_ID_ENV: Record<PaidPlanKey, 'STRIPE_PRO_PRICE_ID' | 'STRIPE_VOLUME_PRICE_ID'> = {
   pro: 'STRIPE_PRO_PRICE_ID',
   volume: 'STRIPE_VOLUME_PRICE_ID',
+};
+
+/**
+ * The prices this project advertised before the plan registry existed —
+ * kept only so this script can log a one-time discrepancy if the configured
+ * Stripe price disagrees with what the portal used to display. Local and
+ * unexported on purpose: nothing outside this file, and nothing at runtime,
+ * may read a hardcoded plan price. `packages/shared` exports none.
+ */
+const HISTORICAL_DISPLAY_CENTS: Record<PaidPlanKey, number> = {
+  pro: 4900,
+  volume: 14900,
 };
 
 /**
@@ -55,11 +68,11 @@ export async function seedPaidPlan(tier: PaidPlanKey, priceId: string): Promise<
     );
   }
 
-  const displayCents = PLAN_SEED[tier].priceCents;
+  const displayCents = HISTORICAL_DISPLAY_CENTS[tier];
   if (displayCents !== retrieved.unitAmountCents) {
     console.warn(
-      `[seed-plans] DISCREPANCY on "${tier}": plans.ts says ${displayCents}c but Stripe price ${priceId} ` +
-        `is ${retrieved.unitAmountCents}c. Writing the Stripe value — plans.ts is a display constant, not billing truth.`,
+      `[seed-plans] DISCREPANCY on "${tier}": the historical display price was ${displayCents}c but Stripe price ` +
+        `${priceId} is ${retrieved.unitAmountCents}c. Writing the Stripe value — Stripe is billing truth.`,
     );
   }
   if (!retrieved.active) {
