@@ -20,6 +20,9 @@
 - **Icons come only from `@ruostack/ui`**, which re-exports a curated lucide set (`packages/ui/src/icons.ts`). There is no `ArrowRight` — use `ChevronRight`. Never import from `lucide-react` directly.
 - **Colours come from semantic Tailwind tokens** (`text-content`, `text-content-muted`, `text-content-faint`, `bg-canvas`, `bg-surface-2`, `border-line`, `text-accent`). Never hard-code hex or raw slate/gray classes — `pnpm lint:contrast` and `pnpm lint:legacy-classes` enforce this.
 - **Commit messages** are sentence-case imperative with no `feat:`/`fix:` prefix (e.g. "Add the onboarding completion service"). Match the existing log.
+- **DB tests need the environment sourced first.** `RUN_DB_TESTS=1` alone is not enough — the connection strings live in the gitignored `.env` at the repo root. Always prefix with `set -a && . ./.env && set +a`. Verified working: the full suite is **404 passed, 0 failed** on this branch's baseline.
+- **Targeted test runs use `exec vitest`, not `test --`.** `pnpm --filter @ruostack/api test -- <pattern>` does NOT filter; pnpm swallows the argument and runs all 45 files (~103s with the DB attached). Use `pnpm --filter @ruostack/api exec vitest run test/integration/<file>.test.ts`.
+- **`apps/brand-web` has no test runner, and this plan does not add one.** This is a decision recorded in the spec, not an oversight: the frontend tasks (4-8) are verified by `pnpm typecheck`, `pnpm build`, and the manual QA list in Task 9. Do NOT add vitest, testing-library, or test files to `apps/brand-web` — that is out of scope and will be rejected.
 - **Copy is fixed by the spec.** Slide titles and body text are given verbatim in Task 5. Do not paraphrase them.
 
 ---
@@ -232,7 +235,8 @@ describe.skipIf(!RUN)('brand onboarding completion (DB integration)', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-RUN_DB_TESTS=1 pnpm --filter @ruostack/api test -- brand-onboarding
+set -a && . ./.env && set +a
+RUN_DB_TESTS=1 pnpm --filter @ruostack/api exec vitest run test/integration/brand-onboarding.test.ts
 ```
 
 Expected: FAIL — the import of `../../src/services/onboarding.ts` cannot be resolved.
@@ -275,7 +279,8 @@ export async function completeOnboarding(prisma: PrismaClient, userId: string): 
 - [ ] **Step 4: Run the test to verify it passes**
 
 ```bash
-RUN_DB_TESTS=1 pnpm --filter @ruostack/api test -- brand-onboarding
+set -a && . ./.env && set +a
+RUN_DB_TESTS=1 pnpm --filter @ruostack/api exec vitest run test/integration/brand-onboarding.test.ts
 ```
 
 Expected: 4 passed. Not skipped.
@@ -339,7 +344,8 @@ Then add, as the last test in the block:
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-RUN_DB_TESTS=1 pnpm --filter @ruostack/api test -- brand-onboarding
+set -a && . ./.env && set +a
+RUN_DB_TESTS=1 pnpm --filter @ruostack/api exec vitest run test/integration/brand-onboarding.test.ts
 ```
 
 Expected: FAIL — the route does not exist, so Fastify returns 404 and `[401, 403]` does not contain it.
@@ -389,7 +395,8 @@ Not written to `AuditLog` — that table records sensitive brand actions (profil
 - [ ] **Step 5: Run the tests to verify they pass**
 
 ```bash
-RUN_DB_TESTS=1 pnpm --filter @ruostack/api test -- brand-onboarding
+set -a && . ./.env && set +a
+RUN_DB_TESTS=1 pnpm --filter @ruostack/api exec vitest run test/integration/brand-onboarding.test.ts
 ```
 
 Expected: 5 passed.
