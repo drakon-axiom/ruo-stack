@@ -1,11 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth.js';
 import { api } from './api.js';
 import { WelcomeTour } from '../components/WelcomeTour.js';
 
 interface OnboardingCtx {
-  /** Reopen the tour without touching server state (Account → Replay). */
+  /**
+   * Reopen the tour (Account -> Replay). Dismissing a replayed tour runs the
+   * same `dismiss` path and POSTs /api/brand/onboarding/complete again — that
+   * is safe because the server (apps/api/src/services/onboarding.ts) is
+   * idempotent and preserves the original completion timestamp rather than
+   * overwriting it.
+   */
   replay(): void;
 }
 
@@ -91,8 +97,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const replay = useCallback(() => setOpen(true), []);
 
+  const value = useMemo<OnboardingCtx>(() => ({ replay }), [replay]);
+
   return (
-    <Ctx.Provider value={{ replay }}>
+    <Ctx.Provider value={value}>
       {children}
       {eligible && <WelcomeTour open={open} firstName={firstName} onDismiss={dismiss} />}
     </Ctx.Provider>

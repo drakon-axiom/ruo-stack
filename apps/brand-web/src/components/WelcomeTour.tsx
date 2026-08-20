@@ -48,6 +48,24 @@ export function WelcomeTour({
         if (!next) onDismiss(false);
       }}
       title={slideTitle(slide, firstName)}
+      footer={
+        <div className="flex w-full items-center justify-between">
+          <Button variant="ghost" onClick={() => onDismiss(false)}>
+            Skip
+          </Button>
+          <div className="flex gap-2">
+            {index > 0 && (
+              <Button variant="ghost" icon={ChevronLeft} onClick={() => setIndex((i) => i - 1)}>
+                Back
+              </Button>
+            )}
+            <Button onClick={() => (isLast ? onDismiss(true) : setIndex((i) => i + 1))}>
+              {isLast ? 'Get started' : 'Next'}
+              <ChevronRight aria-hidden className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      }
     >
       <p className="text-sm leading-relaxed text-content-muted">{slide.body}</p>
 
@@ -66,26 +84,6 @@ export function WelcomeTour({
         <span className="text-2xs text-content-faint">
           Step {index + 1} of {WELCOME_SLIDES.length}
         </span>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between gap-2 border-t border-line pt-4">
-        <Button variant="ghost" size="sm" onClick={() => onDismiss(false)}>
-          Skip
-        </Button>
-        <div className="flex gap-2">
-          {index > 0 && (
-            <Button variant="ghost" size="sm" icon={ChevronLeft} onClick={() => setIndex((i) => i - 1)}>
-              Back
-            </Button>
-          )}
-          <Button
-            size="sm"
-            icon={ChevronRight}
-            onClick={() => (isLast ? onDismiss(true) : setIndex((i) => i + 1))}
-          >
-            {isLast ? 'Get started' : 'Next'}
-          </Button>
-        </div>
       </div>
     </Dialog>
   );
