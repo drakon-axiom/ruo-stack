@@ -27,7 +27,9 @@ export type PaymentsMethod = keyof PaymentsAdapter;
 /** One recorded invocation. `idempotencyKey` mirrors what StripeAdapter would
  *  send Stripe for the same call (see stripe-adapter.ts) so tests can assert
  *  a retry reuses the same key instead of minting a duplicate. Left
- *  undefined for calls that carry none in the real adapter (reads, cancels). */
+ *  undefined for any call the real adapter sends none for — reads and
+ *  cancels, but also archivePrice: setting a Price inactive twice is
+ *  naturally idempotent, so StripeAdapter never keys it either. */
 export interface RecordedCall {
   method: PaymentsMethod;
   args: unknown[];
@@ -162,8 +164,12 @@ export class FakePaymentsAdapter implements PaymentsAdapter {
     return { priceId: this.fakeId('price') };
   }
 
+  /** No idempotencyKey — StripeAdapter.archivePrice sends none. Setting
+   *  `active: false` twice is naturally idempotent, so the real adapter
+   *  never needed one; recording a fabricated key here would assert a
+   *  guarantee that does not exist in the real integration. */
   async archivePrice(priceId: string): Promise<void> {
-    this.record('archivePrice', [priceId], `archive:${priceId}`);
+    this.record('archivePrice', [priceId]);
   }
 
   async retrievePrice(priceId: string): Promise<RetrievedPrice> {

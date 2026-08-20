@@ -13,7 +13,7 @@ describe('FakePaymentsAdapter', () => {
     ]);
   });
 
-  it('createPrice / archivePrice derive idempotency keys the same way StripeAdapter does', async () => {
+  it('createPrice derives the idempotency key the same way StripeAdapter does; archivePrice sends none', async () => {
     const fake = new FakePaymentsAdapter();
     const { priceId } = await fake.createPrice({
       productId: 'prod_1',
@@ -25,7 +25,11 @@ describe('FakePaymentsAdapter', () => {
     });
     await fake.archivePrice(priceId);
     expect(fake.callsFor('createPrice')[0]?.idempotencyKey).toBe('price:pv_1');
-    expect(fake.callsFor('archivePrice')[0]?.idempotencyKey).toBe(`archive:${priceId}`);
+    // StripeAdapter.archivePrice calls prices.update(priceId, { active: false })
+    // with no idempotencyKey option — setting a Price inactive twice is
+    // naturally idempotent, so it never needed one. The fake must not
+    // fabricate a key the real adapter doesn't send.
+    expect(fake.callsFor('archivePrice')[0]?.idempotencyKey).toBeUndefined();
   });
 
   it('failOnCall throws on exactly the Nth call of a method and lets other calls through', async () => {
