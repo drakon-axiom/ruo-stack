@@ -1,6 +1,7 @@
 // ⚠️  THE ONLY FILE IN THE REPO THAT MAY IMPORT THE STRIPE SDK.
 // Enforced by scripts/check-stripe-imports.mjs (critical invariant #4).
 import Stripe from 'stripe';
+import { createHash } from 'node:crypto';
 import type {
   CreateCheckoutInput,
   CreatePriceInput,
@@ -265,13 +266,21 @@ export class StripeAdapter implements PaymentsAdapter {
 
 /**
  * Deterministic digest of a metadata object for idempotency-key purposes.
- * Sorted by key so `{a,b}` and `{b,a}` (same content, different insertion
- * order) digest identically, while any actual content difference changes it.
+ * `metadata` is an unconstrained `Record<string, string>`, so a naive
+ * `key=value` join is NOT injective — `{ a: '1,b=2' }` and `{ a: '1', b: '2' }`
+ * both render as the literal string "a=1,b=2" if `,`/`=` inside a key or
+ * value aren't escaped, which would collide two genuinely different
+ * metadata writes onto one idempotency key. JSON.stringify escapes both
+ * characters, and hashing collapses the result to a fixed-length, safely
+ * embeddable token. Sorted by key first so `{a,b}` and `{b,a}` (same
+ * content, different insertion order) still digest identically.
  */
 function metadataDigest(metadata: Record<string, string> | undefined): string {
   if (!metadata) return 'no-meta';
-  const sortedKeys = Object.keys(metadata).sort();
-  return sortedKeys.map((key) => `${key}=${metadata[key]}`).join(',');
+  const sortedEntries = Object.keys(metadata)
+    .sort()
+    .map((key) => [key, metadata[key]]);
+  return createHash('sha256').update(JSON.stringify(sortedEntries)).digest('hex');
 }
 
 /** Stripe event type → RUOStack NormalizedEvent (core never imports Stripe types). */

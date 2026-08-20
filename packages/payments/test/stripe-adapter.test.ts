@@ -186,6 +186,34 @@ describe('StripeAdapter.updateSubscription', () => {
 
     expect(captured[0]!.opts.idempotencyKey).not.toEqual(captured[1]!.opts.idempotencyKey);
   });
+
+  it('does not collide on adversarial metadata that would render identically under a naive key=value join', async () => {
+    // { a: '1,b=2' } and { a: '1', b: '2' } both render as the literal string
+    // "a=1,b=2" under an unescaped `${key}=${value}` join — a genuinely
+    // different metadata object must still produce a different key.
+    const a = new StripeAdapter({ secretKey: 'sk_test_dummy', webhookSecret: WEBHOOK_SECRET });
+    const captured: { id: string; params: Stripe.SubscriptionUpdateParams; opts: Stripe.RequestOptions }[] = [];
+    (a as unknown as { stripe: Stripe }).stripe.subscriptions = {
+      retrieve: async () => ({ items: { data: [{ id: 'si_existing' }] } }),
+      update: async (id: string, params: Stripe.SubscriptionUpdateParams, opts: Stripe.RequestOptions) => {
+        captured.push({ id, params, opts });
+        return { id: 'sub_1', status: 'active' };
+      },
+    } as unknown as Stripe['subscriptions'];
+
+    await a.updateSubscription('sub_1', {
+      priceId: 'price_volume',
+      prorationBehavior: 'none',
+      metadata: { a: '1,b=2' },
+    });
+    await a.updateSubscription('sub_1', {
+      priceId: 'price_volume',
+      prorationBehavior: 'none',
+      metadata: { a: '1', b: '2' },
+    });
+
+    expect(captured[0]!.opts.idempotencyKey).not.toEqual(captured[1]!.opts.idempotencyKey);
+  });
 });
 
 describe('StripeAdapter.createPrice', () => {
