@@ -274,3 +274,5 @@ Not built now; Task 8's `migration_required` guard prevents a price change from 
 7. `support` role → Plans screen is read-only; `PATCH` returns 403.
 
 **Manual gate before Phase 2 ever runs:** against a Stripe test-mode subscription, confirm `proration_behavior: 'none'` produces no invoice item and leaves the renewal date unmoved.
+
+**Billing-portal proration path — checked 2026-08-20, no action needed.** `stripe-adapter.ts:210` creates portal sessions with no `configuration`, so the account default governs. That default (`bpc_1ThLhfH9RQOremGxHATzAETC`) has `subscription_update.enabled = false`: customers cannot switch plans through the portal at all, so there is no second path around our `'none'` default. Cancel is enabled, which is how a brand reaches Starter by design. This also means archiving an old price cannot break portal plan-switching, since that feature is off. Re-check if portal plan-switching is ever enabled.
