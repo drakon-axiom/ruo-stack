@@ -91,6 +91,17 @@ export class StripeAdapter implements PaymentsAdapter {
       // leave the old plan item in place and bill both plans every cycle. Pass
       // the existing item's id so the price is swapped in place (a plan change).
       const current = await this.stripe.subscriptions.retrieve(subscriptionId);
+      // Anything other than exactly one item makes the fallback below wrong:
+      // zero items would silently fall into the ADD branch above (the exact
+      // double-billing bug the comment warns about); more than one item would
+      // swap the price onto whichever line happens to sort first while a
+      // second (add-on/metered) item keeps billing unchanged. Fail loudly
+      // instead of guessing.
+      if (current.items.data.length !== 1) {
+        throw new Error(
+          `updateSubscription: subscription ${subscriptionId} has ${current.items.data.length} items, expected exactly 1`,
+        );
+      }
       const existingItemId = current.items.data[0]?.id;
       params.items = [
         existingItemId ? { id: existingItemId, price: input.priceId } : { price: input.priceId },
@@ -98,7 +109,14 @@ export class StripeAdapter implements PaymentsAdapter {
     }
     if (input.metadata) params.metadata = input.metadata;
     const sub = await this.stripe.subscriptions.update(subscriptionId, params, {
-      idempotencyKey: `sub-upd:${subscriptionId}:${input.priceId ?? 'meta'}`,
+      // Folds every axis `params` can vary along into the key: a dry-run pass
+      // (prorationBehavior: 'none') followed by a commit pass
+      // ('create_prorations') on the same subscription/price must NOT collide
+      // — a collision either 400s (idempotency_error) or silently replays the
+      // dry-run's response and never applies the real change. Metadata is
+      // folded in via a sorted-key digest so two distinct metadata-only writes
+      // don't collide on the literal 'meta' bucket either.
+      idempotencyKey: `sub-upd:${subscriptionId}:${input.priceId ?? 'meta'}:${input.prorationBehavior ?? 'none'}:${metadataDigest(input.metadata)}`,
     });
     return { subscriptionId: sub.id, status: sub.status };
   }
@@ -243,6 +261,17 @@ export class StripeAdapter implements PaymentsAdapter {
     await this.stripe.disputes.retrieve(input.disputeId);
     // TODO(Phase 1): route to the Exceptions console + freeze affected wallet holds.
   }
+}
+
+/**
+ * Deterministic digest of a metadata object for idempotency-key purposes.
+ * Sorted by key so `{a,b}` and `{b,a}` (same content, different insertion
+ * order) digest identically, while any actual content difference changes it.
+ */
+function metadataDigest(metadata: Record<string, string> | undefined): string {
+  if (!metadata) return 'no-meta';
+  const sortedKeys = Object.keys(metadata).sort();
+  return sortedKeys.map((key) => `${key}=${metadata[key]}`).join(',');
 }
 
 /** Stripe event type → RUOStack NormalizedEvent (core never imports Stripe types). */

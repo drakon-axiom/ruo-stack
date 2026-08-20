@@ -141,6 +141,51 @@ describe('StripeAdapter.updateSubscription', () => {
 
     expect(captured[0]!.params).not.toHaveProperty('billing_cycle_anchor');
   });
+
+  it('throws instead of ADDing an item when the subscription has zero items', async () => {
+    const a = new StripeAdapter({ secretKey: 'sk_test_dummy', webhookSecret: WEBHOOK_SECRET });
+    (a as unknown as { stripe: Stripe }).stripe.subscriptions = {
+      retrieve: async () => ({ items: { data: [] } }),
+      update: async () => {
+        throw new Error('update should never be reached');
+      },
+    } as unknown as Stripe['subscriptions'];
+
+    await expect(a.updateSubscription('sub_empty', { priceId: 'price_volume' })).rejects.toThrow(
+      /sub_empty/,
+    );
+  });
+
+  it('throws instead of guessing which item to swap when the subscription has more than one item', async () => {
+    const a = new StripeAdapter({ secretKey: 'sk_test_dummy', webhookSecret: WEBHOOK_SECRET });
+    (a as unknown as { stripe: Stripe }).stripe.subscriptions = {
+      retrieve: async () => ({ items: { data: [{ id: 'si_1' }, { id: 'si_2' }] } }),
+      update: async () => {
+        throw new Error('update should never be reached');
+      },
+    } as unknown as Stripe['subscriptions'];
+
+    await expect(a.updateSubscription('sub_multi', { priceId: 'price_volume' })).rejects.toThrow(
+      /sub_multi/,
+    );
+  });
+
+  it('folds prorationBehavior into the idempotency key so a dry-run and a commit pass do not collide', async () => {
+    const a = new StripeAdapter({ secretKey: 'sk_test_dummy', webhookSecret: WEBHOOK_SECRET });
+    const captured: { id: string; params: Stripe.SubscriptionUpdateParams; opts: Stripe.RequestOptions }[] = [];
+    (a as unknown as { stripe: Stripe }).stripe.subscriptions = {
+      retrieve: async () => ({ items: { data: [{ id: 'si_existing' }] } }),
+      update: async (id: string, params: Stripe.SubscriptionUpdateParams, opts: Stripe.RequestOptions) => {
+        captured.push({ id, params, opts });
+        return { id: 'sub_1', status: 'active' };
+      },
+    } as unknown as Stripe['subscriptions'];
+
+    await a.updateSubscription('sub_1', { priceId: 'price_volume' });
+    await a.updateSubscription('sub_1', { priceId: 'price_volume', prorationBehavior: 'create_prorations' });
+
+    expect(captured[0]!.opts.idempotencyKey).not.toEqual(captured[1]!.opts.idempotencyKey);
+  });
 });
 
 describe('StripeAdapter.createPrice', () => {
@@ -178,8 +223,12 @@ describe('StripeAdapter.createPrice', () => {
     expect(Number.isInteger(params.unit_amount)).toBe(true);
     expect(params.unit_amount).toBe(4900);
     expect(params.currency).toBe('usd');
-    expect(params.recurring).toMatchObject({ interval: 'month' });
-    expect(params.tax_behavior).toBeDefined();
+    // Pinned exactly — not just "some interval": interval_count is part of the
+    // pin too, so e.g. a stray interval_count:3 (quarterly) would fail this.
+    expect(params.recurring).toEqual({ interval: 'month', interval_count: 1 });
+    // Pinned exactly — 'inclusive'/'exclusive' would silently pass a looser
+    // "is defined" check but is not the value every price generation must share.
+    expect(params.tax_behavior).toBe('unspecified');
     expect(params.product).toBe('prod_1');
   });
 
@@ -193,6 +242,16 @@ describe('StripeAdapter.createPrice', () => {
     expect(captured).toHaveLength(2);
     expect(captured[0]!.opts.idempotencyKey).toBeTruthy();
     expect(captured[0]!.opts.idempotencyKey).toEqual(captured[1]!.opts.idempotencyKey);
+  });
+
+  it('produces a DIFFERENT idempotency key for a different priceVersionId — otherwise a second plan silently receives the first plan\'s Price', async () => {
+    const a = new StripeAdapter({ secretKey: 'sk_test_dummy', webhookSecret: WEBHOOK_SECRET });
+    const captured = stubPrices(a);
+
+    await a.createPrice(input);
+    await a.createPrice({ ...input, priceVersionId: 'pv_other456' });
+
+    expect(captured[0]!.opts.idempotencyKey).not.toEqual(captured[1]!.opts.idempotencyKey);
   });
 });
 
