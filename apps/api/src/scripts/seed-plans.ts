@@ -1,5 +1,5 @@
 import { getPrisma } from '@ruostack/db';
-import { PLANS, PAID_PLAN_KEYS, type PaidPlanKey } from '@ruostack/shared';
+import { PLAN_SEED, PAID_PLAN_KEYS, type PaidPlanKey } from '@ruostack/shared';
 import { loadConfig } from '../config.ts';
 import { getClients } from '../clients.ts';
 
@@ -7,12 +7,12 @@ import { getClients } from '../clients.ts';
  * Seeds `plan_price` (and `plan.stripe_product_id`) from Stripe — the moment
  * the new source of truth gets its initial values.
  *
- * THE PRICE COMES FROM STRIPE, NOT FROM plans.ts. `plans.ts#PLANS[tier].priceCents`
- * is a display constant that has drifted from Stripe before (that drift is the bug
- * this migration closes); only Stripe actually charges anyone. We read the
- * configured price id, call `payments.retrievePrice()`, and write exactly what
- * Stripe returns. Any disagreement with `plans.ts` is logged loudly — it is the
- * symptom, not noise.
+ * THE PRICE COMES FROM STRIPE, NOT FROM plans.ts. `plans.ts#PLAN_SEED[tier].priceCents`
+ * is the value migration 00000000000030 seeded with and has drifted from Stripe
+ * before (that drift is the bug this migration closes); only Stripe actually
+ * charges anyone. We read the configured price id, call `payments.retrievePrice()`,
+ * and write exactly what Stripe returns. Any disagreement with `PLAN_SEED` is
+ * logged loudly — it is the symptom, not noise.
  *
  * Idempotent — safe to re-run:
  *  - Paid tiers upsert on `plan_price.stripe_price_id` (unique). A second run
@@ -55,7 +55,7 @@ export async function seedPaidPlan(tier: PaidPlanKey, priceId: string): Promise<
     );
   }
 
-  const displayCents = PLANS[tier].priceCents;
+  const displayCents = PLAN_SEED[tier].priceCents;
   if (displayCents !== retrieved.unitAmountCents) {
     console.warn(
       `[seed-plans] DISCREPANCY on "${tier}": plans.ts says ${displayCents}c but Stripe price ${priceId} ` +

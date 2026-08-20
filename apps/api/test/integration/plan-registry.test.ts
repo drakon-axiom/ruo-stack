@@ -1,13 +1,14 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@ruostack/db';
 import { getPrisma } from '@ruostack/db';
-import { PLAN_KEYS, PLANS } from '@ruostack/shared';
+import { PLAN_KEYS, PLAN_SEED } from '@ruostack/shared';
 import { getPlanRegistry, invalidatePlanRegistry, type ResolvedPlan } from '../../src/services/plan-registry.ts';
 import { buyablePlanCatalog } from '../../src/routes/brand-billing.ts';
 
 /**
  * plan-registry.ts is the switchover: every backend consumer that used to
- * read the `PLANS` constant now awaits `getPlanRegistry(db)`. Three groups
+ * read the `PLANS` constant (since retired — see `plans.ts#PLAN_SEED`) now
+ * awaits `getPlanRegistry(db)`. Three groups
  * of tests here:
  *
  * 1. Unit tests against a synthetic, in-memory `plan.findMany` — no real DB
@@ -124,13 +125,13 @@ describe('plan registry (unit, synthetic data)', () => {
   });
 
   it('resolves priceCents/stripePriceId from the plan_price row even when they disagree with plans.ts — proves there is no fallback', async () => {
-    // 5900 is deliberately NOT plans.ts's Pro price (4900). Today Stripe and
-    // plans.ts happen to agree in this environment, so a regressed
-    // implementation reading `activePrice ? PLANS[key].priceCents : 0` would
-    // pass every other test in this file undetected — it would only produce
-    // a wrong number where the two sources actually differ, which is exactly
-    // what this fixture manufactures.
-    expect(5900).not.toBe(PLANS.pro.priceCents);
+    // 5900 is deliberately NOT plans.ts's Pro seed price (4900). Today Stripe
+    // and PLAN_SEED happen to agree in this environment, so a regressed
+    // implementation reading `activePrice ? PLAN_SEED[key].priceCents : 0`
+    // would pass every other test in this file undetected — it would only
+    // produce a wrong number where the two sources actually differ, which is
+    // exactly what this fixture manufactures.
+    expect(5900).not.toBe(PLAN_SEED.pro.priceCents);
     const { db } = fakeDbFrom([
       fakeRow({ key: 'starter', prices: [{ priceCents: 0, stripePriceId: null }] }),
       fakeRow({ key: 'pro', prices: [{ priceCents: 5900, stripePriceId: 'price_x' }] }),
@@ -139,7 +140,7 @@ describe('plan registry (unit, synthetic data)', () => {
 
     const registry = await getPlanRegistry(db);
     expect(registry.pro.priceCents).toBe(5900);
-    expect(registry.pro.priceCents).not.toBe(PLANS.pro.priceCents);
+    expect(registry.pro.priceCents).not.toBe(PLAN_SEED.pro.priceCents);
     expect(registry.pro.stripePriceId).toBe('price_x');
   });
 
