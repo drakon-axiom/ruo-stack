@@ -1,11 +1,14 @@
 import type {
   CreateCheckoutInput,
+  CreatePriceInput,
   CreateSubscriptionInput,
   DisputeInput,
   NormalizedEvent,
   PaymentsAdapter,
   RefundCreditInput,
+  RetrievedPrice,
   SubscriptionCheckoutInput,
+  UpdateSubscriptionInput,
 } from '@ruostack/shared';
 
 /**
@@ -33,7 +36,7 @@ export class HighRiskAcquirerAdapter implements PaymentsAdapter {
   }
   updateSubscription(
     _subscriptionId: string,
-    _input: Partial<CreateSubscriptionInput>,
+    _input: UpdateSubscriptionInput,
   ): Promise<{ subscriptionId: string; status: string }> {
     return this.fail('updateSubscription');
   }
@@ -51,5 +54,14 @@ export class HighRiskAcquirerAdapter implements PaymentsAdapter {
   }
   handleDispute(_input: DisputeInput): Promise<void> {
     return this.fail('handleDispute');
+  }
+  createPrice(_input: CreatePriceInput): Promise<{ priceId: string }> {
+    return this.fail('createPrice');
+  }
+  archivePrice(_priceId: string): Promise<void> {
+    return this.fail('archivePrice');
+  }
+  retrievePrice(_priceId: string): Promise<RetrievedPrice> {
+    return this.fail('retrievePrice');
   }
 }

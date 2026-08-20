@@ -3,12 +3,15 @@
 import Stripe from 'stripe';
 import type {
   CreateCheckoutInput,
+  CreatePriceInput,
   CreateSubscriptionInput,
   DisputeInput,
   NormalizedEvent,
   PaymentsAdapter,
   RefundCreditInput,
+  RetrievedPrice,
   SubscriptionCheckoutInput,
+  UpdateSubscriptionInput,
 } from '@ruostack/shared';
 import { STATEMENT_DESCRIPTORS } from '@ruostack/shared';
 
@@ -70,9 +73,19 @@ export class StripeAdapter implements PaymentsAdapter {
 
   async updateSubscription(
     subscriptionId: string,
-    input: Partial<CreateSubscriptionInput>,
+    input: UpdateSubscriptionInput,
   ): Promise<{ subscriptionId: string; status: string }> {
-    const params: Stripe.SubscriptionUpdateParams = {};
+    // Default is 'none' — the only value that can never invent a credit/charge
+    // line item on the customer's next invoice. Stripe's own default
+    // ('create_prorations') would put a proration on EVERY plan change unless
+    // a call site remembers to opt out; that's backwards, so the safe value is
+    // the default and real prorations require an explicit opt-in.
+    // `billing_cycle_anchor` must NEVER be set here: 'now' combined with
+    // proration_behavior:'none' charges the customer the full new price today
+    // with no credit for the period already paid for — a straight double bill.
+    const params: Stripe.SubscriptionUpdateParams = {
+      proration_behavior: input.prorationBehavior === 'create_prorations' ? 'create_prorations' : 'none',
+    };
     if (input.priceId) {
       // An items[] entry WITHOUT an `id` is ADDED, not replaced — that would
       // leave the old plan item in place and bill both plans every cycle. Pass
@@ -88,6 +101,56 @@ export class StripeAdapter implements PaymentsAdapter {
       idempotencyKey: `sub-upd:${subscriptionId}:${input.priceId ?? 'meta'}`,
     });
     return { subscriptionId: sub.id, status: sub.status };
+  }
+
+  /**
+   * Create a new Price "generation" on an existing Product. Prices are
+   * immutable in Stripe — a price change is always a new Price, never a
+   * mutation of the old one. `lookup_key` + `transfer_lookup_key: true` moves
+   * the stable lookup key onto the new price atomically. `currency`,
+   * `recurring.interval`/`interval_count`, and `tax_behavior` are pinned
+   * explicitly (not left to Stripe defaults) so nothing can silently drift
+   * between one price generation and the next.
+   */
+  async createPrice(input: CreatePriceInput): Promise<{ priceId: string }> {
+    const unitAmount = Math.round(input.amountCents);
+    const price = await this.stripe.prices.create(
+      {
+        product: input.productId,
+        currency: input.currency,
+        unit_amount: unitAmount,
+        recurring: {
+          interval: input.interval,
+          interval_count: 1,
+        },
+        tax_behavior: 'unspecified',
+        lookup_key: `${input.planKey}:${input.priceVersionId}`,
+        transfer_lookup_key: true,
+        metadata: { plan_key: input.planKey, price_version_id: input.priceVersionId },
+      },
+      // Keyed on the immutable PlanPrice row id: a retry after a network
+      // timeout returns the same Stripe Price instead of minting a duplicate.
+      { idempotencyKey: `price:${input.priceVersionId}` },
+    );
+    return { priceId: price.id };
+  }
+
+  /** Deactivate a Price. Setting `active: false` on an already-inactive price is a no-op, not an error. */
+  async archivePrice(priceId: string): Promise<void> {
+    await this.stripe.prices.update(priceId, { active: false });
+  }
+
+  /** Read back a Price's current processor-side state. Used by seeding/reconciliation, never checkout. */
+  async retrievePrice(priceId: string): Promise<RetrievedPrice> {
+    const price = await this.stripe.prices.retrieve(priceId);
+    const productId = typeof price.product === 'string' ? price.product : price.product.id;
+    return {
+      productId,
+      unitAmountCents: price.unit_amount ?? 0,
+      currency: price.currency,
+      interval: (price.recurring?.interval as RetrievedPrice['interval']) ?? null,
+      active: price.active,
+    };
   }
 
   /** Pro membership signup via hosted Checkout (subscription mode). */
