@@ -55,15 +55,24 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     };
   }, [eligible, checked]);
 
-  // Forget what we learned when the session ends, so signing in as a different
-  // user re-evaluates rather than reusing the previous user's answer.
+  // Forget what we learned whenever the signed-in identity changes, not just on
+  // sign-out. Login (screens/Auth.tsx) never redirects an already-signed-in
+  // visitor away from /login, and supabase-js's signInWithPassword on top of an
+  // existing session emits SIGNED_IN with a *new* session — it never passes
+  // through SIGNED_OUT. So a user who lands back on /login while still signed in
+  // (back button, stale tab, typed URL) and signs in as someone else swaps
+  // session.user.id directly from A to B, with no falsy session in between. The
+  // old `if (!session)` guard missed that swap: `checked` and `firstName` would
+  // stay A's. Keying the dependency on the user id (rather than the session
+  // object) and resetting unconditionally whenever this effect re-runs handles
+  // both sign-out (id -> undefined) and an A -> B swap (id_A -> id_B), and, as a
+  // side benefit, no longer re-runs on a same-user token refresh (a new session
+  // object, same id) the way depending on `session` did.
   useEffect(() => {
-    if (!session) {
-      setChecked(false);
-      setOpen(false);
-      setFirstName('');
-    }
-  }, [session]);
+    setChecked(false);
+    setOpen(false);
+    setFirstName('');
+  }, [session?.user.id]);
 
   const dismiss = useCallback(
     (finished: boolean) => {
