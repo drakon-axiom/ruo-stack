@@ -234,6 +234,22 @@ Stripe calls go through a `PaymentsAdapter` parameter, not `getClients()`, so te
 **Task 9 — Test isolation from Stripe**
 `apps/api/test/FakePaymentsAdapter.ts` typed **only** against the `PaymentsAdapter` interface, so `scripts/check-stripe-imports.mjs` stays satisfied. Add a test-only injection seam to `clients.ts` (`getClients()` is currently a hard singleton with no override). Plus a vitest-level interceptor that **throws on any outbound request to `api.stripe.com`** — that interceptor is the actual guarantee; everything else is discipline.
 
+**Task 8a — Persist the subscribed price id and detect tier drift** *(added 2026-08-20 after Task 6's review; sequence after Task 8, before Task 10)*
+
+Closes a gap Tasks 7 and 8 structurally cannot: they guarantee prices *we* create land in `plan_price`, but the Stripe Dashboard is the ordinary tool for the ordinary action ("give BigBrand Volume at a negotiated $99"). Such a price is by definition absent from `plan_price`.
+
+When that price arrives on `subscription.activated` for an **existing** brand, `upsertSubscriptionState`'s update path leaves the stored tier untouched — the brand stays on the old tier. Harm, traced: `effectivePlan()` → `wholesaleFieldFor()` → the wrong `wholesale<Tier>` column → `unitWholesaleCents` **snapshotted onto every order line** (`brand-orders.ts:76-79`), so the wrong cost is baked into the immutable order record and a later tier correction does not repair history. Nothing currently detects it.
+
+Do **not** fix this by making `activated` throw. `customer.subscription.updated` with `status: 'active'` is the only event that advances `currentPeriodEnd` — there is no `invoice.paid` case in `parseWebhook`. Throwing would freeze renewals, `isLapsed()` would fire after `LAPSE_GRACE_DAYS = 3`, the sweep would set `expired`, and `effectivePlan()` would drop a **paying** brand to Starter wholesale, the 20-order cap, and flat shipping. That trades a silent overcharge for a hard entitlement outage.
+
+Instead, make the condition detectable:
+
+1. `webhook.ts` — pass `stripePriceId: event.priceId` into the upsert. It is already in hand and discarded. Task 3 added `SubscriptionState.stripePriceId` (`schema.prisma:636`, indexed `:649`) explicitly for this and nothing has written it yet — it is currently a dead column.
+2. `services/subscription.ts` — write it through on both branches, update-branch guarded like its siblings.
+3. `services/reconciliation.ts` `scanDrift()` (`:69-102`) — add a `plan_price_drift` finding for any `subscription_state` row whose `stripePriceId` has no `plan_price` match, **or** whose matching row's `plan` disagrees with the stored `plan`. The second half catches the stuck-on-old-tier case.
+
+This pulls the `plan_price_drift` finding forward from Phase 2, which is justified: Phase 2 is gated on subscribers existing, but this gap arms itself at the *first* subscriber — precisely when Phase 2 is still unbuilt.
+
 **Task 10 — The admin Plans screen**
 `apps/admin-web/src/screens/Plans.tsx`, `App.tsx` lazy route, `Shell.tsx` NavItem under **Administration** (beside Ledger & Reconciliation). Template: `ShippingRules.tsx`. `canWrite(claims.role, 'plans')` gates writes. Starter's price input is disabled with an inline explanation.
 **Price editing is a separate confirm step from the edit form** — never migrate on save. The confirm shows old → new, the delta in words ("**increase** of $10.00/mo"), the current subscriber count, and requires typing the new amount in dollars (`59.00`). Typing the value re-verifies the number that will charge people; typing a magic word verifies nothing.
