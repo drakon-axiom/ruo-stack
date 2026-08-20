@@ -13,6 +13,7 @@ import { getClients } from '../clients.ts';
 import { writeAudit } from '../audit.ts';
 import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
 import { effectivePlan } from '../services/subscription.ts';
+import { completeOnboarding } from '../services/onboarding.ts';
 import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
 const NAME_LOCK_DAYS = 7;
@@ -104,6 +105,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
         full_name: profile.fullName,
         name_last_changed_at: profile.nameLastChangedAt,
         name_editable: !profile.nameLastChangedAt || Date.now() - profile.nameLastChangedAt.getTime() >= NAME_LOCK_MS,
+        onboarding_completed_at: profile.onboardingCompletedAt,
       },
       brand: {
         id: brand.id,
@@ -119,6 +121,15 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
       },
       membership: { role: membership.role, status: membership.status },
     };
+  });
+
+  // ── First-run welcome tour ────────────────────────────────────────────────
+  // requireBrand, not requireBrandSurface: onboarding state is per-USER, so a
+  // staff member must be able to dismiss their own tour. The surface gate exists
+  // to separate owner from staff on brand-wide resources, which this is not.
+  app.post('/api/brand/onboarding/complete', { preHandler: requireBrand }, async (req) => {
+    const at = await completeOnboarding(prisma, req.brand!.userId);
+    return { onboarding_completed_at: at };
   });
 
   // ── Patch profile (7-day name lock; audited as a sensitive brand action) ──

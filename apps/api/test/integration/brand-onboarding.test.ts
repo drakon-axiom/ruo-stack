@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { getPrisma } from '@ruostack/db';
 import { randomToken } from '../../src/crypto.ts';
 import { completeOnboarding } from '../../src/services/onboarding.ts';
+import type { FastifyInstance } from 'fastify';
+import { buildApp } from '../../src/app.ts';
 
 /**
  * First-run tutorial state against a real DB. The HTTP layer can't be exercised
@@ -72,5 +74,26 @@ describe.skipIf(!RUN)('brand onboarding completion (DB integration)', () => {
     const ghost = randomUUID();
     await expect(completeOnboarding(prisma, ghost)).rejects.toThrow(/not found/i);
     expect(await prisma.userProfile.findUnique({ where: { id: ghost } })).toBeNull();
+  });
+
+  it('the completion route refuses an unauthenticated caller', async () => {
+    // The only assertion the HTTP layer can make here: a valid brand token is
+    // minted by Supabase and cannot be forged in a test, so the positive path
+    // is covered against the service above instead.
+    const app: FastifyInstance = await buildApp();
+    await app.ready();
+    try {
+      const res = await app.inject({ method: 'POST', url: '/api/brand/onboarding/complete' });
+      expect([401, 403]).toContain(res.statusCode);
+
+      const garbage = await app.inject({
+        method: 'POST',
+        url: '/api/brand/onboarding/complete',
+        headers: { authorization: 'Bearer not-a-real-jwt' },
+      });
+      expect([401, 403]).toContain(garbage.statusCode);
+    } finally {
+      await app.close();
+    }
   });
 });
