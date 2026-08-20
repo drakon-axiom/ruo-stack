@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
+import { useOnboarding } from '../lib/onboarding.js';
 import { Badge, Button, Card, Check, Input, buttonClass, cn, labelClass } from '@ruostack/ui';
 
 interface Me {
-  profile: { id: string; full_name: string; name_last_changed_at: string | null; name_editable: boolean };
+  profile: {
+    id: string;
+    full_name: string;
+    name_last_changed_at: string | null;
+    name_editable: boolean;
+    onboarding_completed_at: string | null;
+  };
   brand: {
     id: string;
     brand_name: string;
@@ -34,6 +41,7 @@ export function Account() {
   const [channel, setChannel] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const { replay } = useOnboarding();
 
   async function load() {
     const data = await api<Me>('/api/brand/me');
@@ -144,6 +152,13 @@ export function Account() {
       <Section title="Referrals">
         <p className="text-sm text-content-muted">Your referral code:</p>
         <div className="mt-1 font-mono text-lg text-accent">{me.brand.referral_code}</div>
+      </Section>
+
+      <Section title="Help">
+        <p className="mb-3 text-sm text-content-muted">
+          New to the platform? Walk through how fulfillment works again.
+        </p>
+        <Button variant="ghost" onClick={replay}>Replay welcome tour</Button>
       </Section>
     </>
   );

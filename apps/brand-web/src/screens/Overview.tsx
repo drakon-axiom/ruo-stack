@@ -88,6 +88,7 @@ export function Overview() {
   }, []);
 
   const checklistDone = data ? CHECKLIST.every((c) => data.checklist[c.key]) : true;
+  const checklistCount = data ? CHECKLIST.filter((c) => data.checklist[c.key]).length : 0;
 
   return (
     <>
@@ -129,10 +130,28 @@ export function Overview() {
 
       {data && !checklistDone && (
         <Card className="mt-5 p-5">
-          <h2 className="mb-1 text-lg font-semibold">Get started</h2>
+          <div className="mb-1 flex items-baseline justify-between gap-3">
+            <h2 className="text-lg font-semibold">Get started</h2>
+            <span className="text-xs text-content-muted">
+              {checklistCount} of {CHECKLIST.length} done
+            </span>
+          </div>
           <p className="mb-3 text-xs text-content-muted">
             A few steps to start fulfilling under your label.
           </p>
+          <div
+            className="mb-4 h-1.5 overflow-hidden rounded-full bg-line-subtle"
+            role="progressbar"
+            aria-valuenow={checklistCount}
+            aria-valuemin={0}
+            aria-valuemax={CHECKLIST.length}
+            aria-label="Setup progress"
+          >
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-pop"
+              style={{ width: `${(checklistCount / CHECKLIST.length) * 100}%` }}
+            />
+          </div>
           <div className="space-y-2">
             {CHECKLIST.map((c) => {
               const done = data.checklist[c.key];

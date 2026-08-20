@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from '@ruostack/ui';
 import { AuthProvider } from './lib/auth.js';
+import { OnboardingProvider } from './lib/onboarding.js';
 import { App } from './App.js';
 import './index.css';
 
@@ -14,7 +15,9 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider storageKey="ruostack_theme">
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <OnboardingProvider>
+            <App />
+          </OnboardingProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
