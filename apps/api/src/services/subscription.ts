@@ -10,7 +10,12 @@ import { writeAudit } from '../audit.ts';
 export interface SubscriptionUpdate {
   brandId: string;
   status: SubscriptionStateStatus;
-  /** Resolved tier (from the Stripe price). Omit to leave the existing plan. */
+  /**
+   * Resolved tier (from the Stripe price). Omit to leave the existing plan —
+   * valid ONLY when a row already exists to leave it on. On the CREATE path
+   * there is no existing plan to fall back on, so an omitted/unresolved tier
+   * throws rather than guessing (see below); it never defaults to a paid tier.
+   */
   plan?: PlanTier;
   stripeSubscriptionId?: string | null;
   price?: number; // cents
@@ -21,6 +26,22 @@ export interface SubscriptionUpdate {
 export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionUpdate): Promise<void> {
   await db.$transaction(async (tx) => {
     const existing = await tx.subscriptionState.findUnique({ where: { brandId: u.brandId }, select: { status: true } });
+
+    if (!existing && u.plan === undefined) {
+      // No row to preserve a prior tier on, and no resolvable tier from this
+      // event — the exact case `plan: u.plan ?? 'pro'` used to paper over by
+      // silently booking a brand-new subscription as Pro. Throw instead: the
+      // webhook route (webhook.ts:77-84) turns this into a `failed` row and a
+      // Stripe retry, visible in the dead-letter count via reconciliation.ts.
+      // A stuck webhook is recoverable the moment the missing plan_price row
+      // is added; a brand silently billed at the wrong wholesale tier is not.
+      throw new Error(
+        `upsertSubscriptionState: cannot create SubscriptionState for brand "${u.brandId}" — no plan tier was ` +
+          'resolved and there is no existing row to preserve one. The inbound Stripe price id was not recognized ' +
+          '(no matching plan_price row, active or archived).',
+      );
+    }
+
     // Dunning timestamps: stamp pastDueSince when ENTERING past_due (keep the
     // original on repeated failure events); clear both once payment recovers.
     const dunning: { pastDueSince?: Date | null; dunningNotifiedAt?: Date | null } =
@@ -37,7 +58,7 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
       create: {
         brandId: u.brandId,
         status: u.status,
-        plan: u.plan ?? 'pro', // a paid subscription event implies a paid tier
+        plan: u.plan!, // guaranteed defined here: the guard above throws when !existing && plan is undefined
         stripeSubscriptionId: u.stripeSubscriptionId ?? null,
         price: u.price ?? 0,
         currentPeriodEnd: u.currentPeriodEnd ?? null,
