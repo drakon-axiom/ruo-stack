@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Megaphone,
   Scale,
+  Tag,
   Sun,
   Moon,
   LogOut,
@@ -55,6 +56,7 @@ const GROUPS: NavGroup[] = [
       { to: '/audit', label: 'Audit Log', icon: ScrollText },
       { to: '/announcements', label: 'Announcements', icon: Megaphone },
       { to: '/ledger', label: 'Ledger & Reconciliation', icon: Scale },
+      { to: '/plans', label: 'Plans', icon: Tag },
     ],
   },
 ];

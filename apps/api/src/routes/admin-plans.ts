@@ -108,6 +108,63 @@ export async function adminPlanRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  // Read-only price timeline for one plan (Task 10). A separate endpoint,
+  // not a field bolted onto GET /api/admin/plans: the list route is read on
+  // every load of the Plans screen and only ever needs the one active price
+  // (the same shape every other consumer reads), while the full ledger —
+  // joined against admin_user for who and audit_log for the mandatory
+  // reason — is only useful once an operator opens one plan's history, so
+  // it is fetched lazily, per plan, on demand.
+  //
+  // Only rows that reached Step B of changePlanPrice() (a real Stripe Price
+  // was created — stripePriceId is non-null) are "a price this tier has
+  // had". A row stuck at stripePriceId: null is an abandoned PENDING
+  // attempt (Step A ran, Step B never completed) — it was never live and
+  // never charged anyone, so it does not belong in an operator-facing
+  // timeline of prices the tier actually carried.
+  app.get('/api/admin/plans/:key/history', { preHandler: requireAdmin('plans', 'view') }, async (req) => {
+    const { key } = z.object({ key: z.enum(PLAN_KEYS) }).parse(req.params);
+
+    const rows = await prisma.planPrice.findMany({
+      where: { plan: key, stripePriceId: { not: null } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const adminIds = [...new Set(rows.map((r) => r.createdBy).filter((id): id is string => id != null))];
+    const admins = adminIds.length
+      ? await prisma.adminUser.findMany({ where: { id: { in: adminIds } }, select: { id: true, fullName: true } })
+      : [];
+    const nameById = new Map(admins.map((a) => [a.id, a.fullName]));
+
+    // The mandatory `reason` lives on the audit row `changePlanPrice()`
+    // writes in the same Step C transaction that activates the row
+    // (action: planPriceChanged, targetType: 'plan_price', targetId: the
+    // plan_price row's id) — never on plan_price itself.
+    const rowIds = rows.map((r) => r.id);
+    const audits = rowIds.length
+      ? await prisma.auditLog.findMany({
+          where: { action: AUDIT_ACTIONS.planPriceChanged, targetType: 'plan_price', targetId: { in: rowIds } },
+          select: { targetId: true, reason: true },
+        })
+      : [];
+    const reasonById = new Map(audits.map((a) => [a.targetId!, a.reason]));
+
+    return {
+      plan: key,
+      history: rows.map((r) => ({
+        id: r.id,
+        price_cents: r.priceCents,
+        stripe_price_id: r.stripePriceId,
+        active: r.active,
+        created_by: r.createdBy,
+        created_by_name: r.createdBy ? (nameById.get(r.createdBy) ?? null) : null,
+        created_at: r.createdAt.toISOString(),
+        archived_at: r.archivedAt ? r.archivedAt.toISOString() : null,
+        reason: reasonById.get(r.id) ?? null,
+      })),
+    };
+  });
+
   // The price-change transaction (Task 8). See changePlanPrice() for the
   // full ordering (insert pending → Stripe → atomic commit → deferred
   // archive) and its guards (starter, unchanged price, migration_required,

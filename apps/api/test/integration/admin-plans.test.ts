@@ -103,6 +103,49 @@ describe.skipIf(!RUN)('admin plan registry surface (DB integration)', () => {
     expect(body.plans.map((p: { key: string }) => p.key).sort()).toEqual(['pro', 'starter', 'volume']);
   });
 
+  it('support (view-only) can read a plan\'s price history — read-only, gated on the same "plans" surface', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/plans/pro/history',
+      headers: { authorization: `Bearer ${supportToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.plan).toBe('pro');
+    // pro's real, live active row — this suite never writes plan_price, so
+    // it is guaranteed present without any setup here.
+    expect(Array.isArray(body.history)).toBe(true);
+    expect(body.history.length).toBeGreaterThan(0);
+    const active = body.history.find((h: { active: boolean }) => h.active);
+    expect(active).toBeTruthy();
+    expect(active.price_cents).toBe(4900);
+    expect(active.stripe_price_id).toBe('price_1ThLOYH9RQOremGxwM6k9EH0');
+    expect(active.archived_at).toBeNull();
+    // Reason comes from the plan.price_changed audit row, not plan_price itself.
+    expect(typeof active.created_at).toBe('string');
+  });
+
+  it("starter's price history is empty — it has never had a Stripe price", async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/plans/starter/history',
+      headers: { authorization: `Bearer ${financeToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.plan).toBe('starter');
+    expect(body.history).toEqual([]);
+  });
+
+  it('an unknown plan key 400s (never a bare 404 that could be mistaken for "no history")', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/plans/not-a-real-plan/history',
+      headers: { authorization: `Bearer ${financeToken}` },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('finance (write) can PATCH name/features/shipping_cutoff on starter — fully editable, no price on this route', async () => {
     const newName = `Starter Test ${randomToken(4)}`;
     const res = await app.inject({
