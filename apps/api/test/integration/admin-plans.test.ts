@@ -14,7 +14,12 @@ import { invalidatePlanRegistry, getPlanRegistry } from '../../src/services/plan
 // HARD RULE: `plan` is a live, shared table (starter/pro/volume, exactly one
 // row each) — this suite snapshots the ONE row it edits (starter — no price
 // to protect, chosen deliberately over pro/volume) in beforeAll and restores
-// it in afterAll. Never touches `plan_price`.
+// it in afterAll. This suite never WRITES `plan_price` on its own initiative,
+// but the price-history test READS it through /api/admin/plans/pro/history,
+// which depends on an active "pro" row existing — false on an empty database
+// (CI). That test conditionally seeds one (tracked in planPriceIds, same
+// seeded-vs-real cleanup polarity as plan-price.test.ts /
+// brand-subscribe-quote.test.ts) rather than assuming it.
 const RUN = process.env.RUN_DB_TESTS === '1';
 const prisma = getPrisma();
 
@@ -41,6 +46,10 @@ describe.skipIf(!RUN)('admin plan registry surface (DB integration)', () => {
   let financeAdminId: string;
   let supportToken: string;
   const adminIds: string[] = [];
+  // Tracks a throwaway "pro" plan_price row this suite seeds ONLY when none
+  // is active (empty database) — never a real row this suite deactivates or
+  // mutates, so cleanup is a plain delete, not a restore.
+  let seededProPriceId: string | undefined;
 
   let originalStarter: { name: string; features: string[]; shippingCutoff: string };
 
@@ -57,6 +66,20 @@ describe.skipIf(!RUN)('admin plan registry surface (DB integration)', () => {
 
     const starter = await prisma.plan.findUniqueOrThrow({ where: { key: 'starter' } });
     originalStarter = { name: starter.name, features: starter.features, shippingCutoff: starter.shippingCutoff };
+
+    // The price-history test reads "pro"'s active plan_price row through the
+    // route — guaranteed present on the live (already-seeded) database, but
+    // NOT on an empty one (CI: migration 030 leaves plan_price empty and
+    // ci.yml never runs seed:plans). Seed a throwaway active row only when
+    // none exists, tracked for a plain delete in afterAll (never a restore —
+    // this suite never deactivates or mutates an existing "pro" row).
+    const activePro = await prisma.planPrice.findFirst({ where: { plan: 'pro', active: true } });
+    if (!activePro) {
+      const seeded = await prisma.planPrice.create({
+        data: { plan: 'pro', priceCents: 4900, stripePriceId: `price_fixture_history_${randomToken(6)}`, active: true },
+      });
+      seededProPriceId = seeded.id;
+    }
   });
 
   afterAll(async () => {
@@ -73,6 +96,9 @@ describe.skipIf(!RUN)('admin plan registry surface (DB integration)', () => {
       },
     });
     invalidatePlanRegistry();
+    if (seededProPriceId) {
+      await prisma.planPrice.delete({ where: { id: seededProPriceId } });
+    }
     await prisma.adminUser.deleteMany({ where: { id: { in: adminIds } } }).catch(() => undefined);
     await app.close();
     await prisma.$disconnect();
@@ -104,6 +130,15 @@ describe.skipIf(!RUN)('admin plan registry surface (DB integration)', () => {
   });
 
   it('support (view-only) can read a plan\'s price history — read-only, gated on the same "plans" surface', async () => {
+    // Read the SAME row the route resolves, rather than assuming its shape:
+    // on the live database this is the real active "pro" row; on an empty
+    // one it's the throwaway fixture beforeAll seeded. Either way the route
+    // must reflect it — asserting a hardcoded 4900/price_1ThLOY… would pin
+    // this suite to the pre-reprice production fixture and break the first
+    // time "pro" is legitimately repriced, the exact class of bug the final
+    // review flagged elsewhere in this branch.
+    const activeRow = await prisma.planPrice.findFirstOrThrow({ where: { plan: 'pro', active: true } });
+
     const res = await app.inject({
       method: 'GET',
       url: '/api/admin/plans/pro/history',
@@ -112,14 +147,12 @@ describe.skipIf(!RUN)('admin plan registry surface (DB integration)', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.plan).toBe('pro');
-    // pro's real, live active row — this suite never writes plan_price, so
-    // it is guaranteed present without any setup here.
     expect(Array.isArray(body.history)).toBe(true);
     expect(body.history.length).toBeGreaterThan(0);
     const active = body.history.find((h: { active: boolean }) => h.active);
     expect(active).toBeTruthy();
-    expect(active.price_cents).toBe(4900);
-    expect(active.stripe_price_id).toBe('price_1ThLOYH9RQOremGxwM6k9EH0');
+    expect(active.price_cents).toBe(activeRow.priceCents);
+    expect(active.stripe_price_id).toBe(activeRow.stripePriceId);
     expect(active.archived_at).toBeNull();
     // Reason comes from the plan.price_changed audit row, not plan_price itself.
     expect(typeof active.created_at).toBe('string');
