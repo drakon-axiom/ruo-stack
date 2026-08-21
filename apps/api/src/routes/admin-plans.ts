@@ -6,18 +6,23 @@ import { writeAudit } from '../audit.ts';
 import { requireAdmin } from '../middleware/guards.ts';
 import { NotFound } from '../errors.ts';
 import { getPlanRegistry, invalidatePlanRegistry } from '../services/plan-registry.ts';
+import { changePlanPrice } from '../services/plan-price.ts';
 
 /**
- * Admin read/edit surface for the plan registry (`plan` table): name,
- * features, and the display-only shippingCutoff ONLY. Price is deliberately
- * NOT editable here — it lives on the append-only `plan_price` ledger and
- * needs a Stripe round-trip (new Price object, then flip active), which is
- * Task 8's own route, not this simple CRUD.
+ * Admin read/edit surface for the plan registry. `PATCH /api/admin/plans/:key`
+ * is simple CRUD over the `plan` table: name, features, and the display-only
+ * shippingCutoff. Price is a different shape entirely — it lives on the
+ * append-only `plan_price` ledger and needs a Stripe round-trip (new Price
+ * object, then flip active) — so it gets its own route,
+ * `POST /api/admin/plans/:key/price`, backed by `changePlanPrice()`
+ * (services/plan-price.ts).
  *
  * Gated on the 'plans' surface (roles.ts) — see the comment there for why
  * this is not the 'subscription' surface admin-brands.ts already uses.
- * Starter is fully editable here: it has no price to protect, and its name/
- * features/shippingCutoff are exactly as admin-owned as Pro's or Volume's.
+ * Starter is fully editable via PATCH here: it has no price to protect, and
+ * its name/features/shippingCutoff are exactly as admin-owned as Pro's or
+ * Volume's. The price route rejects starter (`starter_is_free`) — Starter
+ * has no Stripe price to change.
  */
 const PlanPatchSchema = z.object({
   name: z.string().min(1).max(120).optional(),
@@ -25,8 +30,14 @@ const PlanPatchSchema = z.object({
   shipping_cutoff: z.string().min(1).max(80).optional(),
 });
 
+const PricePatchSchema = z.object({
+  price_cents: z.number().int().min(100).max(100_000),
+  reason: z.string().min(1).max(300),
+  confirm_large_change: z.boolean().optional(),
+});
+
 export async function adminPlanRoutes(app: FastifyInstance): Promise<void> {
-  const { prisma } = getClients();
+  const { prisma, payments } = getClients();
 
   // The registry plus each plan's active price — the same read every other
   // consumer (brand-billing, dunning, shipping) gets, so what admins see
@@ -94,6 +105,34 @@ export async function adminPlanRoutes(app: FastifyInstance): Promise<void> {
       name: updated.name,
       features: updated.features,
       shipping_cutoff: updated.shippingCutoff,
+    };
+  });
+
+  // The price-change transaction (Task 8). See changePlanPrice() for the
+  // full ordering (insert pending → Stripe → atomic commit → deferred
+  // archive) and its guards (starter, unchanged price, migration_required,
+  // bounds, large-change confirmation, mandatory reason) — all of which
+  // reject before any Stripe call.
+  app.post('/api/admin/plans/:key/price', { preHandler: requireAdmin('plans', 'write') }, async (req) => {
+    const { key } = z.object({ key: z.enum(PLAN_KEYS) }).parse(req.params);
+    const body = PricePatchSchema.parse(req.body);
+
+    const result = await changePlanPrice(prisma, payments, {
+      plan: key,
+      priceCents: body.price_cents,
+      reason: body.reason,
+      confirmLargeChange: body.confirm_large_change ?? false,
+      actorId: req.admin!.adminUserId,
+      ip: req.ip,
+    });
+
+    return {
+      plan: key,
+      plan_price_id: result.planPriceId,
+      price_cents: result.priceCents,
+      stripe_price_id: result.stripePriceId,
+      previous_price_cents: result.previousPriceCents,
+      previous_stripe_price_id: result.previousStripePriceId,
     };
   });
 }
