@@ -13,20 +13,29 @@ import { changePlanPrice } from '../../src/services/plan-price.ts';
 // unless RUN_DB_TESTS=1.
 //
 // HARD RULE: `plan_price` is a live, shared table with exactly 3 rows today
-// (starter/pro/volume, all active). This suite snapshots pro's active row in
-// beforeAll and restores it in afterAll — deleting EVERY "pro" row that
-// isn't the original (by construction, not by trusting a tracked id survived
-// every assertion above it) BEFORE reactivating the original, since the
-// partial unique index allows at most one active row per plan at a time.
-// The restore is never wrapped in `.catch(() => undefined)`: a swallowed
-// failure here is exactly how a previous suite's leak went unnoticed.
-// `volume`'s active row is read-only in this suite; guard tests that need a
-// Stripe round-trip to prove a guard was actually passed script a Stripe
-// failure so nothing on volume ever activates, and delete the resulting
-// pending row themselves. This suite touches `subscription_state` only
-// inside individual guard tests, each creating and deleting its own
-// throwaway brand(s) + row(s) within a try/finally, and never creates an
-// adminUser it doesn't delete.
+// (starter/pro/volume, all active). This suite snapshots pro's AND volume's
+// active rows in beforeAll and restores BOTH the same way in afterAll —
+// deleting EVERY row for that plan that isn't the original (by construction,
+// not by trusting a tracked id survived every assertion above it) BEFORE
+// reactivating the original, since the partial unique index allows at most
+// one active row per plan at a time. The restore is never wrapped in
+// `.catch(() => undefined)`: a swallowed failure here is exactly how a
+// previous suite's leak went unnoticed.
+//
+// `volume`'s active row is meant to stay untouched in practice — guard tests
+// that need a real Stripe round-trip to prove a guard was actually passed
+// (not just trivially satisfied) script a Stripe failure so the request
+// dies before anything commits, and each cleans up its own resulting
+// pending row in a `try/finally`. But "the scripted failure never fires" is
+// exactly the case that slips past a `try/finally` and actually activates a
+// new volume row — so afterAll repairs volume by construction too, the same
+// as pro, rather than only asserting it's still correct and leaving a
+// manual fix (like the one this task needed once already) as the only
+// recovery if that assertion ever fails.
+//
+// This suite touches `subscription_state` only inside individual guard
+// tests, each creating and deleting its own throwaway brand(s) + row(s)
+// within a try/finally, and never creates an adminUser it doesn't delete.
 const RUN = process.env.RUN_DB_TESTS === '1';
 const prisma = getPrisma();
 
@@ -111,9 +120,19 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       data: { active: true, archivedAt: null },
     });
 
-    // Volume was never mutated by this suite, but assert that plainly rather
-    // than assume it — a stray write here would be exactly the kind of leak
-    // this hard rule exists to catch.
+    // Volume is meant to stay read-only in this suite, but two guard tests
+    // now round-trip a real (scripted-to-fail) createPrice call against it —
+    // each already cleans up its own pending row in try/finally, but "the
+    // scripted failure never fires" is exactly the scenario that would slip
+    // past a try/finally and actually commit. Rather than leaving that case
+    // as assert-only (loud failure here, then the same manual repair this
+    // task needed once already), give volume the same belt-and-braces sweep
+    // as pro: repair by construction, not just detect.
+    await prisma.planPrice.deleteMany({ where: { plan: 'volume', id: { not: originalVolumeActive.id } } });
+    await prisma.planPrice.update({
+      where: { id: originalVolumeActive.id },
+      data: { active: true, archivedAt: null },
+    });
     const volumeNow = await prisma.planPrice.findUniqueOrThrow({ where: { id: originalVolumeActive.id } });
     expect(volumeNow.active).toBe(true);
     expect(volumeNow.archivedAt).toBeNull();
@@ -363,27 +382,36 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       // legitimate large change forever, silently, with nothing here to
       // catch it. Script a Stripe failure so the call dies at Stripe (not
       // at the guard, and not with a real commit to volume needing restore).
+      //
+      // try/finally, matching the churned-brand guard test above: `volume`
+      // has NO restore path in afterAll (see its header comment) — if the
+      // scripted failure ever failed to fire, an un-guarded cleanup here
+      // would leave volume's live shared row permanently repriced to 5000c
+      // with nothing to catch or repair it.
       const callsBefore = fake.calls.length;
-      fake.failNextCall('createPrice');
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/admin/plans/volume/price',
-        headers: { authorization: `Bearer ${financeToken}` },
-        payload: {
-          price_cents: 5000,
-          reason: 'Task 8 test: confirmed large change, scripted Stripe failure',
-          confirm_large_change: true,
-        },
-      });
+      try {
+        fake.failNextCall('createPrice');
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/admin/plans/volume/price',
+          headers: { authorization: `Bearer ${financeToken}` },
+          payload: {
+            price_cents: 5000,
+            reason: 'Task 8 test: confirmed large change, scripted Stripe failure',
+            confirm_large_change: true,
+          },
+        });
 
-      expect(res.statusCode).toBe(500); // died at Stripe, not at the guard (which 409s)
-      expect(fake.calls.length).toBe(callsBefore + 1);
-      expect(fake.calls[fake.calls.length - 1]!.method).toBe('createPrice');
-
-      // Clean up the resulting pending row for volume — never activated.
-      await prisma.planPrice.deleteMany({
-        where: { plan: 'volume', priceCents: 5000, active: false, stripePriceId: null },
-      });
+        expect(res.statusCode).toBe(500); // died at Stripe, not at the guard (which 409s)
+        expect(fake.calls.length).toBe(callsBefore + 1);
+        expect(fake.calls[fake.calls.length - 1]!.method).toBe('createPrice');
+      } finally {
+        // Clean up the resulting pending row for volume — never activated,
+        // regardless of which assertion above did or didn't run.
+        await prisma.planPrice.deleteMany({
+          where: { plan: 'volume', priceCents: 5000, active: false, stripePriceId: null },
+        });
+      }
     });
 
     it('price_cents out of bounds -> 400, rejected by validation before the handler runs', async () => {
