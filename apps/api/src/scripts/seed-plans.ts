@@ -164,12 +164,51 @@ function usage(): string {
  * `--volume` — so a new paid tier automatically requires (and gets a usage
  * line for) its own flag here with nothing else to update.
  *
- * Fails loudly, before any Stripe call, on either problem a bad invocation
- * can have: a missing tier (would leave that tier with no active price —
- * `plan_price_unconfigured` at checkout) or a malformed one (a typo'd or
- * transposed argument). Never skips a tier silently.
+ * Fails loudly, before any Stripe call, on any problem a bad invocation can
+ * have. A bootstrap script silently misreading its arguments is worse than
+ * one that rejects them, so this rejects — rather than guesses at — every
+ * shape it doesn't recognise:
+ *  - a missing tier (would leave that tier with no active price —
+ *    `plan_price_unconfigured` at checkout);
+ *  - a malformed price id (a typo'd or transposed argument);
+ *  - a repeated flag (`--pro a --pro b`) — `indexOf` would silently keep
+ *    only the first occurrence, so a user "correcting" a typo by pasting a
+ *    second `--pro` would silently seed the stale first value instead;
+ *  - an unrecognised `--`-prefixed token — silently ignoring it would let a
+ *    user believe an argument took effect when it did nothing;
+ *  - the `--pro=price_x` equals form — not accepted (see below), rejected
+ *    with a specific message rather than the generic "missing" one.
+ * Never skips a tier silently.
  */
 export function parsePriceIdArgs(argv: readonly string[]): Record<PaidPlanKey, string> {
+  const knownFlags = new Set(PAID_PLAN_KEYS.map((tier) => `--${tier}`));
+  const flagCounts = new Map<string, number>();
+
+  // First pass: reject anything that isn't exactly one of the known flags in
+  // the accepted space-separated form, before looking at any value.
+  for (const token of argv) {
+    if (!token.startsWith('--')) continue; // a value, not a flag
+    const eq = token.indexOf('=');
+    const flagPart = eq === -1 ? token : token.slice(0, eq);
+    if (eq !== -1 && knownFlags.has(flagPart)) {
+      // `--pro=price_x` looks intentional (the flag name is right there) but
+      // isn't parsed — say so explicitly instead of reporting it as missing.
+      throw new Error(
+        `[seed-plans] "${flagPart}=..." is not supported — pass the value as a separate argument: ` +
+          `${flagPart} <stripe_price_id>.\n${usage()}`,
+      );
+    }
+    if (!knownFlags.has(token)) {
+      throw new Error(`[seed-plans] Unrecognized argument "${token}".\n${usage()}`);
+    }
+    flagCounts.set(token, (flagCounts.get(token) ?? 0) + 1);
+  }
+  for (const [flag, count] of flagCounts) {
+    if (count > 1) {
+      throw new Error(`[seed-plans] ${flag} was passed ${count} times — pass each price id exactly once.\n${usage()}`);
+    }
+  }
+
   const priceIds = {} as Record<PaidPlanKey, string>;
   for (const tier of PAID_PLAN_KEYS) {
     const flag = `--${tier}`;
