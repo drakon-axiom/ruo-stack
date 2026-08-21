@@ -264,6 +264,10 @@ This pulls the `plan_price_drift` finding forward from Phase 2, which is justifi
 **Task 12 — Retire the price-id env vars** *(after the seed has run in production)*
 Remove `STRIPE_PRO_PRICE_ID` / `STRIPE_VOLUME_PRICE_ID` from `config.ts:51-52`, `.env.example`, and `deploy/`. Separate commit so an app rollback does not strand a deployment. Verify `pnpm test:scripts`.
 
+> **Bootstrap must survive the removal.** `seed-plans.ts:28-30` reads those vars, and it is the *only* way a fresh environment (dev, staging, a new deploy) populates `plan_price` at all — this production database is simply already seeded. Deleting the vars outright would strand every other environment.
+>
+> **Decision (user, 2026-08-20): move the price ids to CLI arguments** — `pnpm seed:plans --pro price_x --volume price_y`. That removes the second authority from config entirely, keeps bootstrap possible everywhere, and makes the one-time nature of the operation explicit at the call site instead of ambient in the environment. The script must fail loudly with usage text when an argument is missing, exactly as it does today for an unset env var.
+
 ### Phase 2 — deferred until subscribers exist
 
 Not built now; Task 8's `migration_required` guard prevents a price change from silently stranding subscribers on an old price. Design already settled: a durable per-brand `plan_migration` work queue; a batched worker passing `prorationBehavior: 'none'`; an `isMigratable()` predicate skipping `past_due`, `cancelAtPeriodEnd`, `expired`, comped brands with no `stripeSubscriptionId`, and any subscription whose live item price no longer matches; a dry-run that persists its eligible set and is re-validated at commit; a notice email with an effective-date floor; and a `plan_price_drift` finding in `scanDrift()` (`services/reconciliation.ts:70-105`).
