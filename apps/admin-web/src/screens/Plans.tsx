@@ -5,7 +5,8 @@ import { useAuth } from '../lib/auth.js';
 import {
   Badge,
   Button,
-  DataTable,
+  Card,
+  Check,
   Dialog,
   Drawer,
   EmptyState,
@@ -13,8 +14,8 @@ import {
   InlineAlert,
   Input,
   PageHeader,
+  Skeleton,
   Textarea,
-  type Column,
 } from '@ruostack/ui';
 
 type PlanKeyStr = 'starter' | 'pro' | 'volume';
@@ -84,69 +85,6 @@ export function Plans() {
     void load();
   }, []);
 
-  const columns: Column<PlanRow>[] = [
-    { key: 'name', header: 'Plan', priority: 'primary', minWidth: 120, cell: (p) => p.name },
-    {
-      key: 'price',
-      header: 'Price',
-      align: 'right',
-      mono: true,
-      minWidth: 110,
-      cell: (p) => (p.key === 'starter' ? 'Free' : `${dollars(p.price_cents)}/mo`),
-    },
-    {
-      key: 'cap',
-      header: 'Order cap',
-      align: 'right',
-      mono: true,
-      minWidth: 100,
-      cell: (p) => (p.max_orders_per_month == null ? 'Unlimited' : p.max_orders_per_month),
-    },
-    {
-      key: 'shipping',
-      header: 'Shipping mode',
-      minWidth: 120,
-      cell: (p) => <span className="capitalize">{p.shipping}</span>,
-    },
-    {
-      key: 'stores',
-      header: 'Store connections',
-      minWidth: 140,
-      cell: (p) => (p.store_connections ? 'Yes' : 'No'),
-    },
-    { key: 'cutoff', header: 'Shipping cutoff', minWidth: 160, cell: (p) => p.shipping_cutoff },
-    {
-      key: 'features',
-      header: 'Features',
-      align: 'right',
-      mono: true,
-      minWidth: 90,
-      cell: (p) => p.features.length,
-    },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      minWidth: 260,
-      cell: (p) => (
-        <span className="flex justify-end gap-1.5">
-          <Button variant="ghost" size="sm" onClick={() => setHistory(p)}>
-            History
-          </Button>
-          {writable && (
-            <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
-              Edit
-            </Button>
-          )}
-          {writable && (
-            <Button variant="ghost" size="sm" onClick={() => setPricing(p)}>
-              Change price
-            </Button>
-          )}
-        </span>
-      ),
-    },
-  ];
 
   return (
     <>
@@ -155,15 +93,32 @@ export function Plans() {
         subtitle="Subscription tiers, database-backed. Editing name/features/shipping cutoff is a plain save; changing a price is a separate, deliberate action below it."
       />
 
-      <DataTable
-        caption="Subscription plan tiers"
-        mode="scroll"
-        columns={columns}
-        rows={plans}
-        rowKey={(p) => p.key}
-        loading={loading}
-        empty={<EmptyState title="No plans" hint="The plan seed has not run." />}
-      />
+      {loading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" role="status" aria-label="Loading plans">
+          {[0, 1, 2].map((i) => (
+            <Card key={i} className="p-5">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="mt-2 h-7 w-32" />
+              <Skeleton className="mt-4 h-24 w-full" />
+            </Card>
+          ))}
+        </div>
+      ) : plans.length === 0 ? (
+        <EmptyState title="No plans" hint="The plan seed has not run." />
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {plans.map((p) => (
+            <PlanCard
+              key={p.key}
+              plan={p}
+              writable={writable}
+              onHistory={() => setHistory(p)}
+              onEdit={() => setEditing(p)}
+              onPrice={() => setPricing(p)}
+            />
+          ))}
+        </div>
+      )}
 
       {editing && (
         <EditDrawer
@@ -187,6 +142,88 @@ export function Plans() {
       )}
       {history && <HistoryDrawer plan={history} onClose={() => setHistory(null)} />}
     </>
+  );
+}
+
+// ── One tier as a card ────────────────────────────────────────────────────
+// Deliberately the same shape the BRAND sees in their plan picker
+// (apps/brand-web/src/screens/Account.tsx): name, price, capability facts,
+// feature bullets. An operator looking at this is looking at what the
+// customer is looking at, plus the admin affordances. Carries every column
+// the table it replaced showed — nothing was dropped in the restyle.
+
+function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-content-muted">{label}</span>
+      <span className="text-right font-medium text-content">{value}</span>
+    </div>
+  );
+}
+
+function PlanCard({
+  plan,
+  writable,
+  onHistory,
+  onEdit,
+  onPrice,
+}: {
+  plan: PlanRow;
+  writable: boolean;
+  onHistory: () => void;
+  onEdit: () => void;
+  onPrice: () => void;
+}) {
+  const free = plan.key === 'starter';
+
+  return (
+    <Card className="flex flex-col p-5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-lg font-semibold text-content">{plan.name}</span>
+        <Badge tone={free ? 'neutral' : 'accent'}>{plan.key}</Badge>
+      </div>
+
+      <div className="mt-1 text-2xl font-extrabold tabular-nums text-content">
+        {free ? 'Free' : dollars(plan.price_cents)}
+        {!free && <span className="text-base font-semibold text-content-muted">/mo</span>}
+      </div>
+
+      <div className="mt-4 space-y-1.5 border-t border-line-subtle pt-4 text-xs">
+        <Fact label="Order cap" value={plan.max_orders_per_month == null ? 'Unlimited' : plan.max_orders_per_month} />
+        <Fact label="Shipping" value={<span className="capitalize">{plan.shipping}</span>} />
+        <Fact label="Store connections" value={plan.store_connections ? 'Yes' : 'No'} />
+        <Fact label="Shipping cutoff" value={plan.shipping_cutoff} />
+      </div>
+
+      {plan.features.length > 0 && (
+        <ul className="mt-4 space-y-1.5 border-t border-line-subtle pt-4 text-xs text-content-muted">
+          {plan.features.map((f) => (
+            <li key={f} className="flex gap-1.5">
+              <Check aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+              {f}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* mt-auto keeps the action row flush to the bottom so cards of
+          differing feature counts still line their buttons up. */}
+      <div className="mt-auto flex flex-wrap gap-1.5 border-t border-line-subtle pt-4">
+        <Button variant="ghost" size="sm" onClick={onHistory}>
+          History
+        </Button>
+        {writable && (
+          <Button variant="ghost" size="sm" onClick={onEdit}>
+            Edit
+          </Button>
+        )}
+        {writable && (
+          <Button variant="ghost" size="sm" onClick={onPrice}>
+            Change price
+          </Button>
+        )}
+      </div>
+    </Card>
   );
 }
 
