@@ -78,15 +78,22 @@ describe.skipIf(!RUN)('brand subscribe quote-token check (DB integration, servic
 
   it('rejects a price_version_id that belongs to a different plan than requested', async () => {
     const brandId = await makeBrand('Wrong Plan Co');
-    // A throwaway row for a DIFFERENT plan than requested below — doesn't
-    // need to be active or even a "real" price, since subscribeBrandToPaidPlan
-    // rejects on `priceRow.plan !== input.plan` alone. Deliberately not
-    // reading the live active "volume" row: that row may not exist at all
-    // on an empty plan_price table (CI), and this test doesn't need it to.
-    const wrongPlanRow = await prisma.planPrice.create({
-      data: { plan: 'volume', priceCents: 9900, stripePriceId: null, active: false },
-    });
-    planPriceIds.push(wrongPlanRow.id);
+    // The guard at brand-billing.ts:124 is a single OR: `!priceRow ||
+    // priceRow.plan !== input.plan || !priceRow.active`. For this test to
+    // prove the MIDDLE clause specifically, the row must be ACTIVE — an
+    // inactive row would also trip the `!active` clause and the test would
+    // pass even if the plan-mismatch check were deleted entirely. Same
+    // conditional-seed pattern as the "succeeds" test below: use the real
+    // active "volume" row if one exists, otherwise seed a throwaway active
+    // one (CHECK-legal: non-starter with a non-null stripe_price_id;
+    // index-safe: only created when no active row already exists).
+    let wrongPlanRow = await prisma.planPrice.findFirst({ where: { plan: 'volume', active: true } });
+    if (!wrongPlanRow) {
+      wrongPlanRow = await prisma.planPrice.create({
+        data: { plan: 'volume', priceCents: 14900, stripePriceId: `price_fixture_wrongplan_${randomToken(6)}`, active: true },
+      });
+      planPriceIds.push(wrongPlanRow.id);
+    }
 
     await expect(
       subscribeBrandToPaidPlan(
