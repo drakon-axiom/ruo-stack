@@ -99,7 +99,23 @@ export async function changePlanPrice(
   // Phase 2 (the subscriber-migration worker) is deliberately not built yet.
   // Without this guard a price change would silently strand existing
   // subscribers on the old price with no record of who is on what.
-  const subscriberCount = await prisma.subscriptionState.count({ where: { plan } });
+  //
+  // `SubscriptionState` is one row per brand and `plan` is never reset on
+  // churn (webhook.ts passes the resolved tier through on `cancelled` too),
+  // so a brand that churned off this tier keeps `plan: <tier>` forever with
+  // `status: 'cancelled'`/`'expired'`/`'suspended'`/`'none'`. Counting all
+  // rows for the plan (no status filter) would count every brand that has
+  // EVER been on the tier, blocking repricing permanently after the first
+  // churn — fail-closed in the wrong direction, and the reported count would
+  // be flatly false. Match plan-preflight.ts's query (the script this exact
+  // guard was designed to be checked against) and every other subscriber-
+  // count consumer (reporting.ts, admin-overview.ts, brand-overview.ts):
+  // only `active`/`past_due` are live risk, and only a row with a real
+  // Stripe subscription can be stranded by a reprice — a comped/manual
+  // membership has none to migrate.
+  const subscriberCount = await prisma.subscriptionState.count({
+    where: { plan, status: { in: ['active', 'past_due'] }, stripeSubscriptionId: { not: null } },
+  });
   if (subscriberCount > 0) {
     throw Conflict(
       'migration_required',

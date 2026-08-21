@@ -14,14 +14,19 @@ import { changePlanPrice } from '../../src/services/plan-price.ts';
 //
 // HARD RULE: `plan_price` is a live, shared table with exactly 3 rows today
 // (starter/pro/volume, all active). This suite snapshots pro's active row in
-// beforeAll and restores it in afterAll, deleting the two rows this suite
-// creates (deactivate/delete BEFORE reactivating the original — the partial
-// unique index allows at most one active row per plan at a time). The
-// restore is never wrapped in `.catch(() => undefined)`: a swallowed
-// failure here is exactly how a previous suite's leak went unnoticed. This
-// suite never touches `subscription_state` outside a single guard test,
-// which creates and deletes its own throwaway brand + row within a
-// try/finally, and never creates an adminUser it doesn't delete.
+// beforeAll and restores it in afterAll — deleting EVERY "pro" row that
+// isn't the original (by construction, not by trusting a tracked id survived
+// every assertion above it) BEFORE reactivating the original, since the
+// partial unique index allows at most one active row per plan at a time.
+// The restore is never wrapped in `.catch(() => undefined)`: a swallowed
+// failure here is exactly how a previous suite's leak went unnoticed.
+// `volume`'s active row is read-only in this suite; guard tests that need a
+// Stripe round-trip to prove a guard was actually passed script a Stripe
+// failure so nothing on volume ever activates, and delete the resulting
+// pending row themselves. This suite touches `subscription_state` only
+// inside individual guard tests, each creating and deleting its own
+// throwaway brand(s) + row(s) within a try/finally, and never creates an
+// adminUser it doesn't delete.
 const RUN = process.env.RUN_DB_TESTS === '1';
 const prisma = getPrisma();
 
@@ -89,14 +94,18 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
   });
 
   afterAll(async () => {
-    // Delete the test-created rows BEFORE reactivating the original — the
-    // partial unique index (plan_price_one_active_per_plan) allows at most
-    // one active row per plan at any instant, and createdRowBId is active
-    // at this point.
-    const toDelete = [createdRowAId, createdRowBId].filter((id): id is string => !!id);
-    if (toDelete.length > 0) {
-      await prisma.planPrice.deleteMany({ where: { id: { in: toDelete } } });
-    }
+    // Belt-and-braces, by CONSTRUCTION rather than by trusting that every
+    // assertion above ran to completion in the right order: delete every
+    // "pro" row that isn't the original real one, whatever it is and
+    // however it got there (createdRowAId, createdRowBId, an untracked row
+    // from an assertion that threw before assigning one, or a stray from
+    // the partial-unique-index test if the index were ever gone). This is
+    // strictly broader than — and supersedes — deleting just the two
+    // tracked ids. Done BEFORE reactivating the original: the partial
+    // unique index (plan_price_one_active_per_plan) allows at most one
+    // active row per plan at any instant, and createdRowBId is active at
+    // this point in the normal run.
+    await prisma.planPrice.deleteMany({ where: { plan: 'pro', id: { not: originalProActive.id } } });
     await prisma.planPrice.update({
       where: { id: originalProActive.id },
       data: { active: true, archivedAt: null },
@@ -128,11 +137,15 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
+      // Tracked immediately, before any assertion below can throw and skip
+      // it — afterAll's belt-and-braces sweep also catches this row by
+      // construction (anything on "pro" that isn't the original), but there
+      // is no reason to depend on that alone when the id is right here.
+      createdRowAId = body.plan_price_id;
       expect(body.price_cents).toBe(5900);
       expect(body.stripe_price_id).toMatch(/^price_fake_/);
       expect(body.previous_price_cents).toBe(4900);
       expect(body.previous_stripe_price_id).toBe(originalProActive.stripePriceId);
-      createdRowAId = body.plan_price_id;
 
       // Exactly one active row for pro.
       const activeRows = await prisma.planPrice.findMany({ where: { plan: 'pro', active: true } });
@@ -165,6 +178,14 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
         payload: { price_cents: 6900, reason: 'Task 8 test: triggers a scripted Stripe failure' },
       });
 
+      // Find and track whatever row this attempt created for (pro, 6900) —
+      // BEFORE asserting its shape, and with no filter on active/
+      // stripePriceId, so it's tracked (and thus cleaned up) even in the
+      // scenario this test exists to guard against: the scripted failure
+      // not firing and the row activating instead of staying pending.
+      const pending = await prisma.planPrice.findFirst({ where: { plan: 'pro', priceCents: 6900 } });
+      if (pending) createdRowBId = pending.id;
+
       // The fake throws a plain Error (not an HttpError) — the route's
       // default error handler maps that to 500.
       expect(res.statusCode).toBe(500);
@@ -174,11 +195,9 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       expect(fake.calls[fake.calls.length - 1]!.method).toBe('createPrice');
 
       // A reusable PENDING row exists: active false, stripePriceId null.
-      const pending = await prisma.planPrice.findFirst({
-        where: { plan: 'pro', priceCents: 6900, active: false, stripePriceId: null },
-      });
       expect(pending).not.toBeNull();
-      createdRowBId = pending!.id;
+      expect(pending!.active).toBe(false);
+      expect(pending!.stripePriceId).toBeNull();
 
       // Nothing active changed — no partial commit.
       const activeAfter = await prisma.planPrice.findFirstOrThrow({ where: { plan: 'pro', active: true } });
@@ -264,23 +283,65 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       expect(fake.calls.length).toBe(callsBefore);
     });
 
-    it('subscribers exist -> 409 migration_required (Phase 2 worker is deliberately not built)', async () => {
+    it('an active subscriber -> 409 migration_required; a churned (cancelled) one alone does NOT block', async () => {
       const callsBefore = fake.calls.length;
-      const brand = await prisma.brand.create({
-        data: { brandName: `Plan Price Guard Test ${randomToken(6)}`, referralCode: randomToken(10) },
+      const activeBrand = await prisma.brand.create({
+        data: { brandName: `Plan Price Guard Test Active ${randomToken(6)}`, referralCode: randomToken(10) },
+      });
+      const churnedBrand = await prisma.brand.create({
+        data: { brandName: `Plan Price Guard Test Churned ${randomToken(6)}`, referralCode: randomToken(10) },
       });
       try {
         await prisma.subscriptionState.create({
-          data: { brandId: brand.id, plan: 'volume', status: 'active' },
+          data: {
+            brandId: activeBrand.id,
+            plan: 'volume',
+            status: 'active',
+            stripeSubscriptionId: `sub_test_${randomToken(8)}`,
+          },
         });
+        // `plan` is never reset on churn (webhook.ts passes the resolved
+        // tier through on `cancelled` too) — this row proves the guard
+        // filters on status/stripeSubscriptionId, not just `plan`, or the
+        // first brand ever to churn off a tier would block it from
+        // repricing forever with a subscriber count that is factually false.
+        await prisma.subscriptionState.create({
+          data: {
+            brandId: churnedBrand.id,
+            plan: 'volume',
+            status: 'cancelled',
+            stripeSubscriptionId: `sub_test_${randomToken(8)}`,
+          },
+        });
+
+        // Both rows present: the live (active) one blocks.
         await expect(
           changePlanPrice(prisma, fake, { plan: 'volume', priceCents: 9900, reason: 'x', actorId: financeAdminId }),
         ).rejects.toMatchObject({ statusCode: 409, code: 'migration_required' });
+        expect(fake.calls.length).toBe(callsBefore);
+
+        // Remove the live subscriber, leaving only the churned row — the
+        // guard must not count it. Prove the guard was actually PASSED (not
+        // just trivially satisfied by some other earlier guard) by scripting
+        // a Stripe failure: the call must die at Stripe, not at the guard.
+        await prisma.subscriptionState.deleteMany({ where: { brandId: activeBrand.id } });
+        fake.failNextCall('createPrice');
+        await expect(
+          changePlanPrice(prisma, fake, { plan: 'volume', priceCents: 9900, reason: 'x', actorId: financeAdminId }),
+        ).rejects.toThrow();
+        expect(fake.calls.length).toBe(callsBefore + 1);
+        expect(fake.calls[fake.calls.length - 1]!.method).toBe('createPrice');
       } finally {
-        await prisma.subscriptionState.deleteMany({ where: { brandId: brand.id } });
-        await prisma.brand.delete({ where: { id: brand.id } });
+        await prisma.subscriptionState.deleteMany({
+          where: { brandId: { in: [activeBrand.id, churnedBrand.id] } },
+        });
+        await prisma.brand.deleteMany({ where: { id: { in: [activeBrand.id, churnedBrand.id] } } });
+        // The failed attempt above left a reusable pending row on volume —
+        // clean it up (never activated, so nothing else to restore).
+        await prisma.planPrice.deleteMany({
+          where: { plan: 'volume', priceCents: 9900, active: false, stripePriceId: null },
+        });
       }
-      expect(fake.calls.length).toBe(callsBefore);
 
       // The hard rule: subscription_state must be empty again.
       expect(await prisma.subscriptionState.count()).toBe(0);
@@ -293,6 +354,36 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
         changePlanPrice(prisma, fake, { plan: 'volume', priceCents: 5000, reason: 'x', actorId: financeAdminId }),
       ).rejects.toMatchObject({ statusCode: 409, code: 'confirm_large_change_required' });
       expect(fake.calls.length).toBe(callsBefore);
+    });
+
+    it('confirm_large_change: true PASSES the guard for a >50% change (proven via a scripted Stripe failure, no commit)', async () => {
+      // Both happy-path prices elsewhere in this suite are <25% moves, so
+      // confirmLargeChange is never observed `true` anywhere else — a wrong
+      // key at the route or a dropped Zod field would reject every
+      // legitimate large change forever, silently, with nothing here to
+      // catch it. Script a Stripe failure so the call dies at Stripe (not
+      // at the guard, and not with a real commit to volume needing restore).
+      const callsBefore = fake.calls.length;
+      fake.failNextCall('createPrice');
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/plans/volume/price',
+        headers: { authorization: `Bearer ${financeToken}` },
+        payload: {
+          price_cents: 5000,
+          reason: 'Task 8 test: confirmed large change, scripted Stripe failure',
+          confirm_large_change: true,
+        },
+      });
+
+      expect(res.statusCode).toBe(500); // died at Stripe, not at the guard (which 409s)
+      expect(fake.calls.length).toBe(callsBefore + 1);
+      expect(fake.calls[fake.calls.length - 1]!.method).toBe('createPrice');
+
+      // Clean up the resulting pending row for volume — never activated.
+      await prisma.planPrice.deleteMany({
+        where: { plan: 'volume', priceCents: 5000, active: false, stripePriceId: null },
+      });
     });
 
     it('price_cents out of bounds -> 400, rejected by validation before the handler runs', async () => {
@@ -331,16 +422,24 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
   });
 
   it('the partial unique index rejects a hand-crafted second active row', async () => {
-    await expect(
-      prisma.planPrice.create({
-        data: {
-          plan: 'pro',
-          priceCents: 1234,
-          stripePriceId: `price_test_dup_${randomToken(8)}`,
-          active: true,
-        },
-      }),
-    ).rejects.toThrow();
+    // Known up front (not read back after the fact), so cleanup below can
+    // target it by construction rather than by tracking an id that only
+    // exists if creation unexpectedly succeeds.
+    const dupStripeId = `price_test_dup_${randomToken(8)}`;
+    try {
+      await expect(
+        prisma.planPrice.create({
+          data: { plan: 'pro', priceCents: 1234, stripePriceId: dupStripeId, active: true },
+        }),
+      ).rejects.toThrow();
+    } finally {
+      // Belt-and-braces: if the index were ever dropped, this create would
+      // actually succeed and leave TWO active "pro" rows — the exact
+      // invariant getPlanRegistry()'s `take: 1` and brand-billing.ts assume
+      // holds. The test guarding that safety net must not itself leak a
+      // permanent violation of it when the safety net is gone.
+      await prisma.planPrice.deleteMany({ where: { stripePriceId: dupStripeId } });
+    }
   });
 
   it('getClients() is actually wired to the fake (sanity on the injection seam)', () => {
