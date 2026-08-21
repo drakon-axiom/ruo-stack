@@ -383,11 +383,10 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       // catch it. Script a Stripe failure so the call dies at Stripe (not
       // at the guard, and not with a real commit to volume needing restore).
       //
-      // try/finally, matching the churned-brand guard test above: `volume`
-      // has NO restore path in afterAll (see its header comment) — if the
-      // scripted failure ever failed to fire, an un-guarded cleanup here
-      // would leave volume's live shared row permanently repriced to 5000c
-      // with nothing to catch or repair it.
+      // try/finally, matching the churned-brand guard test above: belt-
+      // and-braces. This cleans up the pending row immediately if the
+      // scripted failure fires as expected; afterAll's volume sweep (see
+      // its header comment) is the second line of defence if it doesn't.
       const callsBefore = fake.calls.length;
       try {
         fake.failNextCall('createPrice');
