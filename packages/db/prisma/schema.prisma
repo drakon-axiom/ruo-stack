@@ -574,6 +574,13 @@ enum PlanTier {
   @@map("plan_tier")
 }
 
+enum ShippingMode {
+  flat
+  live
+
+  @@map("shipping_mode")
+}
+
 /// Wallet ledger transaction types. NOTE: `hold` / `hold_release` are RESERVED
 /// but currently UNUSED — the wallet reserve is IMPLICIT (getHeld() derives held
 /// funds by summing open orders; see apps/api/src/services/wallet.ts), so no hold
@@ -626,6 +633,7 @@ model SubscriptionState {
   id                   String                  @id @default(uuid()) @db.Uuid
   brandId              String                  @unique @map("brand_id") @db.Uuid
   stripeSubscriptionId String?                 @map("stripe_subscription_id")
+  stripePriceId        String?                 @map("stripe_price_id") // local, indexed answer to "who is on which price" without calling Stripe
   plan                 PlanTier                @default(starter)
   price                Int                     @default(0) // cents
   status               SubscriptionStateStatus @default(none)
@@ -638,7 +646,50 @@ model SubscriptionState {
 
   brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
+  @@index([stripePriceId])
   @@map("subscription_state")
+}
+
+/// Platform-global plan registry — one row per tier. `key` is the `PlanTier`
+/// enum, so "no new tiers" is a DB guarantee, not a convention. There is
+/// deliberately no price column here: price lives only on PlanPrice, so the
+/// displayed number and the Stripe charging id can never diverge (see below).
+model Plan {
+  key               PlanTier     @id
+  name              String
+  features          String[]     @default([])
+  shippingCutoff    String       @map("shipping_cutoff") // display-only
+  storeConnections  Boolean      @map("store_connections") // code-owned in v1; column exists for Phase 2
+  maxOrdersPerMonth Int?         @map("max_orders_per_month")
+  shipping          ShippingMode
+  stripeProductId   String?      @map("stripe_product_id")
+  updatedBy         String?      @map("updated_by") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  prices PlanPrice[]
+
+  @@map("plan")
+}
+
+/// Append-only price ledger. Rows are never updated except to flip
+/// active/archivedAt — `price_cents` and `stripe_price_id` are written once,
+/// together, from the Stripe response, so they cannot drift apart. Starts
+/// EMPTY: Task 4 seeds it from Stripe, not from code.
+model PlanPrice {
+  id            String    @id @default(uuid()) @db.Uuid
+  plan          PlanTier
+  priceCents    Int       @map("price_cents")
+  stripePriceId String?   @unique @map("stripe_price_id") // null while pending; null forever for starter
+  active        Boolean   @default(false)
+  archivedAt    DateTime? @map("archived_at")
+  createdBy     String?   @map("created_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  planRow Plan @relation(fields: [plan], references: [key], onDelete: Cascade)
+
+  @@index([plan, active])
+  @@map("plan_price")
 }
 
 /// Append-only prepaid wallet ledger. `balance_after` is the running available

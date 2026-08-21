@@ -45,11 +45,12 @@ export const EnvSchema = z.object({
     .string()
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'STORE_CREDS_KEY must be base64 of 32 bytes'),
 
-  // Stripe (behind PaymentsAdapter only).
+  // Stripe (behind PaymentsAdapter only). Per-tier price ids are no longer
+  // config: `plan_price` (seeded once via `pnpm seed:plans --pro <id>
+  // --volume <id>`, see apps/api/src/scripts/seed-plans.ts) is the only
+  // source of truth for what each paid tier charges.
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
-  STRIPE_PRO_PRICE_ID: z.string().optional(),
-  STRIPE_VOLUME_PRICE_ID: z.string().optional(),
 
   // Shipping / rates. Origin = RUOStack's fulfillment warehouse (ship-from).
   WAREHOUSE_NAME: z.string().default('RUOStack Fulfillment'),
@@ -84,6 +85,13 @@ export const EnvSchema = z.object({
   SHIPPING_BOX_FILL_FACTOR: z.coerce.number().min(0.1).max(1).default(0.85),
   // Carrier-rate cache TTL (seconds) — short, so checkout never hammers the rater.
   RATE_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  // plan-registry.ts cache TTL (seconds). The API runs as a single PM2 fork
+  // (ecosystem.config.cjs:41-46, instances: 1, exec_mode: 'fork'), so
+  // explicit invalidatePlanRegistry() calls from admin plan writes are exact
+  // today — every request hits the same process. This TTL is the safety net
+  // for if that topology ever changes (multiple forks/instances), not the
+  // primary invalidation path.
+  PLAN_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   // RateQuote validity (seconds) — covers checkout → order-import; reserve uses it.
   RATE_QUOTE_TTL_SECONDS: z.coerce.number().int().positive().default(1800),
   // How often the API sweeps expired RateQuote rows. Default hourly.

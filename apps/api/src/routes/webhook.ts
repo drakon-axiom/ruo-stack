@@ -2,18 +2,34 @@ import type { FastifyInstance } from 'fastify';
 import { Prisma, type PlanTier, type PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type NormalizedEvent } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
-import { loadConfig } from '../config.ts';
 import { writeAudit } from '../audit.ts';
 import { appendEntry } from '../services/wallet.ts';
 import { upsertSubscriptionState } from '../services/subscription.ts';
 
-/** Map a Stripe price id to a plan tier (configured per-tier price ids). */
-function planForPrice(priceId?: string): PlanTier | undefined {
+/**
+ * Map a Stripe price id to a plan tier via an indexed lookup on
+ * `plan_price.stripe_price_id` — across ALL rows, regardless of `active`.
+ * `plan_price` is append-only and the column is `@unique`, so it is a
+ * permanent price-id → tier index: a brand still subscribed on last
+ * quarter's (now archived) price must still resolve to its tier forever.
+ *
+ * `undefined` used to be an expected outcome (an id that matched neither
+ * configured env var). Now that every price this system ever created is in
+ * the table, `undefined` means a Stripe price exists that this system never
+ * created — a real anomaly, logged at error level for follow-up.
+ */
+async function planForPrice(db: PrismaClient, priceId?: string): Promise<PlanTier | undefined> {
   if (!priceId) return undefined;
-  const cfg = loadConfig();
-  if (priceId === cfg.STRIPE_VOLUME_PRICE_ID) return 'volume';
-  if (priceId === cfg.STRIPE_PRO_PRICE_ID) return 'pro';
-  return undefined;
+  const row = await db.planPrice.findUnique({ where: { stripePriceId: priceId }, select: { plan: true } });
+  if (!row) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[webhook] Unrecognized Stripe price id "${priceId}": no plan_price row (active or archived) matches it. ` +
+        'This price was never created by this system — the subscription tier cannot be resolved.',
+    );
+    return undefined;
+  }
+  return row.plan;
 }
 
 /**
@@ -153,8 +169,14 @@ async function dispatch(db: PrismaClient, event: NormalizedEvent, ip: string): P
       await upsertSubscriptionState(db, {
         brandId,
         status,
-        plan: planForPrice(event.priceId),
+        plan: await planForPrice(db, event.priceId),
         stripeSubscriptionId: event.subscriptionId,
+        // Persisted regardless of whether the price resolved to a tier —
+        // Task 3 added this column for exactly this (SubscriptionState.stripePriceId,
+        // schema.prisma:636) and reconciliation's plan/price drift check
+        // (services/reconciliation.ts) depends on it being populated even when
+        // `plan` above came back undefined.
+        stripePriceId: event.priceId ?? null,
         ...(event.kind === 'subscription.activated'
           ? {
               price: event.price,

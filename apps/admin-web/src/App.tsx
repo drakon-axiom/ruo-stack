@@ -19,6 +19,7 @@ const Exceptions = lazy(() => import('./screens/Exceptions.js').then((m) => ({ d
 const Fulfillment = lazy(() => import('./screens/Fulfillment.js').then((m) => ({ default: m.Fulfillment })));
 const Ledger = lazy(() => import('./screens/Ledger.js').then((m) => ({ default: m.Ledger })));
 const Overview = lazy(() => import('./screens/Overview.js').then((m) => ({ default: m.Overview })));
+const Plans = lazy(() => import('./screens/Plans.js').then((m) => ({ default: m.Plans })));
 const Reporting = lazy(() => import('./screens/Reporting.js').then((m) => ({ default: m.Reporting })));
 const ShippingRules = lazy(() => import('./screens/ShippingRules.js').then((m) => ({ default: m.ShippingRules })));
 const StoreMatch = lazy(() => import('./screens/StoreMatch.js').then((m) => ({ default: m.StoreMatch })));
@@ -65,6 +66,7 @@ export function App() {
       <Route path="/brands" element={<Protected><Brands /></Protected>} />
       <Route path="/announcements" element={<Protected><Announcements /></Protected>} />
       <Route path="/ledger" element={<Protected><Ledger /></Protected>} />
+      <Route path="/plans" element={<Protected><Plans /></Protected>} />
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>
   );

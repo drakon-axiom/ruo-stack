@@ -168,6 +168,7 @@ interface PlanCard {
   key: 'starter' | 'pro' | 'volume';
   name: string;
   price_cents: number;
+  price_version_id: string | null;
   paid: boolean;
   features: string[];
 }
@@ -199,10 +200,26 @@ function SubscriptionSection() {
 
   async function choose(plan: PlanCard) {
     setErr('');
+    if (plan.paid && !plan.price_version_id) {
+      // buyablePlanCatalog only ships a paid card with a null price_version_id
+      // when the tier has no active, buyable price at all — shouldn't happen
+      // for a card that's rendered, but refuse to guess rather than send a
+      // request the server schema will reject anyway.
+      setErr('This plan is not available right now — please refresh and try again.');
+      load();
+      return;
+    }
     setBusy(true);
     try {
       if (plan.paid) {
-        const { url } = await api<{ url: string }>('/api/brand/billing/subscribe', { method: 'POST', body: { plan: plan.key } });
+        const { url } = await api<{ url: string }>('/api/brand/billing/subscribe', {
+          method: 'POST',
+          // price_version_id is the checkout quote token: the exact plan_price
+          // row this card's displayed price_cents came from. Required by
+          // SubscribeSchema — omitting it is what made every brand subscribe
+          // 400 on this branch.
+          body: { plan: plan.key, price_version_id: plan.price_version_id! },
+        });
         window.location.href = url;
       } else {
         // Downgrade to free Starter = cancel the paid plan in the Stripe portal.
@@ -210,7 +227,16 @@ function SubscriptionSection() {
         window.location.href = url;
       }
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Could not continue');
+      if (e instanceof ApiError && e.code === 'price_changed') {
+        // The customer-protection rail this token exists for: an admin
+        // repriced between page load and click. Re-fetch so the cards show
+        // the CURRENT price and stop — never retry with the new token, which
+        // would silently charge whatever the admin just set.
+        setErr('Pricing has changed since this page loaded — the plans below now show the current price. Please review and try again.');
+        load();
+      } else {
+        setErr(e instanceof ApiError ? e.message : 'Could not continue');
+      }
       setBusy(false);
     }
   }
@@ -233,7 +259,7 @@ function SubscriptionSection() {
   // nothing is locked, the brand is simply back on Starter. ('suspended' here is
   // only ever a pre-025 row — see the enum comment in schema.prisma.)
   const ended = status === 'expired' || status === 'suspended';
-  const dollars = (c: number) => (c === 0 ? 'Free' : `$${c / 100}/mo`);
+  const dollars = (c: number) => (c === 0 ? 'Free' : `$${(c / 100).toFixed(2)}/mo`);
 
   return (
     <Section title="Subscription">

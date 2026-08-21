@@ -28,8 +28,22 @@ export const WalletTopupSchema = z.object({
 });
 export type WalletTopup = z.infer<typeof WalletTopupSchema>;
 
-/** Subscribe to a PAID plan (Starter is free — selected by cancelling, not here). */
-export const SubscribeSchema = z.object({ plan: z.enum(PAID_PLAN_KEYS) });
+/**
+ * Subscribe to a PAID plan (Starter is free — selected by cancelling, not
+ * here). `price_version_id` is the `plan_price.id` the plan card's displayed
+ * price came from (see `GET /api/brand/subscription`'s `plans[].price_version_id`)
+ * — the checkout quote token. REQUIRED, not optional-but-validated: an
+ * omitted token would silently fall back to resolving the price at click
+ * time, which is exactly the race this field exists to close. `brand-web` is
+ * the only caller and ships in the same deploy as this schema, so there is
+ * no in-flight-client window to protect against — an old bundle cached in an
+ * already-open tab is a version-skew risk every breaking API change already
+ * carries, not one specific to this field.
+ */
+export const SubscribeSchema = z.object({
+  plan: z.enum(PAID_PLAN_KEYS),
+  price_version_id: z.string().uuid(),
+});
 export type Subscribe = z.infer<typeof SubscribeSchema>;
 
 /** A brand's own retail price for a product (overrides the operator suggestion). */

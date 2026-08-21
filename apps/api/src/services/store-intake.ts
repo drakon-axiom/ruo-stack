@@ -136,7 +136,7 @@ export async function importWooOrder(
       const rules = await loadShippingRules(prisma);
       const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
       boxFields = orderBoxFields(parcel);
-      const q = await priceShipping(plan, parcel, { toZip: zip, toState: state }, chosen ?? undefined, pricing, rules.mappings);
+      const q = await priceShipping(prisma, plan, parcel, { toZip: zip, toState: state }, chosen ?? undefined, pricing, rules.mappings);
       shipping = q.chosen.amountCents; // brand cost = carrier + pick-&-pack
       serviceCode = q.chosen.serviceCode;
       carrier = q.chosen.carrier;

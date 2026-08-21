@@ -28,6 +28,43 @@ export interface CreateSubscriptionInput {
   metadata?: Record<string, string>;
 }
 
+/**
+ * Proration behaviour for a subscription price/quantity change. 'none' is the
+ * only value that can never invent a credit/charge line item on the
+ * customer's next invoice — it is the required default. Real prorations are
+ * an explicit opt-in (`'create_prorations'`), never a forgettable field.
+ */
+export type ProrationBehavior = 'none' | 'create_prorations';
+
+export interface UpdateSubscriptionInput extends Partial<CreateSubscriptionInput> {
+  /** Explicit opt-in for real prorations. Omitted/undefined → 'none'. */
+  prorationBehavior?: ProrationBehavior;
+}
+
+/** Billing interval accepted when creating a Price; mirrors Stripe's recurring interval. */
+export type BillingInterval = 'day' | 'week' | 'month' | 'year';
+
+export interface CreatePriceInput {
+  /** The Stripe Product this new Price generation belongs to. */
+  productId: string;
+  /** Integer cents. */
+  amountCents: Cents;
+  currency: string;
+  interval: BillingInterval;
+  /** RUOStack plan tier key, stamped into metadata so the Stripe object is traceable back to the plan. */
+  planKey: string;
+  /** PlanPrice row id (the append-only price ledger), stamped into metadata and used to build a stable idempotency key. */
+  priceVersionId: string;
+}
+
+export interface RetrievedPrice {
+  productId: string;
+  unitAmountCents: Cents;
+  currency: string;
+  interval: BillingInterval | null;
+  active: boolean;
+}
+
 export interface SubscriptionCheckoutInput {
   customerId: string;
   priceId: string;
@@ -67,7 +104,7 @@ export interface PaymentsAdapter {
   cancelSubscription(subscriptionId: string): Promise<void>;
   updateSubscription(
     subscriptionId: string,
-    input: Partial<CreateSubscriptionInput>,
+    input: UpdateSubscriptionInput,
   ): Promise<{ subscriptionId: string; status: string }>;
   /** Pro membership signup via hosted Checkout (subscription mode; collects card). */
   createSubscriptionCheckout(input: SubscriptionCheckoutInput): Promise<{ url: string; sessionId: string }>;
@@ -79,6 +116,12 @@ export interface PaymentsAdapter {
   verifyAndParseWebhook(rawBody: Buffer, signature: string): NormalizedEvent;
   issueRefundCredit(input: RefundCreditInput): Promise<void>;
   handleDispute(input: DisputeInput): Promise<void>;
+  /** Create a new Price generation for a plan's Product. Never mutates an existing Price. */
+  createPrice(input: CreatePriceInput): Promise<{ priceId: string }>;
+  /** Deactivate a Price. Idempotent — tolerates an already-inactive price. */
+  archivePrice(priceId: string): Promise<void>;
+  /** Read back a Price's current processor-side state (used by seeding/reconciliation). */
+  retrievePrice(priceId: string): Promise<RetrievedPrice>;
 }
 
 /** Statement-descriptor / product names — software/logistics, never peptides (payments §1.3). */

@@ -36,6 +36,13 @@ export const AUDIT_ACTIONS = {
   walletManualAdjustment: 'wallet.manual_adjustment',
   subscriptionCheckoutStarted: 'subscription.checkout_started',
   subscriptionStatusChanged: 'subscription.status_changed',
+  // Plan registry admin edits (Task 7): name/features/shippingCutoff only.
+  planUpdated: 'plan.updated',
+  // Price-change transaction (Task 8): one entry when the inert PENDING
+  // plan_price row is inserted (Step A, no side effects yet), a second when
+  // the atomic commit flips it active (Step C, carries before/after + reason).
+  planPricePending: 'plan.price_pending',
+  planPriceChanged: 'plan.price_changed',
   // Orders (Phase 1):
   orderCreated: 'order.created',
   orderUpdated: 'order.updated',

@@ -36,9 +36,11 @@ async function main() {
     cfg.RATE_QUOTE_CLEANUP_INTERVAL_SECONDS * 1000,
     (m) => app.log.info(m),
   );
-  // Background: reconciliation worker — heal stuck webhooks + flag drift.
+  // Background: reconciliation worker — heal stuck webhooks, flag drift, and
+  // sweep deactivated plan_price rows for deferred Stripe archival.
   startReconciliationWorker(
     getClients().prisma,
+    getClients().payments,
     cfg.RECONCILE_INTERVAL_SECONDS * 1000,
     (m) => app.log.info(m),
   );

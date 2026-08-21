@@ -25,6 +25,12 @@ export const ROLE_GATE: Record<string, Record<AdminRole, Access>> = {
   // a comped account) grants paid features with no processor record to reconcile
   // against — same shape as wallet_adjust for the same reason.
   subscription: { super_admin: 'write', operations: 'none', support: 'none', finance: 'write' },
+  // Deliberately NOT the 'subscription' surface above. subscription's blast
+  // radius is one brand at a time (admin-brands.ts's POST .../subscription
+  // route) — a manual payment record for a single account. A plan edit here
+  // changes what EVERY brand on that tier pays, and after the fact no audit
+  // query could tell the two kinds of write apart if they shared a surface.
+  plans: { super_admin: 'write', operations: 'view', support: 'view', finance: 'write' },
   role_grants: { super_admin: 'write', operations: 'none', support: 'none', finance: 'none' },
   // Authoring broadcasts is an ops function — same shape as `catalog`.
   announcements: { super_admin: 'write', operations: 'write', support: 'view', finance: 'view' },

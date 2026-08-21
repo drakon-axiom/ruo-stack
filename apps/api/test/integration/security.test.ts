@@ -11,6 +11,12 @@ import { hashToken, randomToken, hashPassword } from '../../src/crypto.ts';
 const RUN = process.env.RUN_DB_TESTS === '1';
 const prisma = getPrisma();
 
+// Every admin this suite seeds, so afterAll can remove them. Without this the
+// rows accumulate in whatever database the suite is pointed at -- this file was
+// the only one of nine admin-seeding suites with no cleanup, and it had left 120
+// rows behind. adminSession cascades on delete, so tracking the user id is enough.
+const seededAdminIds: string[] = [];
+
 async function seedAdmin(role: AdminRole) {
   const admin = await prisma.adminUser.create({
     data: {
@@ -27,6 +33,7 @@ async function seedAdmin(role: AdminRole) {
     data: { adminUserId: admin.id, refreshTokenHash: hashToken(refresh), expiresAt: new Date(Date.now() + 3_600_000) },
   });
   const token = signAdminAccessToken({ sub: admin.id, role, sid: session.id });
+  seededAdminIds.push(admin.id);
   return { admin, token };
 }
 
@@ -37,6 +44,7 @@ describe.skipIf(!RUN)('security spine (DB integration)', () => {
     await app.ready();
   });
   afterAll(async () => {
+    await prisma.adminUser.deleteMany({ where: { id: { in: seededAdminIds } } });
     await app.close();
     await prisma.$disconnect();
   });

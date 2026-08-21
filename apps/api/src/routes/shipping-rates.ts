@@ -57,7 +57,7 @@ export async function shippingRatesRoutes(app: FastifyInstance): Promise<void> {
 
       const rules = await loadShippingRules(prisma);
       const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
-      const q = await priceShipping(plan, parcel, { toZip: body.destination.zip, toState: body.destination.state }, undefined, pricing, rules.mappings);
+      const q = await priceShipping(prisma, plan, parcel, { toZip: body.destination.zip, toState: body.destination.state }, undefined, pricing, rules.mappings);
       // Persist the offered options so order import reserves the exact quote (§9).
       await persistRateQuotes(prisma, { brandId: conn.brandId, items: body.items, dest: { zip: body.destination.zip, state: body.destination.state }, parcel, pricing, options: q.options });
       return reply.send({ rates: q.options.map(toRate), source: q.source });

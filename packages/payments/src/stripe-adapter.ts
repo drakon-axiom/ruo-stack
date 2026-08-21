@@ -1,14 +1,18 @@
 // ⚠️  THE ONLY FILE IN THE REPO THAT MAY IMPORT THE STRIPE SDK.
 // Enforced by scripts/check-stripe-imports.mjs (critical invariant #4).
 import Stripe from 'stripe';
+import { createHash } from 'node:crypto';
 import type {
   CreateCheckoutInput,
+  CreatePriceInput,
   CreateSubscriptionInput,
   DisputeInput,
   NormalizedEvent,
   PaymentsAdapter,
   RefundCreditInput,
+  RetrievedPrice,
   SubscriptionCheckoutInput,
+  UpdateSubscriptionInput,
 } from '@ruostack/shared';
 import { STATEMENT_DESCRIPTORS } from '@ruostack/shared';
 
@@ -70,14 +74,35 @@ export class StripeAdapter implements PaymentsAdapter {
 
   async updateSubscription(
     subscriptionId: string,
-    input: Partial<CreateSubscriptionInput>,
+    input: UpdateSubscriptionInput,
   ): Promise<{ subscriptionId: string; status: string }> {
-    const params: Stripe.SubscriptionUpdateParams = {};
+    // Default is 'none' — the only value that can never invent a credit/charge
+    // line item on the customer's next invoice. Stripe's own default
+    // ('create_prorations') would put a proration on EVERY plan change unless
+    // a call site remembers to opt out; that's backwards, so the safe value is
+    // the default and real prorations require an explicit opt-in.
+    // `billing_cycle_anchor` must NEVER be set here: 'now' combined with
+    // proration_behavior:'none' charges the customer the full new price today
+    // with no credit for the period already paid for — a straight double bill.
+    const params: Stripe.SubscriptionUpdateParams = {
+      proration_behavior: input.prorationBehavior === 'create_prorations' ? 'create_prorations' : 'none',
+    };
     if (input.priceId) {
       // An items[] entry WITHOUT an `id` is ADDED, not replaced — that would
       // leave the old plan item in place and bill both plans every cycle. Pass
       // the existing item's id so the price is swapped in place (a plan change).
       const current = await this.stripe.subscriptions.retrieve(subscriptionId);
+      // Anything other than exactly one item makes the fallback below wrong:
+      // zero items would silently fall into the ADD branch above (the exact
+      // double-billing bug the comment warns about); more than one item would
+      // swap the price onto whichever line happens to sort first while a
+      // second (add-on/metered) item keeps billing unchanged. Fail loudly
+      // instead of guessing.
+      if (current.items.data.length !== 1) {
+        throw new Error(
+          `updateSubscription: subscription ${subscriptionId} has ${current.items.data.length} items, expected exactly 1`,
+        );
+      }
       const existingItemId = current.items.data[0]?.id;
       params.items = [
         existingItemId ? { id: existingItemId, price: input.priceId } : { price: input.priceId },
@@ -85,9 +110,66 @@ export class StripeAdapter implements PaymentsAdapter {
     }
     if (input.metadata) params.metadata = input.metadata;
     const sub = await this.stripe.subscriptions.update(subscriptionId, params, {
-      idempotencyKey: `sub-upd:${subscriptionId}:${input.priceId ?? 'meta'}`,
+      // Folds every axis `params` can vary along into the key: a dry-run pass
+      // (prorationBehavior: 'none') followed by a commit pass
+      // ('create_prorations') on the same subscription/price must NOT collide
+      // — a collision either 400s (idempotency_error) or silently replays the
+      // dry-run's response and never applies the real change. Metadata is
+      // folded in via a sorted-key digest so two distinct metadata-only writes
+      // don't collide on the literal 'meta' bucket either.
+      idempotencyKey: `sub-upd:${subscriptionId}:${input.priceId ?? 'meta'}:${input.prorationBehavior ?? 'none'}:${metadataDigest(input.metadata)}`,
     });
     return { subscriptionId: sub.id, status: sub.status };
+  }
+
+  /**
+   * Create a new Price "generation" on an existing Product. Prices are
+   * immutable in Stripe — a price change is always a new Price, never a
+   * mutation of the old one. `lookup_key` + `transfer_lookup_key: true` moves
+   * the stable lookup key onto the new price atomically. `currency`,
+   * `recurring.interval`/`interval_count`, and `tax_behavior` are pinned
+   * explicitly (not left to Stripe defaults) so nothing can silently drift
+   * between one price generation and the next.
+   */
+  async createPrice(input: CreatePriceInput): Promise<{ priceId: string }> {
+    const unitAmount = Math.round(input.amountCents);
+    const price = await this.stripe.prices.create(
+      {
+        product: input.productId,
+        currency: input.currency,
+        unit_amount: unitAmount,
+        recurring: {
+          interval: input.interval,
+          interval_count: 1,
+        },
+        tax_behavior: 'unspecified',
+        lookup_key: `${input.planKey}:${input.priceVersionId}`,
+        transfer_lookup_key: true,
+        metadata: { plan_key: input.planKey, price_version_id: input.priceVersionId },
+      },
+      // Keyed on the immutable PlanPrice row id: a retry after a network
+      // timeout returns the same Stripe Price instead of minting a duplicate.
+      { idempotencyKey: `price:${input.priceVersionId}` },
+    );
+    return { priceId: price.id };
+  }
+
+  /** Deactivate a Price. Setting `active: false` on an already-inactive price is a no-op, not an error. */
+  async archivePrice(priceId: string): Promise<void> {
+    await this.stripe.prices.update(priceId, { active: false });
+  }
+
+  /** Read back a Price's current processor-side state. Used by seeding/reconciliation, never checkout. */
+  async retrievePrice(priceId: string): Promise<RetrievedPrice> {
+    const price = await this.stripe.prices.retrieve(priceId);
+    const productId = typeof price.product === 'string' ? price.product : price.product.id;
+    return {
+      productId,
+      unitAmountCents: price.unit_amount ?? 0,
+      currency: price.currency,
+      interval: (price.recurring?.interval as RetrievedPrice['interval']) ?? null,
+      active: price.active,
+    };
   }
 
   /** Pro membership signup via hosted Checkout (subscription mode). */
@@ -180,6 +262,25 @@ export class StripeAdapter implements PaymentsAdapter {
     await this.stripe.disputes.retrieve(input.disputeId);
     // TODO(Phase 1): route to the Exceptions console + freeze affected wallet holds.
   }
+}
+
+/**
+ * Deterministic digest of a metadata object for idempotency-key purposes.
+ * `metadata` is an unconstrained `Record<string, string>`, so a naive
+ * `key=value` join is NOT injective — `{ a: '1,b=2' }` and `{ a: '1', b: '2' }`
+ * both render as the literal string "a=1,b=2" if `,`/`=` inside a key or
+ * value aren't escaped, which would collide two genuinely different
+ * metadata writes onto one idempotency key. JSON.stringify escapes both
+ * characters, and hashing collapses the result to a fixed-length, safely
+ * embeddable token. Sorted by key first so `{a,b}` and `{b,a}` (same
+ * content, different insertion order) still digest identically.
+ */
+function metadataDigest(metadata: Record<string, string> | undefined): string {
+  if (!metadata) return 'no-meta';
+  const sortedEntries = Object.keys(metadata)
+    .sort()
+    .map((key) => [key, metadata[key]]);
+  return createHash('sha256').update(JSON.stringify(sortedEntries)).digest('hex');
 }
 
 /** Stripe event type → RUOStack NormalizedEvent (core never imports Stripe types). */

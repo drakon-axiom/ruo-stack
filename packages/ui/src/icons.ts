@@ -33,6 +33,7 @@ export {
   Scale,
   ClipboardList,
   Inbox,
+  Tag,
   // Chrome and controls
   Bell,
   Search,

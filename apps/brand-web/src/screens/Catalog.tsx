@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DataTable, EmptyState, PageHeader, StatusPill, type Column } from '@ruostack/ui';
+import { PLAN_KEYS, planLabel, type PlanKey } from '@ruostack/shared';
 import { api } from '../lib/api.js';
 
 interface Product {
@@ -17,7 +18,7 @@ interface Product {
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 const margin = (cost: number, retail: number) =>
   retail > 0 ? `${Math.round(((retail - cost) / retail) * 100)}%` : '—';
-const PLAN_LABEL: Record<string, string> = { starter: 'Starter', pro: 'Pro', volume: 'Volume' };
+const planDisplay = (key: string) => (PLAN_KEYS.includes(key as PlanKey) ? planLabel(key as PlanKey) : key);
 
 const productLabel = (p: Product) => `${p.name}${p.dose ? ` · ${p.dose}${p.unit ?? ''}` : ''}`;
 
@@ -96,7 +97,7 @@ export function Catalog() {
     <>
       <PageHeader title="Research Peptides" />
       <p className="-mt-3 mb-5 text-sm text-content-muted">
-        Wholesale shown at your <span className="text-accent">{PLAN_LABEL[plan]}</span> rate. Set your
+        Wholesale shown at your <span className="text-accent">{planDisplay(plan)}</span> rate. Set your
         own retail and keep the spread. Research use only.
       </p>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PLAN_KEYS, planLabel } from '@ruostack/shared';
 import { api } from '../lib/api.js';
 import { Badge, Card, KpiTile, PageHeader } from '@ruostack/ui';
 
@@ -44,10 +45,10 @@ export function Overview() {
         <Card className="p-5">
           <h2 className="mb-3 text-sm uppercase tracking-[0.12em] text-content-faint">Plan mix</h2>
           <div className="space-y-2 text-sm">
-            {([['Starter', d.plans.starter], ['Pro', d.plans.pro], ['Volume', d.plans.volume]] as const).map(([name, n]) => (
-              <div key={name} className="flex items-center justify-between">
-                <span className="text-content-muted">{name}</span>
-                <span className="font-semibold text-content">{n}</span>
+            {PLAN_KEYS.map((key) => (
+              <div key={key} className="flex items-center justify-between">
+                <span className="text-content-muted">{planLabel(key)}</span>
+                <span className="font-semibold text-content">{d.plans[key]}</span>
               </div>
             ))}
           </div>

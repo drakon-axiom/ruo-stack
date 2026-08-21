@@ -1,3 +1,5 @@
+import { installStripeNetworkRail } from './stripe-network-rail.ts';
+
 // Test env defaults. Real secrets only matter for the DB-integration tests,
 // which self-skip unless RUN_DB_TESTS=1 and real connection strings are present.
 const defaults: Record<string, string> = {
@@ -18,3 +20,11 @@ const defaults: Record<string, string> = {
 for (const [k, v] of Object.entries(defaults)) {
   if (!process.env[k]) process.env[k] = v;
 }
+
+// The hard network rail (Task 9): throws on any outbound request to
+// api.stripe.com, over both `fetch` and the Stripe SDK's own node:http(s)
+// client. Installed unconditionally for every test file — see
+// stripe-network-rail.ts for exactly what this does and does not cover. Does
+// NOT touch other hosts (e.g. the Supabase pooler DB-integration tests talk
+// to), which is proven in test/unit/stripe-network-rail.test.ts.
+installStripeNetworkRail();

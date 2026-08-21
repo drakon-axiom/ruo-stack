@@ -14,7 +14,7 @@ interface Connection {
   webhook_url: string | null;
   connected_at: string;
 }
-interface StoreState { plan_allows: boolean; connection: Connection | null }
+interface StoreState { plan_allows: boolean; connection: Connection | null; upsell: string | null }
 
 const STATUS_PILL: Record<string, string> = {
   active: 'border-success/40 bg-success/10 text-success',
@@ -49,7 +49,7 @@ export function Store() {
       {loading || !state ? (
         <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : !state.plan_allows ? (
-        <Upsell />
+        <Upsell message={state.upsell} />
       ) : state.connection ? (
         <>
           <Connected conn={state.connection} onChanged={() => { setManual(null); load(); }} />
@@ -114,11 +114,14 @@ function ShippingMarkup() {
 }
 
 
-function Upsell() {
+function Upsell({ message }: { message: string | null }) {
   return (
     <Card className="flex flex-col items-center gap-2 px-6 py-14 text-center">
-      <div className="text-lg font-semibold">Store connections are a Pro feature</div>
-      <div className="max-w-md text-sm text-content-muted">Upgrade to Pro or Volume to connect your WooCommerce store and pull orders in automatically.</div>
+      <div className="text-lg font-semibold">Store connections are a paid feature</div>
+      <div className="max-w-md text-sm text-content-muted">
+        {message ?? 'Store connections are not available on your plan'}. Upgrade to connect your WooCommerce store and
+        pull orders in automatically.
+      </div>
       <LinkButton to="/app/account" className="mt-2">View plans</LinkButton>
     </Card>
   );

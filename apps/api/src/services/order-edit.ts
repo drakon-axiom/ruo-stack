@@ -77,7 +77,7 @@ export async function applyOrderEdit(
   const pricing = await resolveShippingPricing(prisma, order.brandId);
   const rules = await loadShippingRules(prisma);
   const parcel = deriveParcel(parcelItems, rules.boxes, loadConfig().SHIPPING_DIM_DIVISOR);
-  const shipQuote = await priceShipping(plan, parcel, { toZip: recipient.zip, toState: recipient.state }, serviceCode, pricing, rules.mappings);
+  const shipQuote = await priceShipping(prisma, plan, parcel, { toZip: recipient.zip, toState: recipient.state }, serviceCode, pricing, rules.mappings);
   const shipping = shipQuote.chosen.amountCents; // brand cost = carrier + pick-&-pack
   const walletCharge = wholesaleTotal + shipping;
 

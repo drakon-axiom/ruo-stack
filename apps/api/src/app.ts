@@ -22,6 +22,7 @@ import { adminCatalogRoutes } from './routes/admin-catalog.ts';
 import { adminCatalogImportRoutes } from './routes/admin-catalog-import.ts';
 import { adminUsersRoutes } from './routes/admin-users.ts';
 import { adminShippingRoutes } from './routes/admin-shipping.ts';
+import { adminPlanRoutes } from './routes/admin-plans.ts';
 import { adminAliasRoutes } from './routes/admin-aliases.ts';
 import { adminReconciliationRoutes } from './routes/admin-reconciliation.ts';
 import { brandClaimRoutes } from './routes/brand-claims.ts';
@@ -96,6 +97,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminOverviewRoutes);
   await app.register(adminBrandRoutes);
   await app.register(adminShippingRoutes);
+  await app.register(adminPlanRoutes);
   await app.register(adminAliasRoutes);
   await app.register(adminReconciliationRoutes);
   await app.register(brandClaimRoutes);
