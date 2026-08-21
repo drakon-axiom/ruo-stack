@@ -15,7 +15,7 @@ import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
 import { BadRequest, Conflict, NotFound } from '../errors.ts';
 import { getWalletSummary } from '../services/wallet.ts';
 import { effectivePlan, isLapsed } from '../services/subscription.ts';
-import { getPlanRegistry, type ResolvedPlan } from '../services/plan-registry.ts';
+import { getPlanRegistry, storeConnectionsUpsellMessage, type ResolvedPlan } from '../services/plan-registry.ts';
 
 /**
  * Brand-facing money layer (Phase 1): Pro membership + prepaid wallet. Core never
@@ -213,6 +213,12 @@ export async function brandBillingRoutes(app: FastifyInstance): Promise<void> {
         max_orders_per_month: registry[current].capabilities.maxOrdersPerMonth,
         shipping: registry[current].capabilities.shipping,
         shipping_cutoff: registry[current].capabilities.shippingCutoff,
+      },
+      // Upsell copy, derived from the registry (not a hardcoded tier list) so
+      // it can't drift from the plan cards below when an admin renames a
+      // tier — same message brand-store.ts's 403s use.
+      upsell: {
+        store_connections: storeConnectionsUpsellMessage(registry),
       },
       // The catalogue the plan-picker renders — same DB rows as everything
       // else on this response, so the advertised price_cents and the price

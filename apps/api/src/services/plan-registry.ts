@@ -183,6 +183,25 @@ export async function getPlanRegistry(db: PrismaClient): Promise<PlanRegistry> {
 }
 
 /**
+ * "Which tiers unlock store connections", as a ready-to-render sentence —
+ * derived from the registry's `capabilities.storeConnections` flag rather
+ * than a literal list of tier names. Tier *names* are admin-editable now
+ * (Task 1+), so a hardcoded "Pro or Volume" would silently drift the day
+ * someone renames a tier; this reads the same names the plan cards do.
+ *
+ * Single source for both `brand-store.ts`'s 403 messages and
+ * `GET /api/brand/subscription`'s `upsell.store_connections` — the copy a
+ * brand sees in the error and the copy it sees in the UI can't disagree,
+ * because both come from this one function reading the one registry.
+ */
+export function storeConnectionsUpsellMessage(registry: PlanRegistry): string {
+  const names = PLAN_KEYS.filter((key) => registry[key].capabilities.storeConnections).map((key) => registry[key].name);
+  if (names.length === 0) return 'Store connections are not available on your plan';
+  const list = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+  return `Store connections require the ${list} plan`;
+}
+
+/**
  * Explicit invalidation, called by the admin plan-write routes (Task 7)
  * after any change to `plan` or `plan_price`. Clears both the cache and any
  * in-flight fetch, so the very next call is guaranteed to issue a fresh

@@ -20,12 +20,17 @@ type Markup = { state: 'loading' } | { state: 'locked' } | { state: 'set'; cents
 export function Shipping() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [markup, setMarkup] = useState<Markup>({ state: 'loading' });
+  // Registry-derived upsell copy — see Store.tsx's comment on the same fetch.
+  const [upsellMsg, setUpsellMsg] = useState('');
 
   useEffect(() => {
     api<{ orders: Order[] }>('/api/brand/orders').then((r) => setOrders(r.orders));
     api<{ markup_cents: number }>('/api/brand/store/shipping')
       .then((r) => setMarkup({ state: 'set', cents: r.markup_cents }))
       .catch((e) => setMarkup(e instanceof ApiError && e.status === 403 ? { state: 'locked' } : { state: 'set', cents: 0 }));
+    api<{ upsell: { store_connections: string } }>('/api/brand/subscription')
+      .then((r) => setUpsellMsg(r.upsell.store_connections))
+      .catch(() => undefined);
   }, []);
 
   const startOfMonth = new Date();
@@ -82,7 +87,7 @@ export function Shipping() {
           ) : markup.state === 'locked' ? (
             <>
               <p className="mb-3 text-sm text-content-muted">
-                Add a per-order shipping markup as profit on every store order. Available on Pro & Volume.
+                Add a per-order shipping markup as profit on every store order. {upsellMsg || 'Available on a paid plan.'}
               </p>
               <LinkButton to="/app/account">Upgrade plan</LinkButton>
             </>

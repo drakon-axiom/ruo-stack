@@ -13,11 +13,14 @@ import {
   cn,
   type Column,
 } from '@ruostack/ui';
+import { PLAN_KEYS, planLabel, type PlanKey } from '@ruostack/shared';
 import { api } from '../lib/api.js';
 import { FulfillmentBadge } from '../lib/fulfillment.js';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
-const PLAN_LABEL: Record<string, string> = { starter: 'Starter', pro: 'Pro', volume: 'Volume' };
+// Falls back to the raw value for a plan key the client doesn't recognize
+// (same behavior the old local PLAN_LABEL[key] ?? key lookup had).
+const planDisplay = (key: string) => (PLAN_KEYS.includes(key as PlanKey) ? planLabel(key as PlanKey) : key);
 
 interface RecentOrder {
   id: string;
@@ -114,7 +117,7 @@ export function Overview() {
           value={data ? dollars(data.wallet.available_cents) : '—'}
           tone="accent"
         />
-        <KpiTile label="Current plan" value={data ? (PLAN_LABEL[data.plan] ?? data.plan) : '—'} />
+        <KpiTile label="Current plan" value={data ? planDisplay(data.plan) : '—'} />
       </div>
 
       {data && data.orders.action_required > 0 && (

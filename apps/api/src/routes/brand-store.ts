@@ -7,7 +7,7 @@ import { loadConfig } from '../config.ts';
 import { writeAudit } from '../audit.ts';
 import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
 import { effectivePlan } from '../services/subscription.ts';
-import { getPlanRegistry } from '../services/plan-registry.ts';
+import { getPlanRegistry, storeConnectionsUpsellMessage } from '../services/plan-registry.ts';
 import { randomToken } from '../crypto.ts';
 import { decryptStoreCreds, deleteWooWebhooks, encryptStoreCreds, registerWooWebhooks, verifyWooCreds } from '../services/woo.ts';
 import { buildProductCsv, type ProvisionProduct } from '../services/store-provision.ts';
@@ -36,8 +36,15 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
     return registry[effectivePlan(sub)].capabilities.storeConnections;
   }
 
+  // Local wrapper around the registry-derived message — see
+  // storeConnectionsUpsellMessage's doc comment for why this isn't a
+  // hardcoded "Pro or Volume" string.
+  async function storeConnectionsUpsell(): Promise<string> {
+    return storeConnectionsUpsellMessage(await getPlanRegistry(prisma));
+  }
+
   async function requireConnection(brandId: string): Promise<BrandStoreConnection> {
-    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
     const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
     if (!conn) throw BadRequest('not_connected', 'Connect your store before pushing products');
     return conn;
@@ -76,7 +83,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/brand/store/connect', { preHandler: requireBrandSurface('store_connection') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const body = ConnectSchema.parse(req.body);
-    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
     const existing = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
     if (existing) throw Conflict('already_connected', 'A WooCommerce store is already connected — disconnect it first');
 
@@ -151,7 +158,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   // ── Shipping config (per-brand markup; pick-&-pack fee is platform-owned) ──
   app.get('/api/brand/store/shipping', { preHandler: requireBrand }, async (req) => {
     const { brandId } = req.brand!;
-    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
     const cfg = await prisma.brandShippingConfig.findUnique({ where: { brandId } });
     return {
       markup_cents: cfg?.markupCents ?? 0,
@@ -163,7 +170,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   app.patch('/api/brand/store/shipping', { preHandler: requireBrandSurface('store_config') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const { markup_cents } = z.object({ markup_cents: z.number().int().min(0).max(100_000) }).parse(req.body);
-    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
     const cfg = await prisma.brandShippingConfig.upsert({
       where: { brandId },
       create: { brandId, markupCents: markup_cents },
@@ -299,7 +306,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/brand/store/provision.csv', { preHandler: requireBrandSurface('provisioning') }, async (req, reply) => {
     const { brandId } = req.brand!;
     const { ids } = z.object({ ids: z.string().optional() }).parse(req.query);
-    if (!(await planAllowsStore(brandId))) throw Forbidden('Store connections require the Pro or Volume plan');
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
     const idList = ids ? ids.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
     const products = await loadProvisionProducts(brandId, idList);
     return reply

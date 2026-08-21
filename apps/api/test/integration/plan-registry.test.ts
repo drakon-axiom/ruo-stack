@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@ruostack/db';
 import { getPrisma } from '@ruostack/db';
 import { PLAN_KEYS } from '@ruostack/shared';
-import { getPlanRegistry, invalidatePlanRegistry, type ResolvedPlan } from '../../src/services/plan-registry.ts';
+import { getPlanRegistry, invalidatePlanRegistry, storeConnectionsUpsellMessage, type ResolvedPlan } from '../../src/services/plan-registry.ts';
 import { buyablePlanCatalog } from '../../src/routes/brand-billing.ts';
 
 // Mirrors seed-plans.ts's private, unexported HISTORICAL_DISPLAY_CENTS
@@ -286,6 +286,57 @@ describe('buyablePlanCatalog (brand-billing.ts) — drops unbuyable paid plans o
     };
 
     expect(buyablePlanCatalog(registry).some((p) => p.key === 'starter')).toBe(true);
+  });
+});
+
+describe('storeConnectionsUpsellMessage (plan-registry.ts) — derived, not hardcoded, tier names', () => {
+  function resolvedPlan(overrides: Partial<ResolvedPlan> & Pick<ResolvedPlan, 'key'>): ResolvedPlan {
+    return {
+      name: overrides.key,
+      features: [],
+      paid: overrides.key !== 'starter',
+      priceCents: 0,
+      stripePriceId: null,
+      priceVersionId: null,
+      capabilities: { storeConnections: false, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' },
+      ...overrides,
+    };
+  }
+
+  it('names both tiers when both Pro and Volume carry storeConnections', () => {
+    const registry = {
+      starter: resolvedPlan({ key: 'starter', capabilities: { storeConnections: false, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' } }),
+      pro: resolvedPlan({ key: 'pro', name: 'Pro', capabilities: { storeConnections: true, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' } }),
+      volume: resolvedPlan({ key: 'volume', name: 'Volume', capabilities: { storeConnections: true, maxOrdersPerMonth: null, shipping: 'live', shippingCutoff: '2 PM CST' } }),
+    };
+    expect(storeConnectionsUpsellMessage(registry)).toBe('Store connections require the Pro or Volume plan');
+  });
+
+  it('reflects an admin-renamed tier — proves the message is NOT a hardcoded "Pro or Volume" literal', () => {
+    const registry = {
+      starter: resolvedPlan({ key: 'starter', capabilities: { storeConnections: false, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' } }),
+      pro: resolvedPlan({ key: 'pro', name: 'Growth', capabilities: { storeConnections: true, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' } }),
+      volume: resolvedPlan({ key: 'volume', name: 'Scale', capabilities: { storeConnections: true, maxOrdersPerMonth: null, shipping: 'live', shippingCutoff: '2 PM CST' } }),
+    };
+    expect(storeConnectionsUpsellMessage(registry)).toBe('Store connections require the Growth or Scale plan');
+  });
+
+  it('names a single tier without "or" when only one carries the capability', () => {
+    const registry = {
+      starter: resolvedPlan({ key: 'starter', capabilities: { storeConnections: false, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' } }),
+      pro: resolvedPlan({ key: 'pro', capabilities: { storeConnections: false, maxOrdersPerMonth: null, shipping: 'flat', shippingCutoff: '10 AM CST' } }),
+      volume: resolvedPlan({ key: 'volume', name: 'Volume', capabilities: { storeConnections: true, maxOrdersPerMonth: null, shipping: 'live', shippingCutoff: '2 PM CST' } }),
+    };
+    expect(storeConnectionsUpsellMessage(registry)).toBe('Store connections require the Volume plan');
+  });
+
+  it('falls back to a plan-agnostic sentence when no tier carries the capability', () => {
+    const registry = {
+      starter: resolvedPlan({ key: 'starter' }),
+      pro: resolvedPlan({ key: 'pro' }),
+      volume: resolvedPlan({ key: 'volume' }),
+    };
+    expect(storeConnectionsUpsellMessage(registry)).toBe('Store connections are not available on your plan');
   });
 });
 
