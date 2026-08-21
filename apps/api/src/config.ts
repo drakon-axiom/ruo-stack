@@ -45,11 +45,12 @@ export const EnvSchema = z.object({
     .string()
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'STORE_CREDS_KEY must be base64 of 32 bytes'),
 
-  // Stripe (behind PaymentsAdapter only).
+  // Stripe (behind PaymentsAdapter only). Per-tier price ids are no longer
+  // config: `plan_price` (seeded once via `pnpm seed:plans --pro <id>
+  // --volume <id>`, see apps/api/src/scripts/seed-plans.ts) is the only
+  // source of truth for what each paid tier charges.
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
-  STRIPE_PRO_PRICE_ID: z.string().optional(),
-  STRIPE_VOLUME_PRICE_ID: z.string().optional(),
 
   // Shipping / rates. Origin = RUOStack's fulfillment warehouse (ship-from).
   WAREHOUSE_NAME: z.string().default('RUOStack Fulfillment'),

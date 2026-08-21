@@ -1,16 +1,15 @@
 import { getPrisma } from '@ruostack/db';
 import { PAID_PLAN_KEYS, type PaidPlanKey } from '@ruostack/shared';
-import { loadConfig } from '../config.ts';
 import { getClients } from '../clients.ts';
 
 /**
  * Seeds `plan_price` (and `plan.stripe_product_id`) from Stripe — the moment
  * the new source of truth gets its initial values.
  *
- * THE PRICE COMES FROM STRIPE, NOT FROM ANY LOCAL CONSTANT. We read the
- * configured price id, call `payments.retrievePrice()`, and write exactly
- * what Stripe returns. `HISTORICAL_DISPLAY_CENTS` below is checked only to
- * log a discrepancy — it is the symptom of the original bug (a price
+ * THE PRICE COMES FROM STRIPE, NOT FROM ANY LOCAL CONSTANT. We take the price
+ * id given on the command line, call `payments.retrievePrice()`, and write
+ * exactly what Stripe returns. `HISTORICAL_DISPLAY_CENTS` below is checked
+ * only to log a discrepancy — it is the symptom of the original bug (a price
  * constant that drifted from Stripe with no type error and no failing
  * test), not a source of truth. It is not exported from `@ruostack/shared`;
  * this script is its only reader.
@@ -22,13 +21,17 @@ import { getClients } from '../clients.ts';
  *  - Starter has no Stripe price (it's free) — see seedStarter() below for why
  *    it still gets a `plan_price` row.
  *
- * Env: STRIPE_PRO_PRICE_ID, STRIPE_VOLUME_PRICE_ID (apps/api/src/config.ts).
+ * Price ids are CLI arguments, not env vars — this is a one-time bootstrap
+ * operation (or a deliberate re-point), not ambient config something else
+ * reads at boot. `apps/api/src/config.ts` has no `STRIPE_*_PRICE_ID` entries;
+ * after the seed has run once, `plan_price` is the only source of truth and
+ * this script's arguments are forgotten on purpose:
+ *
+ *   pnpm seed:plans --pro price_xxx --volume price_yyy
+ *
+ * See parsePriceIdArgs() below for the flag names, which are derived from
+ * PAID_PLAN_KEYS rather than hardcoded.
  */
-
-const PRICE_ID_ENV: Record<PaidPlanKey, 'STRIPE_PRO_PRICE_ID' | 'STRIPE_VOLUME_PRICE_ID'> = {
-  pro: 'STRIPE_PRO_PRICE_ID',
-  volume: 'STRIPE_VOLUME_PRICE_ID',
-};
 
 /**
  * The prices this project advertised before the plan registry existed —
@@ -44,10 +47,10 @@ const HISTORICAL_DISPLAY_CENTS: Record<PaidPlanKey, number> = {
 
 /**
  * Seeds one paid tier from an already-resolved Stripe price id. Split out from
- * `seedPlans()`'s env lookup so integration tests can drive this against a
- * fake, test-scoped price id — proving the upsert/idempotency behavior
- * without colliding with (or depending on) the real `STRIPE_*_PRICE_ID`
- * configured in this environment.
+ * `seedPlans()`'s argument parsing so integration tests can drive this
+ * against a fake, test-scoped price id — proving the upsert/idempotency
+ * behavior without colliding with (or depending on) whatever real price id
+ * is passed to this script on the command line.
  */
 export async function seedPaidPlan(tier: PaidPlanKey, priceId: string): Promise<void> {
   const { prisma, payments } = getClients();
@@ -58,13 +61,13 @@ export async function seedPaidPlan(tier: PaidPlanKey, priceId: string): Promise<
   // tiered / graduated prices have no single `unit_amount`). A paid tier can
   // never legitimately cost 0 — silently writing price_cents: 0, active: true
   // would make Pro or Volume free for every new signup. Refuse loudly instead
-  // of writing it, same posture as the missing-env-var guard in seedPlans().
+  // of writing it, same posture as the missing-argument guard in seedPlans().
   if (retrieved.unitAmountCents <= 0) {
     throw new Error(
       `[seed-plans] Refusing to seed "${tier}": Stripe price ${priceId} has unit_amount ${retrieved.unitAmountCents}c. ` +
         `This is almost certainly a metered/tiered/graduated price with no flat unit_amount (retrievePrice() coerces a ` +
-        `missing unit_amount to 0) — seeding it would make a paid tier free. Point STRIPE_${tier.toUpperCase()}_PRICE_ID ` +
-        `at a standard recurring price with a fixed amount, or fix this check if that assumption is wrong.`,
+        `missing unit_amount to 0) — seeding it would make a paid tier free. Point --${tier} at a standard recurring ` +
+        `price with a fixed amount, or fix this check if that assumption is wrong.`,
     );
   }
 
@@ -149,20 +152,61 @@ export async function seedStarterPlan(): Promise<void> {
   console.log(`[seed-plans] "starter": seeded plan_price ${created.id} = 0c (free, no Stripe price).`);
 }
 
-export async function seedPlans(): Promise<void> {
-  await seedStarterPlan();
-  const cfg = loadConfig();
+/** e.g. `Usage: pnpm seed:plans --pro <stripe_price_id> --volume <stripe_price_id>` */
+function usage(): string {
+  const flags = PAID_PLAN_KEYS.map((tier) => `--${tier} <stripe_price_id>`).join(' ');
+  return `Usage: pnpm seed:plans ${flags}`;
+}
+
+/**
+ * Parses `--<tier> <stripe_price_id>` pairs off argv for every paid tier.
+ * Flag names are derived from `PAID_PLAN_KEYS` — not hardcoded to `--pro` /
+ * `--volume` — so a new paid tier automatically requires (and gets a usage
+ * line for) its own flag here with nothing else to update.
+ *
+ * Fails loudly, before any Stripe call, on either problem a bad invocation
+ * can have: a missing tier (would leave that tier with no active price —
+ * `plan_price_unconfigured` at checkout) or a malformed one (a typo'd or
+ * transposed argument). Never skips a tier silently.
+ */
+export function parsePriceIdArgs(argv: readonly string[]): Record<PaidPlanKey, string> {
+  const priceIds = {} as Record<PaidPlanKey, string>;
   for (const tier of PAID_PLAN_KEYS) {
-    const priceId = cfg[PRICE_ID_ENV[tier]];
-    if (!priceId) {
-      throw new Error(`${PRICE_ID_ENV[tier]} is not set — cannot seed the "${tier}" plan price.`);
+    const flag = `--${tier}`;
+    const flagIndex = argv.indexOf(flag);
+    if (flagIndex === -1) {
+      throw new Error(`[seed-plans] Missing required argument ${flag} <stripe_price_id>.\n${usage()}`);
     }
-    await seedPaidPlan(tier, priceId);
+    const value = argv[flagIndex + 1];
+    if (!value || value.startsWith('--')) {
+      throw new Error(`[seed-plans] ${flag} requires a value (a Stripe price id).\n${usage()}`);
+    }
+    // A Stripe price id always starts with "price_" — catch a typo'd or
+    // transposed argument (e.g. the product id, or the two flags swapped)
+    // here, before it ever reaches retrievePrice().
+    if (!value.startsWith('price_')) {
+      throw new Error(
+        `[seed-plans] ${flag} "${value}" does not look like a Stripe price id (expected it to start with "price_").\n${usage()}`,
+      );
+    }
+    priceIds[tier] = value;
+  }
+  return priceIds;
+}
+
+export async function seedPlans(argv: readonly string[]): Promise<void> {
+  // Parse (and validate the shape of) every price id before writing anything,
+  // including the free starter row — a bad invocation should fail before any
+  // side effect, not partway through.
+  const priceIds = parsePriceIdArgs(argv);
+  await seedStarterPlan();
+  for (const tier of PAID_PLAN_KEYS) {
+    await seedPaidPlan(tier, priceIds[tier]);
   }
 }
 
 async function main() {
-  await seedPlans();
+  await seedPlans(process.argv.slice(2));
 }
 
 // Only run as a script (not when imported by tests).
