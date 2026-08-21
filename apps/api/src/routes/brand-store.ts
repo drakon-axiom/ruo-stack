@@ -66,7 +66,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
 
   async function requireConnection(brandId: string): Promise<BrandStoreConnection> {
-    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell(), 'store_connections_required');
     const conn = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
     if (!conn) throw BadRequest('not_connected', 'Connect your store before pushing products');
     return conn;
@@ -105,7 +105,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/brand/store/connect', { preHandler: requireBrandSurface('store_connection') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const body = ConnectSchema.parse(req.body);
-    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell(), 'store_connections_required');
     const existing = await prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } });
     if (existing) throw Conflict('already_connected', 'A WooCommerce store is already connected — disconnect it first');
 
@@ -180,7 +180,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   // ── Shipping config (per-brand markup; pick-&-pack fee is platform-owned) ──
   app.get('/api/brand/store/shipping', { preHandler: requireBrand }, async (req) => {
     const { brandId } = req.brand!;
-    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell(), 'store_connections_required');
     const cfg = await prisma.brandShippingConfig.findUnique({ where: { brandId } });
     return {
       markup_cents: cfg?.markupCents ?? 0,
@@ -192,7 +192,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   app.patch('/api/brand/store/shipping', { preHandler: requireBrandSurface('store_config') }, async (req) => {
     const { brandId, userId } = req.brand!;
     const { markup_cents } = z.object({ markup_cents: z.number().int().min(0).max(100_000) }).parse(req.body);
-    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell(), 'store_connections_required');
     const cfg = await prisma.brandShippingConfig.upsert({
       where: { brandId },
       create: { brandId, markupCents: markup_cents },
@@ -328,7 +328,7 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/brand/store/provision.csv', { preHandler: requireBrandSurface('provisioning') }, async (req, reply) => {
     const { brandId } = req.brand!;
     const { ids } = z.object({ ids: z.string().optional() }).parse(req.query);
-    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
+    if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell(), 'store_connections_required');
     const idList = ids ? ids.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
     const products = await loadProvisionProducts(brandId, idList);
     return reply

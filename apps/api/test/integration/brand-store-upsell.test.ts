@@ -37,8 +37,12 @@ describe.skipIf(!RUN)('brand store upsell field (DB integration, service-level)'
   }
 
   afterAll(async () => {
-    await prisma.subscriptionState.deleteMany({ where: { brandId: { in: brandIds } } }).catch(() => undefined);
-    await prisma.brand.deleteMany({ where: { id: { in: brandIds } } }).catch(() => undefined);
+    // NOT wrapped in .catch(() => undefined): two of the three tests below
+    // insert subscription_state rows into a live shared database whose
+    // required baseline is zero rows. A silently swallowed delete here would
+    // leak them permanently with no test failure to signal it.
+    await prisma.subscriptionState.deleteMany({ where: { brandId: { in: brandIds } } });
+    await prisma.brand.deleteMany({ where: { id: { in: brandIds } } });
     await prisma.$disconnect();
   });
 

@@ -14,8 +14,10 @@ interface Order {
   delivered_at: string | null;
   created_at: string;
 }
-// 'set' = markup loaded; 'locked' = Starter plan (403, message carries the
-// registry-derived upsell copy — see brand-store.ts's storeConnectionsUpsell); 'loading' = pending.
+// 'set' = markup loaded; 'locked' = can't reach /api/brand/store/shipping —
+// message is the registry-derived upsell copy for the plan-gate 403
+// ('store_connections_required'), or a generic fallback for any other 403
+// (never a raw account-status message); 'loading' = pending.
 type Markup = { state: 'loading' } | { state: 'locked'; message: string } | { state: 'set'; cents: number };
 
 export function Shipping() {
@@ -26,13 +28,23 @@ export function Shipping() {
     api<{ orders: Order[] }>('/api/brand/orders').then((r) => setOrders(r.orders));
     api<{ markup_cents: number }>('/api/brand/store/shipping')
       .then((r) => setMarkup({ state: 'set', cents: r.markup_cents }))
-      .catch((e) =>
-        setMarkup(
-          e instanceof ApiError && e.status === 403
-            ? { state: 'locked', message: e.message }
-            : { state: 'set', cents: 0 },
-        ),
-      );
+      .catch((e) => {
+        // Every 403 in this app carries the same HTTP status and the same
+        // generic `error: 'forbidden'` code (errors.ts) — status alone can't
+        // tell "plan doesn't allow this" apart from "brand suspended" or
+        // "membership revoked" (guards.ts), and those carry account-status
+        // text that must never be rendered as marketing copy. Only the
+        // plan-gate 403 (brand-store.ts) sets the distinguishing
+        // 'store_connections_required' code; anything else — including any
+        // other 403 — falls back to generic copy, never the raw message.
+        if (e instanceof ApiError && e.code === 'store_connections_required') {
+          setMarkup({ state: 'locked', message: e.message });
+        } else if (e instanceof ApiError && e.status === 403) {
+          setMarkup({ state: 'locked', message: 'Available on a paid plan' });
+        } else {
+          setMarkup({ state: 'set', cents: 0 });
+        }
+      });
   }, []);
 
   const startOfMonth = new Date();
