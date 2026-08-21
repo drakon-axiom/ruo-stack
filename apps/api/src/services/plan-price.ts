@@ -25,16 +25,24 @@ import { invalidatePlanRegistry } from './plan-registry.ts';
  *     `plan`+`amount` instead would be wrong: a 4900→5900→4900 revert would
  *     collide with the first (now-archived) attempt and return an inactive
  *     Price that can't accept new subscriptions.
- *   Step C (one atomic $transaction) — stamp the Stripe id onto the pending
- *     row, deactivate whatever was active, activate the pending row, write
- *     the audit with before/after + the mandatory reason. The partial
+ *   Step C (one atomic $transaction) — re-check the live subscriber count
+ *     (closes the check-then-act window Step B's Stripe round-trip opens —
+ *     see the comment at the re-check below), stamp the Stripe id onto the
+ *     pending row, deactivate whatever was active, activate the pending row,
+ *     write the audit with before/after + the mandatory reason. The partial
  *     unique index `plan_price_one_active_per_plan` forces
  *     deactivate-before-activate — the database enforces the ordering.
- *   Step D (post-commit, best-effort) — archive the old Stripe price.
- *     Deliberately outside the transaction: archiving is idempotent and
- *     non-destructive (does not affect subscriptions already on that price),
- *     so a failure here is cosmetic Stripe clutter, never a reason to roll
- *     back correct DB state.
+ *
+ *   Archiving the old Stripe price is NOT done here. Plan Rail 3 ("Deferred
+ *   archive") requires the old price to survive ~48h so in-flight Checkout
+ *   Sessions (~24h TTL) drain before it stops accepting new subscriptions —
+ *   archiving in-request would risk breaking a Checkout a brand opened
+ *   moments before this reprice. `archivedAt`, stamped on the deactivated row
+ *   above, only means "deactivated in our ledger"; it is NOT "archived in
+ *   Stripe". The reconciliation worker (`services/reconciliation.ts`,
+ *   `sweepArchivablePrices`) is what actually calls `payments.archivePrice()`,
+ *   once `archivedAt` is old enough. That distinction is load-bearing: do not
+ *   "simplify" by archiving here again.
  *
  * Takes the PaymentsAdapter as a parameter, not via getClients() — the seam
  * tests inject a FakePaymentsAdapter through.
@@ -173,11 +181,42 @@ export async function changePlanPrice(
     priceVersionId: pending.id,
   });
 
-  // ── Step C — one atomic commit: stamp the Stripe id, deactivate the old
-  // active row, activate the pending row, write the audit. ─────────────────
+  // ── Step C — one atomic commit: re-check subscribers, stamp the Stripe id,
+  // deactivate the old active row, activate the pending row, write the audit. ─
 
   const pendingId = pending.id;
   const committed = await prisma.$transaction(async (tx) => {
+    // Re-check the live subscriber count INSIDE this transaction. The outer
+    // guard above ran BEFORE payments.createPrice()'s Stripe round-trip
+    // (hundreds of ms); a `subscription.activated` webhook landing in that
+    // window can take the count from zero to positive between the pre-flight
+    // check and this commit, stranding a brand on the price this transaction
+    // is about to deactivate — with no Phase 2 worker to migrate them.
+    // Re-reading inside the same transaction that performs the deactivation
+    // closes that specific window atomically: either this sees the new
+    // subscriber and aborts (rolling back the whole transaction, including
+    // the stripePriceId stamp above), or it doesn't and the deactivation is
+    // still race-free by the time it commits. Query matches the outer guard
+    // exactly (plan, status in ['active','past_due'], stripeSubscriptionId
+    // not null) — see the comment on the outer check for why.
+    //
+    // This does NOT close every window: a brand who opens Checkout before
+    // the reprice and completes it after this transaction commits is
+    // stranded regardless — no in-transaction check can see a Checkout
+    // Session that hasn't posted its webhook yet. That is a materially
+    // different window (open Checkout, not open subscription) and nothing
+    // here can close it; do not treat this guard as total.
+    const liveSubscriberCount = await tx.subscriptionState.count({
+      where: { plan, status: { in: ['active', 'past_due'] }, stripeSubscriptionId: { not: null } },
+    });
+    if (liveSubscriberCount > 0) {
+      throw Conflict(
+        'migration_required',
+        `"${plan}" gained ${liveSubscriberCount} subscriber(s) while this price change was in flight. ` +
+          `Repricing would strand them on the old price — the subscriber-migration worker (Phase 2) is not built yet.`,
+      );
+    }
+
     await tx.planPrice.update({ where: { id: pendingId }, data: { stripePriceId: priceId } });
 
     // Re-read inside the transaction — the outer `currentActive` read is
@@ -211,21 +250,10 @@ export async function changePlanPrice(
   // would let a concurrent read repopulate the cache with pre-commit data.
   invalidatePlanRegistry();
 
-  // ── Step D — deferred, best-effort archive of the old Stripe price.
-  // A failure here is cosmetic Stripe clutter, not a billing fault: it must
-  // never roll back the DB state that already committed above. ────────────
-  if (committed.oldActive?.stripePriceId) {
-    try {
-      await payments.archivePrice(committed.oldActive.stripePriceId);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `[plan-price] failed to archive old Stripe price ${committed.oldActive.stripePriceId} for "${plan}" ` +
-          `(new active price ${priceId} already committed):`,
-        err,
-      );
-    }
-  }
+  // Archiving the old Stripe price is deliberately NOT done here — see the
+  // module doc comment. It is picked up later by the reconciliation worker's
+  // `sweepArchivablePrices`, once `archivedAt` (stamped above) is old enough
+  // to be sure no in-flight Checkout Session still points at it.
 
   return {
     planPriceId: committed.activated.id,

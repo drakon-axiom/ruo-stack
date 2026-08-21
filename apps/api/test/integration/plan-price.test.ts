@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { getPrisma, type AdminRole } from '@ruostack/db';
+import type { CreatePriceInput } from '@ruostack/shared';
 import { buildApp } from '../../src/app.ts';
 import { signAdminAccessToken } from '../../src/auth/admin-jwt.ts';
 import { hashPassword, hashToken, randomToken } from '../../src/crypto.ts';
@@ -9,18 +10,29 @@ import { FakePaymentsAdapter } from '../FakePaymentsAdapter.ts';
 import { changePlanPrice } from '../../src/services/plan-price.ts';
 
 // The price-change transaction (Task 8): insert pending → Stripe → one
-// atomic commit flipping `active` + audit → deferred archive. Self-skips
-// unless RUN_DB_TESTS=1.
+// atomic commit re-checking subscribers + flipping `active` + audit.
+// Archiving the old Stripe price is deliberately NOT part of this request —
+// see plan-price.ts's module doc comment and reconciliation-archive-sweep.test.ts.
+// Self-skips unless RUN_DB_TESTS=1.
 //
-// HARD RULE: `plan_price` is a live, shared table with exactly 3 rows today
-// (starter/pro/volume, all active). This suite snapshots pro's AND volume's
-// active rows in beforeAll and restores BOTH the same way in afterAll —
-// deleting EVERY row for that plan that isn't the original (by construction,
-// not by trusting a tracked id survived every assertion above it) BEFORE
-// reactivating the original, since the partial unique index allows at most
-// one active row per plan at a time. The restore is never wrapped in
-// `.catch(() => undefined)`: a swallowed failure here is exactly how a
-// previous suite's leak went unnoticed.
+// HARD RULE: `plan_price` is a live, shared table — today it holds exactly 3
+// rows (starter/pro/volume, all active), but this suite does NOT assume
+// that: on an empty table (CI — migration 030 deliberately leaves it empty,
+// and ci.yml never runs seed:plans) it seeds its own throwaway pro/volume
+// fixture in beforeAll (see seededProFixture/seededVolumeFixture) and
+// removes exactly that fixture in afterAll, leaving the table exactly as
+// empty as it found it. Against the real (already-seeded) database this
+// suite snapshots pro's AND volume's real active rows in beforeAll and
+// restores BOTH the same way in afterAll — deleting EVERY row for that plan
+// that isn't the original (by construction, not by trusting a tracked id
+// survived every assertion above it) BEFORE reactivating the original,
+// since the partial unique index allows at most one active row per plan at
+// a time, both wrapped together in one `$transaction` so a process kill
+// mid-cleanup can never leave a plan with zero active rows. The restore is
+// never wrapped in `.catch(() => undefined)`: a swallowed failure here is
+// exactly how a previous suite's leak went unnoticed. No assertion in this
+// suite pins an absolute price (e.g. `toBe(4900)`) — every guard test reads
+// the actually-active price and computes a target relative to it.
 //
 // `volume`'s active row is meant to stay untouched in practice — guard tests
 // that need a real Stripe round-trip to prove a guard was actually passed
@@ -64,29 +76,106 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
   let supportToken: string;
   const adminIds: string[] = [];
 
-  // pro's real active row, snapshotted so it can be put back exactly.
+  // pro's/volume's real active row, snapshotted so it can be put back
+  // exactly. Read nullable (findFirst, not findFirstOrThrow) — null on an
+  // empty plan_price table, e.g. CI: migration 030 deliberately leaves it
+  // empty and ci.yml never runs seed:plans. Mirrors seed-plans.test.ts's
+  // "null on an empty database (nothing to restore)" pattern.
   let originalProActive: { id: string; priceCents: number; stripePriceId: string | null };
   let originalVolumeActive: { id: string; priceCents: number; stripePriceId: string | null };
+  let originalProProductId: string | null;
+  let originalVolumeProductId: string | null;
+  // True only when THIS suite created the fixture because the table/column
+  // was empty — distinguishes "restore the real thing" from "remove exactly
+  // what we added" in afterAll.
+  let seededProFixture = false;
+  let seededVolumeFixture = false;
+  let seededProProductId = false;
+  let seededVolumeProductId = false;
 
   // The two plan_price rows this suite's happy-path/failure/retry sequence
   // creates on "pro" — tracked so afterAll can delete exactly these and
   // nothing else.
-  let createdRowAId: string | undefined; // 4900 -> 5900
+  let createdRowAId: string | undefined; // startingProCents -> 5900
   let createdRowBId: string | undefined; // 5900 -> 6900 (fails once, then retried)
 
+  // Read off whatever is actually active at suite start rather than assumed
+  // — this suite must not pin itself to the pre-reprice production fixture
+  // (4900c/14900c) and break the day that number legitimately changes.
+  let startingProCents: number;
+  // A drop guaranteed to exceed the ±50% confirm_large_change threshold
+  // regardless of what volume is actually priced at today.
+  let largeDropVolumeCents: number;
+  // A small, in-bounds move guaranteed to differ from volume's current
+  // price, for guard tests that only care about "a different price", not
+  // "how different".
+  let migrationGuardTargetCents: number;
+
   beforeAll(async () => {
-    const [pro, volume] = await Promise.all([
-      prisma.planPrice.findFirstOrThrow({ where: { plan: 'pro', active: true } }),
-      prisma.planPrice.findFirstOrThrow({ where: { plan: 'volume', active: true } }),
+    const [proPlan, volumePlan] = await Promise.all([
+      prisma.plan.findUniqueOrThrow({ where: { key: 'pro' } }),
+      prisma.plan.findUniqueOrThrow({ where: { key: 'volume' } }),
     ]);
-    originalProActive = { id: pro.id, priceCents: pro.priceCents, stripePriceId: pro.stripePriceId };
-    originalVolumeActive = { id: volume.id, priceCents: volume.priceCents, stripePriceId: volume.stripePriceId };
-    // The volume row is read-only in this suite (guard tests only) — confirm
-    // the pre-flight numbers this whole plan was built against, so a drifted
-    // fixture fails loudly here instead of producing a confusing guard-test
-    // failure later.
-    expect(originalProActive.priceCents).toBe(4900);
-    expect(originalVolumeActive.priceCents).toBe(14900);
+    originalProProductId = proPlan.stripeProductId;
+    originalVolumeProductId = volumePlan.stripeProductId;
+
+    const [proActive, volumeActive] = await Promise.all([
+      prisma.planPrice.findFirst({ where: { plan: 'pro', active: true } }),
+      prisma.planPrice.findFirst({ where: { plan: 'volume', active: true } }),
+    ]);
+
+    // This suite exercises repricing FROM a starting price, and
+    // changePlanPrice needs plan.stripe_product_id to create a new Price
+    // generation. On an empty plan_price table / unset stripe_product_id
+    // (CI) there is neither — seed a throwaway fixture so the suite is
+    // self-sufficient, tracked so afterAll removes exactly what it added
+    // and nothing else. Against the real (already-seeded) database, none
+    // of this fires — proActive/volumeActive/*ProductId are already set.
+    if (!proPlan.stripeProductId) {
+      await prisma.plan.update({ where: { key: 'pro' }, data: { stripeProductId: `prod_fixture_pro_${randomToken(6)}` } });
+      seededProProductId = true;
+    }
+    if (!volumePlan.stripeProductId) {
+      await prisma.plan.update({ where: { key: 'volume' }, data: { stripeProductId: `prod_fixture_volume_${randomToken(6)}` } });
+      seededVolumeProductId = true;
+    }
+    if (proActive) {
+      originalProActive = { id: proActive.id, priceCents: proActive.priceCents, stripePriceId: proActive.stripePriceId };
+    } else {
+      const seeded = await prisma.planPrice.create({
+        data: { plan: 'pro', priceCents: 4900, stripePriceId: `price_fixture_pro_${randomToken(6)}`, active: true },
+      });
+      originalProActive = { id: seeded.id, priceCents: seeded.priceCents, stripePriceId: seeded.stripePriceId };
+      seededProFixture = true;
+    }
+    if (volumeActive) {
+      originalVolumeActive = { id: volumeActive.id, priceCents: volumeActive.priceCents, stripePriceId: volumeActive.stripePriceId };
+    } else {
+      const seeded = await prisma.planPrice.create({
+        data: { plan: 'volume', priceCents: 14900, stripePriceId: `price_fixture_volume_${randomToken(6)}`, active: true },
+      });
+      originalVolumeActive = { id: seeded.id, priceCents: seeded.priceCents, stripePriceId: seeded.stripePriceId };
+      seededVolumeFixture = true;
+    }
+
+    startingProCents = originalProActive.priceCents;
+    // Self-check, not an assumption: the happy-path test below reprices pro
+    // TO 5900 — if the starting price ever happened to already be 5900 that
+    // test would 409 price_unchanged instead of exercising the happy path.
+    expect(startingProCents).not.toBe(5900);
+
+    largeDropVolumeCents = Math.max(100, Math.round(originalVolumeActive.priceCents * 0.2));
+    // Self-check: this must actually clear the >50% threshold, or the
+    // "requires confirm" guard test below would pass trivially without
+    // exercising anything.
+    expect(Math.abs(largeDropVolumeCents - originalVolumeActive.priceCents) / originalVolumeActive.priceCents).toBeGreaterThan(0.5);
+
+    // A small, in-bounds move guaranteed to differ from volume's current
+    // price — the migration_required guard test below needs to clear the
+    // price_unchanged guard (which runs first) without depending on what
+    // that current price actually is.
+    migrationGuardTargetCents = Math.min(100_000, originalVolumeActive.priceCents + 500);
+    expect(migrationGuardTargetCents).not.toBe(originalVolumeActive.priceCents);
 
     fake = new FakePaymentsAdapter();
     setClientsForTest({ payments: fake });
@@ -104,38 +193,59 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
 
   afterAll(async () => {
     // Belt-and-braces, by CONSTRUCTION rather than by trusting that every
-    // assertion above ran to completion in the right order: delete every
-    // "pro" row that isn't the original real one, whatever it is and
-    // however it got there (createdRowAId, createdRowBId, an untracked row
-    // from an assertion that threw before assigning one, or a stray from
-    // the partial-unique-index test if the index were ever gone). This is
-    // strictly broader than — and supersedes — deleting just the two
-    // tracked ids. Done BEFORE reactivating the original: the partial
-    // unique index (plan_price_one_active_per_plan) allows at most one
-    // active row per plan at any instant, and createdRowBId is active at
-    // this point in the normal run.
-    await prisma.planPrice.deleteMany({ where: { plan: 'pro', id: { not: originalProActive.id } } });
-    await prisma.planPrice.update({
-      where: { id: originalProActive.id },
-      data: { active: true, archivedAt: null },
+    // assertion above ran to completion in the right order: remove every
+    // "pro" row that isn't the original one, whatever it is and however it
+    // got there (createdRowAId, createdRowBId, an untracked row from an
+    // assertion that threw before assigning one, or a stray from the
+    // partial-unique-index test if the index were ever gone).
+    //
+    // Wrapped in ONE transaction rather than a delete then a separate
+    // update: between an unwrapped delete and reactivate, "pro" would have
+    // ZERO active rows for a window — a process kill right there leaves
+    // production at plan_price_unconfigured with Pro missing from the plan
+    // picker. The transaction removes that window: either the whole
+    // cleanup commits atomically, or none of it does and the (still
+    // correct) pre-cleanup state stands.
+    await prisma.$transaction(async (tx) => {
+      if (seededProFixture) {
+        // This suite created pro's active row from nothing (empty
+        // plan_price table) — leave it exactly as empty as it found it.
+        await tx.planPrice.deleteMany({ where: { plan: 'pro' } });
+      } else {
+        await tx.planPrice.deleteMany({ where: { plan: 'pro', id: { not: originalProActive.id } } });
+        await tx.planPrice.update({ where: { id: originalProActive.id }, data: { active: true, archivedAt: null } });
+      }
+
+      // Volume is meant to stay read-only in this suite, but two guard
+      // tests round-trip a real (scripted-to-fail) createPrice call against
+      // it — each already cleans up its own pending row in try/finally, but
+      // "the scripted failure never fires" is exactly the scenario that
+      // would slip past a try/finally and actually commit. Rather than
+      // leaving that case as assert-only, give volume the same
+      // belt-and-braces sweep as pro: repair by construction, not just
+      // detect. Same empty-table branch as pro, for the same reason.
+      if (seededVolumeFixture) {
+        await tx.planPrice.deleteMany({ where: { plan: 'volume' } });
+      } else {
+        await tx.planPrice.deleteMany({ where: { plan: 'volume', id: { not: originalVolumeActive.id } } });
+        await tx.planPrice.update({ where: { id: originalVolumeActive.id }, data: { active: true, archivedAt: null } });
+      }
     });
 
-    // Volume is meant to stay read-only in this suite, but two guard tests
-    // now round-trip a real (scripted-to-fail) createPrice call against it —
-    // each already cleans up its own pending row in try/finally, but "the
-    // scripted failure never fires" is exactly the scenario that would slip
-    // past a try/finally and actually commit. Rather than leaving that case
-    // as assert-only (loud failure here, then the same manual repair this
-    // task needed once already), give volume the same belt-and-braces sweep
-    // as pro: repair by construction, not just detect.
-    await prisma.planPrice.deleteMany({ where: { plan: 'volume', id: { not: originalVolumeActive.id } } });
-    await prisma.planPrice.update({
-      where: { id: originalVolumeActive.id },
-      data: { active: true, archivedAt: null },
-    });
-    const volumeNow = await prisma.planPrice.findUniqueOrThrow({ where: { id: originalVolumeActive.id } });
-    expect(volumeNow.active).toBe(true);
-    expect(volumeNow.archivedAt).toBeNull();
+    if (seededVolumeFixture) {
+      expect(await prisma.planPrice.findFirst({ where: { plan: 'volume' } })).toBeNull();
+    } else {
+      const volumeNow = await prisma.planPrice.findUniqueOrThrow({ where: { id: originalVolumeActive.id } });
+      expect(volumeNow.active).toBe(true);
+      expect(volumeNow.archivedAt).toBeNull();
+    }
+
+    if (seededProProductId) {
+      await prisma.plan.update({ where: { key: 'pro' }, data: { stripeProductId: originalProProductId } });
+    }
+    if (seededVolumeProductId) {
+      await prisma.plan.update({ where: { key: 'volume' }, data: { stripeProductId: originalVolumeProductId } });
+    }
 
     await prisma.adminUser.deleteMany({ where: { id: { in: adminIds } } });
     resetClientsForTest();
@@ -163,7 +273,7 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       createdRowAId = body.plan_price_id;
       expect(body.price_cents).toBe(5900);
       expect(body.stripe_price_id).toMatch(/^price_fake_/);
-      expect(body.previous_price_cents).toBe(4900);
+      expect(body.previous_price_cents).toBe(startingProCents);
       expect(body.previous_stripe_price_id).toBe(originalProActive.stripePriceId);
 
       // Exactly one active row for pro.
@@ -178,11 +288,15 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       expect(oldRow.active).toBe(false);
       expect(oldRow.archivedAt).not.toBeNull();
 
-      // Exactly one createPrice call happened, and the old Stripe price was
-      // archived (deferred, best-effort, post-commit).
-      expect(fake.calls.length).toBe(callsBefore + 2); // createPrice + archivePrice
-      const archiveCalls = fake.callsFor('archivePrice');
-      expect(archiveCalls[archiveCalls.length - 1]!.args[0]).toBe(originalProActive.stripePriceId);
+      // Exactly one createPrice call happened. Archiving the old Stripe
+      // price is deliberately NOT done in-request (Fix 2 / plan Rail 3) —
+      // it's picked up later by the reconciliation worker's
+      // sweepArchivablePrices, ~48h after archivedAt, so an in-flight
+      // Checkout Session holding the old price has time to drain. See
+      // reconciliation-archive-sweep.test.ts for that behaviour.
+      expect(fake.calls.length).toBe(callsBefore + 1); // createPrice only
+      expect(fake.calls[fake.calls.length - 1]!.method).toBe('createPrice');
+      expect(fake.callsFor('archivePrice')).toHaveLength(0);
     });
 
     it('a Stripe failure leaves a reusable pending row and changes nothing active', async () => {
@@ -241,8 +355,10 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       expect(body.plan_price_id).toBe(createdRowBId);
       expect(body.price_cents).toBe(6900);
 
-      // createPrice + archivePrice this time.
-      expect(fake.calls.length).toBe(callsBefore + 2);
+      // createPrice only this time too — archiving stays deferred to the
+      // reconciliation sweep, not performed in-request (Fix 2).
+      expect(fake.calls.length).toBe(callsBefore + 1);
+      expect(fake.callsFor('archivePrice')).toHaveLength(0);
 
       const createCalls = fake.callsFor('createPrice');
       // The failed attempt and this retry both targeted the same pending row id.
@@ -255,7 +371,9 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       expect(activeRows).toHaveLength(1);
       expect(activeRows[0]!.id).toBe(createdRowBId);
 
-      // Row A (5900) is now archived — the previous active row.
+      // Row A (5900) is deactivated (archivedAt stamped in our ledger) —
+      // the previous active row — even though it has not yet been archived
+      // in Stripe itself; that's the sweep's job, deferred ~48h.
       const rowA = await prisma.planPrice.findUniqueOrThrow({ where: { id: createdRowAId! } });
       expect(rowA.active).toBe(false);
       expect(rowA.archivedAt).not.toBeNull();
@@ -335,7 +453,7 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
 
         // Both rows present: the live (active) one blocks.
         await expect(
-          changePlanPrice(prisma, fake, { plan: 'volume', priceCents: 9900, reason: 'x', actorId: financeAdminId }),
+          changePlanPrice(prisma, fake, { plan: 'volume', priceCents: migrationGuardTargetCents, reason: 'x', actorId: financeAdminId }),
         ).rejects.toMatchObject({ statusCode: 409, code: 'migration_required' });
         expect(fake.calls.length).toBe(callsBefore);
 
@@ -346,7 +464,7 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
         await prisma.subscriptionState.deleteMany({ where: { brandId: activeBrand.id } });
         fake.failNextCall('createPrice');
         await expect(
-          changePlanPrice(prisma, fake, { plan: 'volume', priceCents: 9900, reason: 'x', actorId: financeAdminId }),
+          changePlanPrice(prisma, fake, { plan: 'volume', priceCents: migrationGuardTargetCents, reason: 'x', actorId: financeAdminId }),
         ).rejects.toThrow();
         expect(fake.calls.length).toBe(callsBefore + 1);
         expect(fake.calls[fake.calls.length - 1]!.method).toBe('createPrice');
@@ -358,7 +476,7 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
         // The failed attempt above left a reusable pending row on volume —
         // clean it up (never activated, so nothing else to restore).
         await prisma.planPrice.deleteMany({
-          where: { plan: 'volume', priceCents: 9900, active: false, stripePriceId: null },
+          where: { plan: 'volume', priceCents: migrationGuardTargetCents, active: false, stripePriceId: null },
         });
       }
 
@@ -368,9 +486,10 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
 
     it('a change over ±50% without confirm_large_change -> 409, requires confirm', async () => {
       const callsBefore = fake.calls.length;
-      // volume is at 14900c; 5000c is a 66% drop.
+      // largeDropVolumeCents is computed in beforeAll to be >50% below
+      // whatever volume's active price actually is (self-checked there).
       await expect(
-        changePlanPrice(prisma, fake, { plan: 'volume', priceCents: 5000, reason: 'x', actorId: financeAdminId }),
+        changePlanPrice(prisma, fake, { plan: 'volume', priceCents: largeDropVolumeCents, reason: 'x', actorId: financeAdminId }),
       ).rejects.toMatchObject({ statusCode: 409, code: 'confirm_large_change_required' });
       expect(fake.calls.length).toBe(callsBefore);
     });
@@ -395,7 +514,7 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
           url: '/api/admin/plans/volume/price',
           headers: { authorization: `Bearer ${financeToken}` },
           payload: {
-            price_cents: 5000,
+            price_cents: largeDropVolumeCents,
             reason: 'Task 8 test: confirmed large change, scripted Stripe failure',
             confirm_large_change: true,
           },
@@ -408,7 +527,7 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
         // Clean up the resulting pending row for volume — never activated,
         // regardless of which assertion above did or didn't run.
         await prisma.planPrice.deleteMany({
-          where: { plan: 'volume', priceCents: 5000, active: false, stripePriceId: null },
+          where: { plan: 'volume', priceCents: largeDropVolumeCents, active: false, stripePriceId: null },
         });
       }
     });
@@ -445,6 +564,86 @@ describe.skipIf(!RUN)('plan price change transaction (DB integration)', () => {
       });
       expect(res.statusCode).toBe(400);
       expect(fake.calls.length).toBe(callsBefore);
+    });
+  });
+
+  describe('the in-transaction subscriber re-check (Fix 3: closes the check-then-act window)', () => {
+    /** Wraps FakePaymentsAdapter to inject a side effect into createPrice —
+     *  the Stripe round-trip Step C waits on — standing in for a
+     *  `subscription.activated` webhook that lands during that wait. */
+    class RaceInjectingPaymentsAdapter extends FakePaymentsAdapter {
+      private readonly onCreatePrice: () => Promise<void>;
+      constructor(onCreatePrice: () => Promise<void>) {
+        super();
+        this.onCreatePrice = onCreatePrice;
+      }
+      override async createPrice(input: CreatePriceInput): Promise<{ priceId: string }> {
+        await this.onCreatePrice();
+        return super.createPrice(input);
+      }
+    }
+
+    it('a subscriber landing during the Stripe round-trip aborts Step C with migration_required, not a silent commit', async () => {
+      // The outer pre-flight guard (subscriberCount === 0) passes here —
+      // subscription_state is empty at this point in the suite (every
+      // earlier guard test restores it to 0; asserted below too). The race
+      // is injected entirely inside createPrice, exactly where the real gap
+      // sits: after the pre-flight read, before Step C's transaction.
+      const racingBrand = await prisma.brand.create({
+        data: { brandName: `Plan Price Race Test ${randomToken(6)}`, referralCode: randomToken(10) },
+      });
+      let racingSubscriptionId: string | undefined;
+      const racingFake = new RaceInjectingPaymentsAdapter(async () => {
+        const sub = await prisma.subscriptionState.create({
+          data: {
+            brandId: racingBrand.id,
+            plan: 'volume',
+            status: 'active',
+            stripeSubscriptionId: `sub_race_${randomToken(8)}`,
+          },
+        });
+        racingSubscriptionId = sub.id;
+      });
+
+      try {
+        await expect(
+          changePlanPrice(prisma, racingFake, {
+            plan: 'volume',
+            priceCents: migrationGuardTargetCents,
+            reason: 'Fix 3 test: subscriber lands mid-Stripe-round-trip',
+            actorId: financeAdminId,
+          }),
+        ).rejects.toMatchObject({ statusCode: 409, code: 'migration_required' });
+
+        // createPrice DID run (that's how the race was injected) — but
+        // nothing committed: Step C's transaction rolled back entirely,
+        // including the stripePriceId stamp it wrote before the re-check
+        // fired. Without Fix 3 this assertion is what would fail — Step C
+        // would deactivate the real active row and activate the pending
+        // one, stranding racingBrand on a price about to disappear.
+        expect(racingFake.callsFor('createPrice')).toHaveLength(1);
+        const activeAfter = await prisma.planPrice.findFirstOrThrow({ where: { plan: 'volume', active: true } });
+        expect(activeAfter.id).toBe(originalVolumeActive.id);
+
+        // The pending row Step A inserted is still there (reusable on
+        // retry), with stripePriceId rolled back to null.
+        const pending = await prisma.planPrice.findFirst({
+          where: { plan: 'volume', priceCents: migrationGuardTargetCents, active: false },
+        });
+        expect(pending).not.toBeNull();
+        expect(pending!.stripePriceId).toBeNull();
+      } finally {
+        if (racingSubscriptionId) {
+          await prisma.subscriptionState.delete({ where: { id: racingSubscriptionId } });
+        }
+        await prisma.brand.delete({ where: { id: racingBrand.id } });
+        await prisma.planPrice.deleteMany({
+          where: { plan: 'volume', priceCents: migrationGuardTargetCents, active: false, stripePriceId: null },
+        });
+      }
+
+      // The hard rule: subscription_state must be empty again.
+      expect(await prisma.subscriptionState.count()).toBe(0);
     });
   });
 

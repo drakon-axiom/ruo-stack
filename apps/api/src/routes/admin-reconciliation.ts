@@ -11,7 +11,7 @@ const MAX_WEBHOOK_ATTEMPTS = 5;
  * schedule (RECONCILE_INTERVAL_SECONDS). Role-gated on 'exceptions'.
  */
 export async function adminReconciliationRoutes(app: FastifyInstance): Promise<void> {
-  const { prisma } = getClients();
+  const { prisma, payments } = getClients();
 
   app.get('/api/admin/reconciliation', { preHandler: requireAdmin('exceptions', 'view') }, async () => {
     const [deadLetter, retryable, drift] = await Promise.all([
@@ -32,6 +32,6 @@ export async function adminReconciliationRoutes(app: FastifyInstance): Promise<v
   });
 
   app.post('/api/admin/reconciliation/run', { preHandler: requireAdmin('exceptions', 'write') }, async () => {
-    return runReconciliation(prisma);
+    return runReconciliation(prisma, payments);
   });
 }

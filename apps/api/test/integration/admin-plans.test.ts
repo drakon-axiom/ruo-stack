@@ -61,17 +61,17 @@ describe.skipIf(!RUN)('admin plan registry surface (DB integration)', () => {
 
   afterAll(async () => {
     // Restore starter exactly as found, regardless of which test last wrote it.
-    await prisma.plan
-      .update({
-        where: { key: 'starter' },
-        data: {
-          name: originalStarter.name,
-          features: originalStarter.features,
-          shippingCutoff: originalStarter.shippingCutoff,
-          updatedBy: null,
-        },
-      })
-      .catch(() => undefined);
+    // Never swallowed: a failed restore here is exactly the live-data hazard
+    // this branch already got bitten by once (see plan-price.test.ts's rule).
+    await prisma.plan.update({
+      where: { key: 'starter' },
+      data: {
+        name: originalStarter.name,
+        features: originalStarter.features,
+        shippingCutoff: originalStarter.shippingCutoff,
+        updatedBy: null,
+      },
+    });
     invalidatePlanRegistry();
     await prisma.adminUser.deleteMany({ where: { id: { in: adminIds } } }).catch(() => undefined);
     await app.close();

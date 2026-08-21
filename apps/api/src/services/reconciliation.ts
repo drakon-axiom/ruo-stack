@@ -1,5 +1,5 @@
 import type { PrismaClient, WebhookEvent } from '@ruostack/db';
-import { AUDIT_ACTIONS, type NormalizedEvent } from '@ruostack/shared';
+import { AUDIT_ACTIONS, type NormalizedEvent, type PaymentsAdapter } from '@ruostack/shared';
 import { writeAudit } from '../audit.ts';
 import { dispatchStripeEvent } from '../routes/webhook.ts';
 import { importWooOrder, type WooOrder } from './store-intake.ts';
@@ -12,6 +12,72 @@ import { importWooOrder, type WooOrder } from './store-intake.ts';
 const MAX_WEBHOOK_ATTEMPTS = 5;
 const RETRY_GRACE_MS = 120_000; // don't race the live handler / external retry
 const STALE_EXPORT_MS = 24 * 60 * 60 * 1000;
+
+// ── Sweep: archive deactivated plan_price rows in Stripe, deferred ─────────
+/**
+ * Plan Rail 3 ("Deferred archive"): a repriced-away Stripe Price must keep
+ * accepting the subscriptions already on it, but must not be archived so
+ * soon that an in-flight Checkout Session (~24h TTL) — created moments
+ * before the reprice, still holding the old price — gets rejected on
+ * completion. 48h is 2x that TTL: comfortable margin for a session created
+ * right before the reprice to fully drain (complete or expire) before its
+ * price stops accepting new subscriptions.
+ */
+const ARCHIVE_DEFERRAL_MS = 48 * 60 * 60 * 1000;
+/**
+ * Upper bound on how far back the sweep looks for rows to archive. Without
+ * this, a row that failed to archive (or a sweep that didn't run for a long
+ * stretch) would be re-considered forever. 30 days is far beyond the 48h
+ * deferral — anything this old has certainly drained — and bounds the
+ * per-tick query instead of leaving it open-ended.
+ */
+const ARCHIVE_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface ArchiveSweepResult {
+  examined: number;
+  archived: number;
+  failed: number;
+}
+
+/**
+ * Archive, in Stripe, every `plan_price` row that was deactivated (Step C of
+ * `changePlanPrice`) more than `ARCHIVE_DEFERRAL_MS` ago and less than
+ * `ARCHIVE_LOOKBACK_MS` ago. `archivedAt` on the row means "deactivated in
+ * OUR ledger" — not "archived in Stripe"; this function is what actually
+ * performs the latter. `payments.archivePrice()` is idempotent (setting a
+ * Price inactive twice is a no-op), so re-sweeping a row this ran on before
+ * — e.g. across restarts, or within the same lookback window on a later tick
+ * — is harmless; the lookback bound exists to stop scanning forever, not to
+ * prevent a harmless re-archive.
+ */
+export async function sweepArchivablePrices(prisma: PrismaClient, payments: PaymentsAdapter): Promise<ArchiveSweepResult> {
+  const now = Date.now();
+  const rows = await prisma.planPrice.findMany({
+    where: {
+      active: false,
+      stripePriceId: { not: null },
+      archivedAt: {
+        lte: new Date(now - ARCHIVE_DEFERRAL_MS),
+        gte: new Date(now - ARCHIVE_LOOKBACK_MS),
+      },
+    },
+    select: { id: true, plan: true, stripePriceId: true },
+  });
+
+  let archived = 0;
+  let failed = 0;
+  for (const row of rows) {
+    try {
+      await payments.archivePrice(row.stripePriceId!);
+      archived++;
+    } catch (err) {
+      failed++;
+      // eslint-disable-next-line no-console
+      console.error(`[reconciliation] failed to archive Stripe price ${row.stripePriceId} for "${row.plan}" (plan_price ${row.id}):`, err);
+    }
+  }
+  return { examined: rows.length, archived, failed };
+}
 
 // ── Heal: re-dispatch stuck webhook events ─────────────────────────────────────
 async function redispatch(prisma: PrismaClient, ev: WebhookEvent): Promise<void> {
@@ -173,27 +239,46 @@ export async function scanDrift(prisma: PrismaClient): Promise<DriftFinding[]> {
 export interface ReconciliationReport {
   retry: RetryResult;
   drift: DriftFinding[];
+  archive: ArchiveSweepResult;
   ranAt: Date;
 }
 
-export async function runReconciliation(prisma: PrismaClient): Promise<ReconciliationReport> {
+export async function runReconciliation(prisma: PrismaClient, payments: PaymentsAdapter): Promise<ReconciliationReport> {
   const retry = await retryStuckWebhooks(prisma);
   const drift = await scanDrift(prisma);
+  const archive = await sweepArchivablePrices(prisma, payments);
   await writeAudit(prisma, {
     actorType: 'system',
     actorId: null,
     action: AUDIT_ACTIONS.reconciliationRun,
-    after: { healed: retry.healed, failed: retry.failed, dead_letter: retry.deadLetter, drift: drift.length },
+    after: {
+      healed: retry.healed,
+      failed: retry.failed,
+      dead_letter: retry.deadLetter,
+      drift: drift.length,
+      prices_archived: archive.archived,
+      prices_archive_failed: archive.failed,
+    },
     ip: null,
   });
-  return { retry, drift, ranAt: new Date() };
+  return { retry, drift, archive, ranAt: new Date() };
 }
 
 /** Periodic worker (runs once on start, then every interval). Unref'd. */
-export function startReconciliationWorker(prisma: PrismaClient, intervalMs: number, log?: (msg: string) => void): () => void {
+export function startReconciliationWorker(
+  prisma: PrismaClient,
+  payments: PaymentsAdapter,
+  intervalMs: number,
+  log?: (msg: string) => void,
+): () => void {
   const tick = () => {
-    runReconciliation(prisma)
-      .then((r) => log?.(`reconcile: healed ${r.retry.healed}, failed ${r.retry.failed}, dead-letter ${r.retry.deadLetter}, drift ${r.drift.length}`))
+    runReconciliation(prisma, payments)
+      .then((r) =>
+        log?.(
+          `reconcile: healed ${r.retry.healed}, failed ${r.retry.failed}, dead-letter ${r.retry.deadLetter}, ` +
+            `drift ${r.drift.length}, prices archived ${r.archive.archived} (failed ${r.archive.failed})`,
+        ),
+      )
       .catch((err) => log?.(`reconcile failed: ${err instanceof Error ? err.message : err}`));
   };
   tick();

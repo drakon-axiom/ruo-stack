@@ -93,7 +93,7 @@ Four rails implement it:
 
 1. **Quote token round-trip** (Task 7). The plan card carries `price_version_id`; `POST /billing/subscribe` sends it back; the server refuses a stale one with `price_changed` and a *"Pricing has changed — please review"* message rather than silently charging more. Converts a race into a checkable condition.
 2. **Append-only versions** (Task 3). New Stripe Price + new row; old rows never mutated. In-flight Stripe Checkout sessions keep working on the price they were created with.
-3. **Deferred archive** (Task 8). The old Stripe price is archived by a sweeper ~48h later, not on save, so Checkout sessions (~24h TTL) drain first. Archiving never affects existing subscriptions — only new use.
+3. **Deferred archive** (Task 8, implemented by the reconciliation worker's `sweepArchivablePrices`, `services/reconciliation.ts`). The old Stripe price is archived by that sweep ~48h later, not synchronously in the price-change request, so Checkout sessions (~24h TTL) drain first. `plan_price.archivedAt` (stamped when the row is deactivated) means "deactivated in our ledger" only — the sweep is what actually calls `payments.archivePrice()` once `archivedAt` clears the 48h deferral, bounded by a 30-day lookback so it does not re-scan ancient rows forever. Archiving never affects existing subscriptions — only new use.
 4. **Boundary semantics** for anything gating live work — the reason capability flags stay code-owned in v1.
 
 No downtime, no maintenance window, no "plans locked" banner. An admin repricing at noon is invisible to every brand except those loading the picker afterwards.
@@ -226,10 +226,12 @@ New `plans` surface in `ROLE_GATE` — `super_admin: 'write', finance: 'write', 
 *Tests:* `support` → 403 on PATCH, `finance` → through, via `seedAdmin` (`catalog-crud.test.ts:15-28`); subscribe with a stale token → rejected; subscribe uses the **DB** price id, not `cfg.STRIPE_PRO_PRICE_ID`.
 
 **Task 8 — The price-change transaction**
-`services/plan-price.ts` + `POST /api/admin/plans/:key/price`. Order: **insert pending row → create Stripe price (idempotency key derived from the row id) → one atomic transaction flipping `active` and writing the audit → deferred archive.** Deriving the key from a row created *before* the side effect is what makes retry safe; `price:${plan}:${amount}` would be wrong, since a 4900→5900→4900 revert would return the *archived* first price.
+`services/plan-price.ts` + `POST /api/admin/plans/:key/price`. Order: **insert pending row → create Stripe price (idempotency key derived from the row id) → one atomic transaction re-checking the subscriber count, flipping `active`, and writing the audit.** Deriving the key from a row created *before* the side effect is what makes retry safe; `price:${plan}:${amount}` would be wrong, since a 4900→5900→4900 revert would return the *archived* first price.
+**Archiving the old Stripe price is not part of this request at all.** It is deliberately deferred to the reconciliation worker's sweep (Rail 3, "Deferred archive," above) so a Checkout Session opened moments before the reprice still has ~24h to complete against the price it was shown — archiving in-request would risk breaking exactly that checkout.
+The subscriber-count guard runs twice: once before Step B's Stripe round-trip (fast rejection, avoids a wasted Stripe call in the common case), and again *inside* the Step C transaction, because `subscription.activated` can land during that round-trip and flip the count from zero to positive in the gap. The in-transaction re-check closes that window atomically; it cannot close the wider one where a brand completes Checkout *after* this transaction commits — nothing server-side can, see the code comment.
 Guards, all rejecting before any Stripe call: `starter` → 400; unchanged price → 409; **subscribers exist and the Phase 2 worker is absent → 409 `migration_required`**; bounded `min(100).max(100_000)`; a change over ±50% needs `confirm_large_change: true`; mandatory `reason` (modelled on `admin-brands.ts:202-206`).
 Stripe calls go through a `PaymentsAdapter` parameter, not `getClients()`, so tests can inject a fake.
-*Tests:* happy path flips `active` atomically; Stripe failure leaves a reusable pending row and nothing live; retry reuses the row and the same key; every guard; the partial unique index rejects a hand-crafted second active row.
+*Tests:* happy path flips `active` atomically and does NOT call `archivePrice`; Stripe failure leaves a reusable pending row and nothing live; retry reuses the row and the same key; every guard, including the in-transaction re-check; the partial unique index rejects a hand-crafted second active row.
 
 **Task 9 — Test isolation from Stripe**
 `apps/api/test/FakePaymentsAdapter.ts` typed **only** against the `PaymentsAdapter` interface, so `scripts/check-stripe-imports.mjs` stays satisfied. Add a test-only injection seam to `clients.ts` (`getClients()` is currently a hard singleton with no override). Plus a vitest-level interceptor that **throws on any outbound request to `api.stripe.com`** — that interceptor is the actual guarantee; everything else is discipline.
@@ -287,7 +289,7 @@ Not built now; Task 8's `migration_required` guard prevents a price change from 
 **End-to-end, in Stripe test mode:**
 1. `pnpm seed:plans` → `GET /api/brand/subscription` reports the amounts Stripe holds, not `plans.ts`'s old constants.
 2. Admin → Plans → change Pro to a new price → confirm dialog shows the delta and requires typing the amount.
-3. Verify a new Stripe Price exists, the old one is still active (deferred archive), and `plan_price` has exactly one active row for `pro`.
+3. Verify a new Stripe Price exists, the old one is still active in Stripe (archival is deferred to the reconciliation worker's sweep, ~48h later — not performed at reprice time), and `plan_price` has exactly one active row for `pro`.
 4. Brand portal → plan picker shows the new price; Subscribe → Stripe Checkout charges **that** amount.
 5. **The rail:** load the picker, reprice in another tab, then click Subscribe → expect `price_changed` and a review prompt, **not** a silent charge at the new price.
 6. Dispatch a webhook carrying the **old** price id → tier still resolves correctly.

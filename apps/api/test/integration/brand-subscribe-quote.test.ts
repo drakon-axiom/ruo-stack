@@ -78,12 +78,20 @@ describe.skipIf(!RUN)('brand subscribe quote-token check (DB integration, servic
 
   it('rejects a price_version_id that belongs to a different plan than requested', async () => {
     const brandId = await makeBrand('Wrong Plan Co');
-    const volumeActive = await prisma.planPrice.findFirstOrThrow({ where: { plan: 'volume', active: true } });
+    // A throwaway row for a DIFFERENT plan than requested below — doesn't
+    // need to be active or even a "real" price, since subscribeBrandToPaidPlan
+    // rejects on `priceRow.plan !== input.plan` alone. Deliberately not
+    // reading the live active "volume" row: that row may not exist at all
+    // on an empty plan_price table (CI), and this test doesn't need it to.
+    const wrongPlanRow = await prisma.planPrice.create({
+      data: { plan: 'volume', priceCents: 9900, stripePriceId: null, active: false },
+    });
+    planPriceIds.push(wrongPlanRow.id);
 
     await expect(
       subscribeBrandToPaidPlan(
         { origin: undefined, ip: '127.0.0.1' },
-        { brandId, userId: `u_${randomToken(6)}`, plan: 'pro', priceVersionId: volumeActive.id },
+        { brandId, userId: `u_${randomToken(6)}`, plan: 'pro', priceVersionId: wrongPlanRow.id },
       ),
     ).rejects.toMatchObject({ code: 'price_changed' });
 
@@ -102,7 +110,19 @@ describe.skipIf(!RUN)('brand subscribe quote-token check (DB integration, servic
 
   it('a current price_version_id succeeds and resolves the Stripe price id from that SAME row (not cfg env, not the registry)', async () => {
     const brandId = await makeBrand('Current Quote Co');
-    const activeRow = await prisma.planPrice.findFirstOrThrow({ where: { plan: 'pro', active: true } });
+    // Use the real active "pro" row if one exists. On an empty plan_price
+    // table (CI: migration 030 deliberately leaves it empty, and ci.yml
+    // never runs seed:plans) there is none — seed a throwaway active row for
+    // this test alone, tracked in planPriceIds for the same cleanup every
+    // other row this suite creates gets. Never touches an existing active
+    // row (this suite's hard rule: only ever inserts new, throwaway rows).
+    let activeRow = await prisma.planPrice.findFirst({ where: { plan: 'pro', active: true } });
+    if (!activeRow) {
+      activeRow = await prisma.planPrice.create({
+        data: { plan: 'pro', priceCents: 4900, stripePriceId: `price_fixture_quote_${randomToken(6)}`, active: true },
+      });
+      planPriceIds.push(activeRow.id);
+    }
 
     const result = await subscribeBrandToPaidPlan(
       { origin: 'https://brand.test', ip: '127.0.0.1' },

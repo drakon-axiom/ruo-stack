@@ -361,11 +361,18 @@ describe.skipIf(!RUN)('plan registry (DB integration, read-only)', () => {
       const registry = await getPlanRegistry(prisma);
 
       for (const key of PLAN_KEYS) {
-        const activeRow = await prisma.planPrice.findFirstOrThrow({ where: { plan: key, active: true } });
+        // Nullable read, not findFirstOrThrow: on an empty plan_price table
+        // (CI — migration 030 deliberately leaves it empty, and ci.yml never
+        // runs seed:plans) there is no active row for any tier, and the
+        // registry's own documented behaviour (see the unit test above,
+        // "never fabricates a price") is priceCents: 0 / stripePriceId:
+        // null. This test stays read-only either way — it only compares two
+        // reads of the same fact, never asserts an absolute amount.
+        const activeRow = await prisma.planPrice.findFirst({ where: { plan: key, active: true } });
         // What GET /api/brand/subscription would display...
-        expect(registry[key].priceCents).toBe(activeRow.priceCents);
+        expect(registry[key].priceCents).toBe(activeRow?.priceCents ?? 0);
         // ...is read from the same row POST /api/brand/billing/subscribe would charge.
-        expect(registry[key].stripePriceId).toBe(activeRow.stripePriceId);
+        expect(registry[key].stripePriceId).toBe(activeRow?.stripePriceId ?? null);
       }
     },
   );
