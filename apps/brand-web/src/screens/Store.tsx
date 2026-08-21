@@ -14,8 +14,7 @@ interface Connection {
   webhook_url: string | null;
   connected_at: string;
 }
-interface StoreState { plan_allows: boolean; connection: Connection | null }
-interface SubscriptionUpsell { upsell: { store_connections: string } }
+interface StoreState { plan_allows: boolean; connection: Connection | null; upsell: string | null }
 
 const STATUS_PILL: Record<string, string> = {
   active: 'border-success/40 bg-success/10 text-success',
@@ -30,10 +29,6 @@ export function Store() {
   // Connecting the store, setting the markup and pushing products are all
   // owner-only server-side — don't show staff controls that will 403.
   const [isOwner, setIsOwner] = useState(false);
-  // Registry-derived upsell copy ("Store connections require the Pro or
-  // Volume plan") — never hardcoded here, so a tier rename can't drift it
-  // out of sync with the server's own 403 message.
-  const [upsellMsg, setUpsellMsg] = useState('');
 
   function load() {
     setLoading(true);
@@ -45,11 +40,6 @@ export function Store() {
       .then((r) => setIsOwner(r.membership.role === 'owner'))
       .catch(() => setIsOwner(false));
   }, []);
-  useEffect(() => {
-    api<SubscriptionUpsell>('/api/brand/subscription')
-      .then((r) => setUpsellMsg(r.upsell.store_connections))
-      .catch(() => undefined);
-  }, []);
 
   return (
     <>
@@ -59,7 +49,7 @@ export function Store() {
       {loading || !state ? (
         <Card className="p-10 text-center text-content-muted">Loading…</Card>
       ) : !state.plan_allows ? (
-        <Upsell message={upsellMsg} />
+        <Upsell message={state.upsell} />
       ) : state.connection ? (
         <>
           <Connected conn={state.connection} onChanged={() => { setManual(null); load(); }} />
@@ -124,12 +114,13 @@ function ShippingMarkup() {
 }
 
 
-function Upsell({ message }: { message: string }) {
+function Upsell({ message }: { message: string | null }) {
   return (
     <Card className="flex flex-col items-center gap-2 px-6 py-14 text-center">
       <div className="text-lg font-semibold">Store connections are a paid feature</div>
       <div className="max-w-md text-sm text-content-muted">
-        {message || 'Upgrade your plan'} to connect your WooCommerce store and pull orders in automatically.
+        {message ?? 'Store connections are not available on your plan'}. Upgrade to connect your WooCommerce store and
+        pull orders in automatically.
       </div>
       <LinkButton to="/app/account" className="mt-2">View plans</LinkButton>
     </Card>

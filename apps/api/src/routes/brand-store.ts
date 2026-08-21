@@ -27,21 +27,43 @@ const ConnectSchema = z.object({
   consumer_secret: z.string().min(10).max(120),
 });
 
+// Module-level (not a closure over one getClients() call at route-
+// registration time) so it always reads whatever client setClientsForTest()
+// has installed at call time — same reasoning as ensureCustomer in
+// brand-billing.ts, and what makes this directly unit-testable against a
+// real brand/subscriptionState row rather than only over app.inject (which
+// brand routes can't be driven through — Supabase-minted JWTs can't be
+// forged in tests).
+export async function planAllowsStore(brandId: string): Promise<boolean> {
+  const { prisma } = getClients();
+  const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true, currentPeriodEnd: true } });
+  const registry = await getPlanRegistry(prisma);
+  return registry[effectivePlan(sub)].capabilities.storeConnections;
+}
+
+// Local wrapper around the registry-derived message — see
+// storeConnectionsUpsellMessage's doc comment for why this isn't a
+// hardcoded "Pro or Volume" string.
+export async function storeConnectionsUpsell(): Promise<string> {
+  const { prisma } = getClients();
+  return storeConnectionsUpsellMessage(await getPlanRegistry(prisma));
+}
+
+/**
+ * The `upsell` field on `GET /api/brand/store`'s payload: null when the
+ * brand's plan already allows store connections (the common case — most
+ * visits pay no cost for this, since the registry read behind it is
+ * process-cached), otherwise the registry-derived message. `plan_allows` is
+ * derived from this same call (`upsell === null`) rather than a second,
+ * separately-timed `planAllowsStore` read, so the two fields can't disagree.
+ */
+export async function storeConnectionsUpsellForBrand(brandId: string): Promise<string | null> {
+  if (await planAllowsStore(brandId)) return null;
+  return storeConnectionsUpsell();
+}
+
 export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
-
-  async function planAllowsStore(brandId: string): Promise<boolean> {
-    const sub = await prisma.subscriptionState.findUnique({ where: { brandId }, select: { plan: true, status: true, currentPeriodEnd: true } });
-    const registry = await getPlanRegistry(prisma);
-    return registry[effectivePlan(sub)].capabilities.storeConnections;
-  }
-
-  // Local wrapper around the registry-derived message — see
-  // storeConnectionsUpsellMessage's doc comment for why this isn't a
-  // hardcoded "Pro or Volume" string.
-  async function storeConnectionsUpsell(): Promise<string> {
-    return storeConnectionsUpsellMessage(await getPlanRegistry(prisma));
-  }
 
   async function requireConnection(brandId: string): Promise<BrandStoreConnection> {
     if (!(await planAllowsStore(brandId))) throw Forbidden(await storeConnectionsUpsell());
@@ -72,11 +94,11 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
   // Current connection + whether the plan permits one.
   app.get('/api/brand/store', { preHandler: requireBrand }, async (req) => {
     const { brandId } = req.brand!;
-    const [allowed, conn] = await Promise.all([
-      planAllowsStore(brandId),
+    const [upsell, conn] = await Promise.all([
+      storeConnectionsUpsellForBrand(brandId),
       prisma.brandStoreConnection.findFirst({ where: { brandId, platform: 'woocommerce' } }),
     ]);
-    return { plan_allows: allowed, connection: conn ? serialize(conn) : null };
+    return { plan_allows: upsell === null, connection: conn ? serialize(conn) : null, upsell };
   });
 
   // Connect a store.
