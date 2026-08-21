@@ -171,6 +171,12 @@ async function dispatch(db: PrismaClient, event: NormalizedEvent, ip: string): P
         status,
         plan: await planForPrice(db, event.priceId),
         stripeSubscriptionId: event.subscriptionId,
+        // Persisted regardless of whether the price resolved to a tier —
+        // Task 3 added this column for exactly this (SubscriptionState.stripePriceId,
+        // schema.prisma:636) and reconciliation's plan/price drift check
+        // (services/reconciliation.ts) depends on it being populated even when
+        // `plan` above came back undefined.
+        stripePriceId: event.priceId ?? null,
         ...(event.kind === 'subscription.activated'
           ? {
               price: event.price,

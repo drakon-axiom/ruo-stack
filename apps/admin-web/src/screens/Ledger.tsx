@@ -42,8 +42,11 @@ interface Summary {
 }
 
 interface Drift {
-  kind: 'shipped_not_captured' | 'stale_export';
-  order_id: string;
+  kind: 'shipped_not_captured' | 'stale_export' | 'plan_price_mismatch';
+  // Optional: order-shaped findings carry order_id; plan_price_mismatch is
+  // subscription-shaped and carries brand_id instead — there is no order.
+  order_id?: string;
+  brand_id?: string;
   brand_name: string;
   detail: string;
   at: string | null;
@@ -255,26 +258,31 @@ export function Ledger() {
           <div className="mb-2 text-base font-semibold">Reconciliation drift</div>
           <div className="space-y-2">
             {drift.map((d) => (
-              <div key={`${d.kind}:${d.order_id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
+              <div key={`${d.kind}:${d.order_id ?? d.brand_id ?? d.brand_name}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
                 <div className="min-w-0">
                   <Badge tone="warning">
-                    {d.kind === 'shipped_not_captured' ? 'not captured' : 'stale export'}
+                    {d.kind === 'shipped_not_captured' ? 'not captured' : d.kind === 'stale_export' ? 'stale export' : 'plan/price mismatch'}
                   </Badge>
                   <span className="text-content">{d.brand_name}</span>
                   <span className="ml-2 text-content-muted">{d.detail}</span>
                   {d.at && <span className="ml-2 text-content-faint">{day(d.at)}</span>}
                 </div>
-                {d.kind === 'shipped_not_captured' ? (
+                {d.kind === 'shipped_not_captured' && d.order_id ? (
                   canHeal ? (
-                    <Button disabled={healing === d.order_id} onClick={() => heal(d.order_id)}>
+                    <Button disabled={healing === d.order_id} onClick={() => heal(d.order_id!)}>
                       {healing === d.order_id ? '…' : 'Re-run capture'}
                     </Button>
                   ) : (
                     <span className="text-xs text-content-faint">finance only</span>
                   )
-                ) : (
+                ) : d.kind === 'stale_export' ? (
                   // The heal for a stale export is a re-queue, which lives with ops.
                   <span className="text-xs text-content-faint">re-send from Fulfillment Queue</span>
+                ) : (
+                  // plan_price_mismatch: resolving means confirming the brand's
+                  // real tier and correcting SubscriptionState — a manual,
+                  // judgment call, not a one-click heal.
+                  <span className="text-xs text-content-faint">confirm tier with the brand</span>
                 )}
               </div>
             ))}

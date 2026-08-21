@@ -22,7 +22,11 @@ interface DeadLetter {
 }
 interface Drift {
   kind: string;
-  order_id: string;
+  // Optional: order-shaped findings (shipped_not_captured, stale_export)
+  // carry order_id; subscription-shaped findings (plan_price_mismatch) carry
+  // brand_id instead — there is no order to point at.
+  order_id?: string;
+  brand_id?: string;
   brand_name: string;
   detail: string;
   at: string | null;
@@ -41,6 +45,7 @@ interface RunResult {
 const DRIFT_LABEL: Record<string, string> = {
   shipped_not_captured: 'Shipped — not captured',
   stale_export: 'Stale export (>24h)',
+  plan_price_mismatch: 'Plan/price mismatch',
 };
 
 const DRIFT_COLUMNS: Column<Drift>[] = [
@@ -52,7 +57,7 @@ const DRIFT_COLUMNS: Column<Drift>[] = [
     cell: (d) => <Badge tone="warning">{DRIFT_LABEL[d.kind] ?? d.kind}</Badge>,
   },
   { key: 'brand', header: 'Brand', minWidth: 140, cell: (d) => d.brand_name },
-  { key: 'order', header: 'Order', mono: true, minWidth: 100, cell: (d) => d.order_id.slice(0, 8) },
+  { key: 'order', header: 'Order', mono: true, minWidth: 100, cell: (d) => (d.order_id ? d.order_id.slice(0, 8) : '—') },
   { key: 'detail', header: 'Detail', minWidth: 200, cell: (d) => d.detail },
   {
     key: 'since',
@@ -158,7 +163,7 @@ export function Exceptions() {
             mode="scroll"
             columns={DRIFT_COLUMNS}
             rows={rep?.drift ?? []}
-            rowKey={(d) => `${d.kind}:${d.order_id}`}
+            rowKey={(d) => `${d.kind}:${d.order_id ?? d.brand_id ?? d.brand_name}`}
             loading={rep === null}
             empty={<EmptyState title="No drift" hint="Orders, shipments, and the ledger agree." />}
           />

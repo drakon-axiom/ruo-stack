@@ -59,9 +59,19 @@ export async function retryStuckWebhooks(prisma: PrismaClient): Promise<RetryRes
 }
 
 // ── Flag: drift between order state and money/fulfillment ──────────────────────
+/**
+ * `order_id`/`brand_id` are both optional because not every finding has an
+ * order to point at: `shipped_not_captured` and `stale_export` are
+ * order-shaped, but `plan_price_mismatch` (Task 8a) is subscription-shaped —
+ * a brand's stored plan disagreeing with its Stripe price has no order in
+ * play. Widened rather than jamming a brand id into `order_id`, which would
+ * make every consumer's `order_id` lookups (the admin Exceptions screen, the
+ * ledger heal-by-order-id flow) ambiguous about what kind of id they hold.
+ */
 export interface DriftFinding {
-  kind: 'shipped_not_captured' | 'stale_export';
-  order_id: string;
+  kind: 'shipped_not_captured' | 'stale_export' | 'plan_price_mismatch';
+  order_id?: string;
+  brand_id?: string;
   brand_name: string;
   detail: string;
   at: Date | null;
@@ -99,6 +109,55 @@ export async function scanDrift(prisma: PrismaClient): Promise<DriftFinding[]> {
   for (const o of stale) {
     findings.push({ kind: 'stale_export', order_id: o.id, brand_name: o.brand.brandName, detail: 'exported but not shipped > 24h', at: o.exportedAt });
   }
+
+  // Plan/price drift (Task 8a): a SubscriptionState whose stored `plan`
+  // doesn't agree with what its Stripe price actually maps to in
+  // `plan_price`. Two ways in:
+  //   - the price isn't in `plan_price` at all — a price this system never
+  //     created (e.g. hand-made in the Stripe Dashboard).
+  //   - the price IS in `plan_price`, but for a DIFFERENT plan than the one
+  //     stored — the stuck-on-old-tier case: a brand's price was rotated in
+  //     the Stripe Dashboard and `upsertSubscriptionState`'s update path
+  //     left the stored tier untouched (by design — see subscription.ts).
+  //     This is the one that actually costs money: `effectivePlan()` keeps
+  //     billing wholesale at the STORED tier while Stripe collects for the
+  //     new one.
+  // Rows with no `stripePriceId` are skipped — nothing to compare against
+  // (starter has no Stripe price at all; plan_price.stripePriceId is null
+  // forever for starter too).
+  const subs = await prisma.subscriptionState.findMany({
+    where: { stripePriceId: { not: null } },
+    select: { brandId: true, plan: true, stripePriceId: true, brand: { select: { brandName: true } } },
+  });
+  if (subs.length > 0) {
+    const priceIds = [...new Set(subs.map((s) => s.stripePriceId!))];
+    const prices = await prisma.planPrice.findMany({
+      where: { stripePriceId: { in: priceIds } },
+      select: { stripePriceId: true, plan: true },
+    });
+    const planForPriceId = new Map(prices.map((p) => [p.stripePriceId!, p.plan]));
+    for (const s of subs) {
+      const matchedPlan = planForPriceId.get(s.stripePriceId!);
+      if (matchedPlan === undefined) {
+        findings.push({
+          kind: 'plan_price_mismatch',
+          brand_id: s.brandId,
+          brand_name: s.brand.brandName,
+          detail: `Stripe price ${s.stripePriceId} has no plan_price row (stored tier: ${s.plan})`,
+          at: null,
+        });
+      } else if (matchedPlan !== s.plan) {
+        findings.push({
+          kind: 'plan_price_mismatch',
+          brand_id: s.brandId,
+          brand_name: s.brand.brandName,
+          detail: `stored tier "${s.plan}" disagrees with "${matchedPlan}", the tier its Stripe price (${s.stripePriceId}) actually maps to`,
+          at: null,
+        });
+      }
+    }
+  }
+
   return findings;
 }
 

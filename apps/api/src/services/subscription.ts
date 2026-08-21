@@ -18,6 +18,16 @@ export interface SubscriptionUpdate {
    */
   plan?: PlanTier;
   stripeSubscriptionId?: string | null;
+  /**
+   * The Stripe price id this event carried, verbatim — independent of
+   * whatever tier it resolved to. Persisted so reconciliation can catch a
+   * price that was rotated for an EXISTING brand from the Stripe Dashboard
+   * (never touching `plan_price`): the tier stored here would otherwise
+   * silently stay on the old plan forever, since the update path leaves an
+   * unresolved/unchanged tier alone by design (see `plan` above and
+   * webhook.ts's `planForPrice`).
+   */
+  stripePriceId?: string | null;
   price?: number; // cents
   currentPeriodEnd?: Date | null;
   cancelAtPeriodEnd?: boolean;
@@ -60,6 +70,7 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
         status: u.status,
         plan: u.plan!, // guaranteed defined here: the guard above throws when !existing && plan is undefined
         stripeSubscriptionId: u.stripeSubscriptionId ?? null,
+        stripePriceId: u.stripePriceId ?? null,
         price: u.price ?? 0,
         currentPeriodEnd: u.currentPeriodEnd ?? null,
         cancelAtPeriodEnd: u.cancelAtPeriodEnd ?? false,
@@ -69,6 +80,7 @@ export async function upsertSubscriptionState(db: PrismaClient, u: SubscriptionU
         status: u.status,
         ...(u.plan !== undefined ? { plan: u.plan } : {}),
         ...(u.stripeSubscriptionId !== undefined ? { stripeSubscriptionId: u.stripeSubscriptionId } : {}),
+        ...(u.stripePriceId !== undefined ? { stripePriceId: u.stripePriceId } : {}),
         ...(u.price !== undefined ? { price: u.price } : {}),
         ...(u.currentPeriodEnd !== undefined ? { currentPeriodEnd: u.currentPeriodEnd } : {}),
         ...(u.cancelAtPeriodEnd !== undefined ? { cancelAtPeriodEnd: u.cancelAtPeriodEnd } : {}),
