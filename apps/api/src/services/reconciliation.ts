@@ -124,10 +124,19 @@ export async function scanDrift(prisma: PrismaClient): Promise<DriftFinding[]> {
   //     new one.
   // Rows with no `stripePriceId` are skipped — nothing to compare against
   // (starter has no Stripe price at all; plan_price.stripePriceId is null
-  // forever for starter too).
+  // forever for starter too). Also scoped to status active/past_due, the
+  // only statuses `effectivePlan()` (subscription.ts) ever honours — it
+  // forces 'starter' for anything else (cancelled/expired/suspended/none),
+  // so a mismatch on one of those rows has zero financial exposure (the
+  // harm chain this exists to catch can't fire) and is permanently
+  // non-actionable (nobody corrects a dead subscription's historical
+  // Stripe price). Matches the scoping every other subscriber-scoped query
+  // in the codebase uses (plan-preflight.ts, plan-price.ts's
+  // migration_required guard, reporting.ts, admin-overview.ts,
+  // brand-overview.ts).
   const subs = await prisma.subscriptionState.findMany({
-    where: { stripePriceId: { not: null } },
-    select: { brandId: true, plan: true, stripePriceId: true, brand: { select: { brandName: true } } },
+    where: { stripePriceId: { not: null }, status: { in: ['active', 'past_due'] } },
+    select: { brandId: true, plan: true, stripePriceId: true, updatedAt: true, brand: { select: { brandName: true } } },
   });
   if (subs.length > 0) {
     const priceIds = [...new Set(subs.map((s) => s.stripePriceId!))];
@@ -144,7 +153,7 @@ export async function scanDrift(prisma: PrismaClient): Promise<DriftFinding[]> {
           brand_id: s.brandId,
           brand_name: s.brand.brandName,
           detail: `Stripe price ${s.stripePriceId} has no plan_price row (stored tier: ${s.plan})`,
-          at: null,
+          at: s.updatedAt,
         });
       } else if (matchedPlan !== s.plan) {
         findings.push({
@@ -152,7 +161,7 @@ export async function scanDrift(prisma: PrismaClient): Promise<DriftFinding[]> {
           brand_id: s.brandId,
           brand_name: s.brand.brandName,
           detail: `stored tier "${s.plan}" disagrees with "${matchedPlan}", the tier its Stripe price (${s.stripePriceId}) actually maps to`,
-          at: null,
+          at: s.updatedAt,
         });
       }
     }

@@ -76,6 +76,9 @@ describe.skipIf(!RUN)('plan/price drift detection (Task 8a, DB integration)', ()
       expect(finding).toBeTruthy();
       expect(finding!.order_id).toBeUndefined();
       expect(finding!.detail).toContain(unknownPriceId);
+      // `at` carries subscriptionState.updatedAt — the same "since" hint the
+      // order-shaped kinds give, not the null a first pass left it as.
+      expect(finding!.at).not.toBeNull();
     });
 
     it('a row whose plan_price match has a DIFFERENT plan than the stored plan produces a finding — the stuck-on-old-tier case', async () => {
@@ -99,6 +102,24 @@ describe.skipIf(!RUN)('plan/price drift detection (Task 8a, DB integration)', ()
       expect(finding!.detail).toContain('pro');
       expect(finding!.detail).toContain('volume');
       expect(finding!.order_id).toBeUndefined();
+      expect(finding!.at).not.toBeNull();
+    });
+
+    it('the SAME mismatch on a CANCELLED row produces NO finding — effectivePlan() already forces starter for anything but active/past_due, so there is zero financial exposure and the finding would be permanently non-actionable', async () => {
+      const brandId = await makeBrand(`Drift Cancelled Stuck Tier Co ${randomToken(4)}`);
+      const rotatedPriceId = `price_drifttest_cancelled_rotated_${randomToken(6)}`;
+      const priceRow = await prisma.planPrice.create({
+        data: { plan: 'volume', priceCents: 9900, stripePriceId: rotatedPriceId, active: false, archivedAt: new Date() },
+      });
+      planPriceIds.push(priceRow.id);
+      // Same mismatch shape as the active case above (stored "pro" vs.
+      // plan_price's "volume" for this price) — only `status` differs.
+      await prisma.subscriptionState.create({
+        data: { brandId, plan: 'pro', status: 'cancelled', stripePriceId: rotatedPriceId, stripeSubscriptionId: `sub_${randomToken(8)}` },
+      });
+
+      const findings = await scanDrift(prisma);
+      expect(findings.find((f) => f.kind === 'plan_price_mismatch' && f.brand_id === brandId)).toBeUndefined();
     });
 
     it('a correctly-matched row produces no finding', async () => {
