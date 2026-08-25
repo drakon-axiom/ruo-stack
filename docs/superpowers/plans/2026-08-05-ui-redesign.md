@@ -2,6 +2,27 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **STATUS: EXECUTED AND SUPERSEDED — do not run this plan.**
+>
+> Every task below shipped and merged in PR #60 (`95e6af3`, 2026-08-06). The
+> checkboxes were never ticked, which makes this file read as outstanding work;
+> it is not. `packages/ui` is live and both apps consume it.
+>
+> Two tasks did not survive contact and were solved differently in the merged
+> branch — read these before treating anything here as a description of `main`:
+>
+> - **Task 24's grep** matched `bg-surface-3` as the legacy `surface` class and
+>   its `grep -v` filter dropped whole lines, so it reported clean while 308
+>   references rendered unstyled. Replaced by `scripts/check-legacy-classes.mjs`
+>   (`fdb08c0`), and by the `styles.ts` class builders — which is the shim
+>   Decision 8 set out to avoid.
+> - **Task 25's Playwright config** targeted app routes behind auth with no API
+>   running, so it could only ever reach the login page. The shipped suite drives
+>   the `@ruostack/ui` gallery instead, and therefore gates no app screen.
+>
+> Superseded by `docs/superpowers/plans/2026-08-25-mobile-first-ui.md`, which
+> carries the remaining work forward.
+
 **Goal:** Replace both front ends' ad-hoc styling with one shared, responsive, accessible design system, and migrate all 33 screens onto it.
 
 **Architecture:** A new source-only workspace package `@ruostack/ui` holds CSS-custom-property tokens, a Tailwind preset both apps consume, and every shared component. Both apps drop their duplicated Tailwind configs and their hand-rolled shells. Screens migrate onto a single `DataTable` that renders a real table on desktop and stacked cards on phones. No compatibility shim: the legacy `@layer components` blocks survive until every screen is migrated, then are deleted in one task.
