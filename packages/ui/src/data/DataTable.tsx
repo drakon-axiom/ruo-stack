@@ -104,7 +104,7 @@ export function DataTable<T>({
     const rest = columns.filter((c) => c !== primary && c.priority !== 'meta');
 
     return (
-      <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {rows.map((row) => (
           <Card
             key={rowKey(row)}
@@ -119,7 +119,10 @@ export function DataTable<T>({
                 }
               },
             })}
-            className={cn('p-4', onRowClick && 'cursor-pointer')}
+            className={cn(
+              'overflow-hidden p-4 transition duration-fast',
+              onRowClick && 'cursor-pointer active:scale-[0.99] active:bg-surface-3',
+            )}
           >
             <div className="flex items-start gap-3">
               {selectable && (
@@ -147,9 +150,9 @@ export function DataTable<T>({
 
             <dl className="mt-3 space-y-1.5">
               {rest.map((c) => (
-                <div key={c.key} className="flex items-center justify-between gap-3">
+                <div key={c.key} className="flex items-start justify-between gap-3 border-t border-line-subtle pt-1.5 first:border-0 first:pt-0">
                   <dt className="text-2xs uppercase tracking-[0.1em] text-content-faint">{c.header}</dt>
-                  <dd className={cn('text-sm text-content', c.mono && 'font-mono tabular-nums')}>
+                  <dd className={cn('min-w-0 break-words text-right text-sm text-content', c.mono && 'font-mono tabular-nums')}>
                     {c.cell(row)}
                   </dd>
                 </div>

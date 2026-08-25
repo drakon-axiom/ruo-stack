@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import * as RD from '@radix-ui/react-dialog';
 import { cn } from '../lib/cn.js';
@@ -9,8 +9,43 @@ import { Toaster } from '../feedback/Toaster.js';
 import { TooltipProvider } from '../overlays/Tooltip.js';
 import { PanelLeftClose, PanelLeftOpen, Search } from '../icons.js';
 import { Logo } from '../brand/Logo.js';
+import { DATA_REFRESHED_EVENT } from '../hooks/useLiveRefresh.js';
 
 const COLLAPSE_KEY = 'ruostack_nav_collapsed';
+
+function LiveStatus() {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    const onRefreshed = (event: Event) => setRefreshedAt((event as CustomEvent<number>).detail);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    window.addEventListener(DATA_REFRESHED_EVENT, onRefreshed);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener(DATA_REFRESHED_EVENT, onRefreshed);
+    };
+  }, []);
+
+  const exact = refreshedAt
+    ? new Date(refreshedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : null;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-pill border border-line px-2 py-1 text-2xs text-content-faint"
+      title={online ? (exact ? `Data refreshed at ${exact}` : 'Live updates are active') : 'Updates paused while offline'}
+      role="status"
+    >
+      <span className={cn('h-1.5 w-1.5 rounded-full', online ? 'bg-success' : 'bg-warning')} />
+      <span className="hidden sm:inline">{online ? 'Live' : 'Offline'}</span>
+    </span>
+  );
+}
 
 export interface AppShellProps {
   brandName: string;
@@ -78,6 +113,7 @@ export function AppShell({
             <span className="text-base font-bold md:hidden">{brandName}</span>
 
             <div className="ml-auto flex items-center gap-2">
+              <LiveStatus />
               <span className="hidden items-center gap-1.5 rounded-pill border border-line px-2.5 py-1 text-2xs text-content-faint md:inline-flex">
                 <Search aria-hidden className="h-3 w-3" /> ⌘K
               </span>

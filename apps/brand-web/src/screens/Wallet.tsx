@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Badge,
   Button,
@@ -14,6 +14,7 @@ import {
   Plus,
   cn,
   type Column,
+  useLiveRefresh,
 } from '@ruostack/ui';
 import { api, ApiError } from '../lib/api.js';
 
@@ -74,9 +75,10 @@ export function Wallet() {
   const [modal, setModal] = useState(false);
   const [banner, setBanner] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setData(await api<WalletData>('/api/brand/wallet'));
-  }
+  }, []);
+  useLiveRefresh(load);
   useEffect(() => {
     void load();
     // surface Stripe Checkout return status
@@ -84,7 +86,7 @@ export function Wallet() {
     if (q === 'success')
       setBanner('Payment received — your balance updates as soon as the webhook confirms it.');
     if (q === 'cancelled') setBanner('Top-up cancelled.');
-  }, []);
+  }, [load]);
 
   const spent = (data?.entries ?? [])
     .filter((e) => e.amount_cents < 0)

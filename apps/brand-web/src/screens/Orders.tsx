@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Badge,
@@ -19,6 +19,7 @@ import {
   Tabs,
   X,
   type Column,
+  useLiveRefresh,
 } from '@ruostack/ui';
 import { api, ApiError } from '../lib/api.js';
 import { FulfillmentBadge } from '../lib/fulfillment.js';
@@ -108,14 +109,15 @@ export function Orders() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  function load() {
-    setLoading(true);
-    api<{ orders: Order[] }>('/api/brand/orders').then((r) => {
+  const load = useCallback((showLoading = false) => {
+    if (showLoading) setLoading(true);
+    return api<{ orders: Order[] }>('/api/brand/orders').then((r) => {
       setOrders(r.orders);
       setLoading(false);
     });
-  }
-  useEffect(load, []);
+  }, []);
+  useEffect(() => { void load(true); }, [load]);
+  useLiveRefresh(load);
 
   // "Ship again" on Customers routes here with a recipient in history state.
   // Consume it once and strip it, or a refresh — or a Back into this entry —

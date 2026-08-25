@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { canWrite } from '@ruostack/shared';
 import {
   Badge,
@@ -7,6 +7,7 @@ import {
   EmptyState,
   InlineAlert,
   PageHeader,
+  useLiveRefresh,
   type Column,
 } from '@ruostack/ui';
 import { api, ApiError } from '../lib/api.js';
@@ -99,10 +100,9 @@ export function Exceptions() {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
-  function load() {
-    api<Report>('/api/admin/reconciliation').then(setRep);
-  }
-  useEffect(load, []);
+  const load = useCallback(() => api<Report>('/api/admin/reconciliation').then(setRep), []);
+  useEffect(() => { void load(); }, [load]);
+  useLiveRefresh(load);
 
   async function run() {
     setBusy(true);

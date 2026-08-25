@@ -1,6 +1,7 @@
 export { cn } from './lib/cn.js';
 export { ThemeProvider, useTheme, type Theme } from './hooks/useTheme.js';
 export { useMediaQuery } from './hooks/useMediaQuery.js';
+export { useLiveRefresh, DATA_REFRESHED_EVENT } from './hooks/useLiveRefresh.js';
 
 export * from './icons.js';
 
