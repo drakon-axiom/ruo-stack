@@ -43,4 +43,3 @@ export function useLiveRefresh(refresh: () => void | Promise<void>, intervalMs =
     };
   }, [intervalMs]);
 }
-

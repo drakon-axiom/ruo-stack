@@ -230,4 +230,3 @@ function AddFunds({ onClose }: { onClose: () => void }) {
     </Dialog>
   );
 }
-
