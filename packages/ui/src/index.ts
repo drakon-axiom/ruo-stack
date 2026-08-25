@@ -1,6 +1,7 @@
 export { cn } from './lib/cn.js';
 export { ThemeProvider, useTheme, type Theme } from './hooks/useTheme.js';
 export { useMediaQuery } from './hooks/useMediaQuery.js';
+export { useLiveRefresh, DATA_REFRESHED_EVENT } from './hooks/useLiveRefresh.js';
 
 export * from './icons.js';
 
@@ -38,3 +39,4 @@ export { BottomTabs } from './nav/BottomTabs.js';
 export { CommandPalette } from './nav/CommandPalette.js';
 export { InlineAlert } from './feedback/InlineAlert.js';
 export { Toaster, toast } from './feedback/Toaster.js';
+

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PLAN_KEYS, planLabel } from '@ruostack/shared';
 import { api } from '../lib/api.js';
-import { Badge, Card, KpiTile, PageHeader } from '@ruostack/ui';
+import { Badge, Card, KpiTile, PageHeader, useLiveRefresh } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -18,9 +18,9 @@ interface Overview {
 export function Overview() {
   const [d, setD] = useState<Overview | null>(null);
 
-  useEffect(() => {
-    api<Overview>('/api/admin/overview').then(setD);
-  }, []);
+  const load = useCallback(() => api<Overview>('/api/admin/overview').then(setD), []);
+  useEffect(() => { void load(); }, [load]);
+  useLiveRefresh(load);
 
   if (!d) return <Card className="p-10 text-center text-content-muted">Loading…</Card>;
 
@@ -41,7 +41,7 @@ export function Overview() {
         <KpiTile label="Published SKUs" value={d.catalog.published} />
       </div>
 
-      <div className="grid grid-cols-[1fr_1fr] gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <h2 className="mb-3 text-sm uppercase tracking-[0.12em] text-content-faint">Plan mix</h2>
           <div className="space-y-2 text-sm">
@@ -80,3 +80,4 @@ export function Overview() {
     </>
   );
 }
+

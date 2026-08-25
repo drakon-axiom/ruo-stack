@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Badge, DataTable, EmptyState, PageHeader, type Column } from '@ruostack/ui';
+import { useCallback, useEffect, useState } from 'react';
+import { Badge, DataTable, EmptyState, PageHeader, useLiveRefresh, type Column } from '@ruostack/ui';
 import { api } from '../lib/api.js';
 
 interface Order {
@@ -56,12 +56,13 @@ export function Tracking() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() =>
     api<{ orders: Order[] }>('/api/brand/orders').then((r) => {
       setOrders(r.orders.filter((o) => o.status === 'shipped' || o.status === 'delivered'));
       setLoading(false);
-    });
-  }, []);
+    }), []);
+  useEffect(() => { void load(); }, [load]);
+  useLiveRefresh(load);
 
   return (
     <>
@@ -78,3 +79,4 @@ export function Tracking() {
     </>
   );
 }
+

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
-import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, labelClass, type Column } from '@ruostack/ui';
+import { Badge, Button, Card, DataTable, Drawer, EmptyState, Field, Input, PageHeader, Select, Tabs, labelClass, useLiveRefresh, type Column } from '@ruostack/ui';
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -48,11 +48,12 @@ export function Fulfillment() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  function load() {
-    setLoading(true);
-    api<{ orders: Order[] }>('/api/admin/orders').then((r) => { setOrders(r.orders); setLoading(false); });
-  }
-  useEffect(load, []);
+  const load = useCallback((showLoading = false) => {
+    if (showLoading) setLoading(true);
+    return api<{ orders: Order[] }>('/api/admin/orders').then((r) => { setOrders(r.orders); setLoading(false); });
+  }, []);
+  useEffect(() => { void load(true); }, [load]);
+  useLiveRefresh(load);
 
   const counts = useMemo(() => ({
     ready_for_fulfillment: orders.filter((o) => o.status === 'ready_for_fulfillment').length,
@@ -351,3 +352,4 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
     </Drawer>
   );
 }
+

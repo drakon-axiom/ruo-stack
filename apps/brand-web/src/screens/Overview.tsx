@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Card,
   Check,
@@ -12,6 +12,7 @@ import {
   Plus,
   cn,
   type Column,
+  useLiveRefresh,
 } from '@ruostack/ui';
 import { PLAN_KEYS, planLabel, type PlanKey } from '@ruostack/shared';
 import { api } from '../lib/api.js';
@@ -83,12 +84,13 @@ export function Overview() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() =>
     api<Overview>('/api/brand/overview').then((r) => {
       setData(r);
       setLoading(false);
-    });
-  }, []);
+    }), []);
+  useEffect(() => { void load(); }, [load]);
+  useLiveRefresh(load);
 
   const checklistDone = data ? CHECKLIST.every((c) => data.checklist[c.key]) : true;
   const checklistCount = data ? CHECKLIST.filter((c) => data.checklist[c.key]).length : 0;
@@ -213,3 +215,4 @@ export function Overview() {
     </>
   );
 }
+
