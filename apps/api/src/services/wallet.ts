@@ -1,4 +1,5 @@
-import { Prisma, type PrismaClient, type WalletLedger, type WalletTxnType } from '@ruostack/db';
+import { type Prisma, type PrismaClient, type WalletLedger, type WalletTxnType } from '@ruostack/db';
+import { Conflict } from '../errors.ts';
 
 /**
  * Prepaid wallet ledger. The wallet is closed-loop, non-refundable, and
@@ -84,45 +85,40 @@ export async function appendEntry(
   db: PrismaClient,
   input: AppendEntryInput,
 ): Promise<{ entry: WalletLedger; duplicate: boolean }> {
-  return db.$transaction(async (tx) => {
-    // Serialize ledger writes for this brand (released at tx end).
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.brandId}), 0)`;
+  return db.$transaction(tx => appendEntryTx(tx, input));
+}
 
-    if (input.externalId) {
-      const existing = await tx.walletLedger.findUnique({ where: { externalId: input.externalId } });
-      if (existing) return { entry: existing, duplicate: true };
-    }
-
-    const last = await tx.walletLedger.findFirst({
-      where: { brandId: input.brandId },
-      orderBy: { seq: 'desc' },
-      select: { balanceAfter: true },
-    });
-    const balanceAfter = (last?.balanceAfter ?? 0) + input.amount;
-    if (balanceAfter < 0) {
-      throw new Error(`Wallet balance cannot go negative (brand ${input.brandId})`);
-    }
-
-    try {
-      const entry = await tx.walletLedger.create({
-        data: {
-          brandId: input.brandId,
-          type: input.type,
-          amount: input.amount,
-          balanceAfter,
-          externalId: input.externalId ?? null,
-          reason: input.reason ?? null,
-          createdBy: input.createdBy ?? null,
-        },
-      });
-      return { entry, duplicate: false };
-    } catch (err) {
-      // Lost an idempotency race on externalId — return the winner's row.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002' && input.externalId) {
-        const existing = await tx.walletLedger.findUnique({ where: { externalId: input.externalId } });
-        if (existing) return { entry: existing, duplicate: true };
+/** Append within a caller-owned transaction so the business outcome and audit
+ * commit with the money. Always acquire the wallet lock before other row locks. */
+export async function appendEntryTx(
+  tx: Prisma.TransactionClient,
+  input: AppendEntryInput,
+): Promise<{ entry: WalletLedger; duplicate: boolean }> {
+  await lockBrandWallet(tx, input.brandId);
+  if (input.externalId) {
+    // externalId is globally unique, while wallets are locked per brand. A
+    // separate namespace serializes cross-brand collisions before INSERT so a
+    // unique violation cannot abort the transaction before replay validation.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.externalId}), 1)`;
+    const existing = await tx.walletLedger.findUnique({ where: { externalId: input.externalId } });
+    if (existing) {
+      if (existing.brandId !== input.brandId || existing.type !== input.type || existing.amount !== input.amount) {
+        throw Conflict('ledger_replay_conflict', 'Ledger reference already used with different parameters');
       }
-      throw err;
+      return { entry: existing, duplicate: true };
     }
-  });
+  }
+
+  const balanceAfter = await getBalance(tx, input.brandId) + input.amount;
+  if (balanceAfter < 0) throw new Error(`Wallet balance cannot go negative (brand ${input.brandId})`);
+  const entry = await tx.walletLedger.create({ data: {
+    brandId: input.brandId,
+    type: input.type,
+    amount: input.amount,
+    balanceAfter,
+    externalId: input.externalId ?? null,
+    reason: input.reason ?? null,
+    createdBy: input.createdBy ?? null,
+  } });
+  return { entry, duplicate: false };
 }

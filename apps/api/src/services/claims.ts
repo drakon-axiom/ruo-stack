@@ -1,7 +1,7 @@
 import type { Claim, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type ClaimResolution } from '@ruostack/shared';
 import { writeAudit } from '../audit.ts';
-import { appendEntry, getWalletSummary } from './wallet.ts';
+import { appendEntryTx, getWalletSummary, lockBrandWallet } from './wallet.ts';
 import { BadRequest, Conflict, NotFound } from '../errors.ts';
 
 export interface ResolveInput {
@@ -17,50 +17,44 @@ export interface ResolveInput {
  * claim id so a retry can't double-credit.
  */
 export async function resolveClaim(prisma: PrismaClient, claimId: string, input: ResolveInput, adminId: string, ip?: string | null): Promise<Claim> {
-  const claim = await prisma.claim.findUnique({ where: { id: claimId }, include: { order: { include: { items: true } } } });
-  if (!claim) throw NotFound('Claim not found');
-  if (claim.status === 'resolved') throw Conflict('resolved', 'Claim is already resolved');
-
-  let amountCents: number | null = null;
-
-  // Credit is idempotent on the claim id (unique ledger externalId), so issuing
-  // it before the resolve transaction is safe against retries — a replay returns
-  // the existing entry instead of double-crediting.
-  if (input.resolution === 'credited') {
-    if (!input.amountCents || input.amountCents <= 0) throw BadRequest('amount_required', 'A credit amount is required');
-    amountCents = input.amountCents;
-    await appendEntry(prisma, { brandId: claim.brandId, type: 'refund_credit', amount: amountCents, externalId: `claim:${claimId}:credit`, reason: `Claim ${claimId}: ${input.reason}`, createdBy: adminId });
-  }
-
-  // Pre-compute the reship charge/blocker. The order.create itself runs INSIDE the
-  // resolve transaction below, gated on the status flip — so concurrent resolves
-  // and retries can't produce a second physical shipment (unlike the credit path,
-  // the reship has no natural idempotency key).
-  let reship: { charge: number; blocker: 'none' | 'awaiting_funds'; comp: boolean; wholesale: number; shipping: number } | null = null;
-  if (input.resolution === 'reshipped') {
-    const o = claim.order;
-    const comp = input.comp !== false; // default to platform comp
-    const wholesale = comp ? 0 : o.wholesaleTotalCents;
-    const shipping = comp ? 0 : o.shippingTotalCents;
-    const charge = wholesale + shipping;
-    let blocker: 'none' | 'awaiting_funds' = 'none';
-    if (!comp && charge > 0) {
-      const { available } = await getWalletSummary(prisma, o.brandId);
-      if (available < charge) blocker = 'awaiting_funds';
-    }
-    reship = { charge, blocker, comp, wholesale, shipping };
-  }
+  // Read only the lock key outside the transaction; all decisions use a fresh
+  // claim/order snapshot after the wallet lock is held.
+  const key = await prisma.claim.findUnique({ where: { id: claimId }, select: { brandId: true } });
+  if (!key) throw NotFound('Claim not found');
 
   return prisma.$transaction(async (tx) => {
-    // Gate: atomically flip a non-resolved claim to resolved. Concurrent resolves
-    // serialize on this row update; the loser matches 0 rows and bails, so at most
-    // one reship is created. Any failure below rolls the flip back with the
-    // transaction, so a crashed attempt leaves the claim open (no orphan reship).
+    await lockBrandWallet(tx, key.brandId);
+    const claim = await tx.claim.findUnique({ where: { id: claimId }, include: { order: { include: { items: true } } } });
+    if (!claim) throw NotFound('Claim not found');
+    if (claim.brandId !== key.brandId) throw Conflict('claim_changed', 'Claim changed; retry resolution');
+    if (claim.status === 'resolved') throw Conflict('resolved', 'Claim is already resolved');
     const gate = await tx.claim.updateMany({
       where: { id: claimId, status: { not: 'resolved' } },
       data: { status: 'resolved' },
     });
     if (gate.count === 0) throw Conflict('resolved', 'Claim is already resolved');
+
+    let amountCents: number | null = null;
+    if (input.resolution === 'credited') {
+      if (!input.amountCents || input.amountCents <= 0) throw BadRequest('amount_required', 'A credit amount is required');
+      amountCents = input.amountCents;
+      await appendEntryTx(tx, {
+        brandId: claim.brandId, type: 'refund_credit', amount: amountCents,
+        externalId: `claim:${claimId}:credit`, reason: `Claim ${claimId}: ${input.reason}`, createdBy: adminId,
+      });
+    }
+
+    let reship: { charge: number; blocker: 'none' | 'awaiting_funds'; comp: boolean; wholesale: number; shipping: number } | null = null;
+    if (input.resolution === 'reshipped') {
+      const o = claim.order;
+      const comp = input.comp !== false;
+      const wholesale = comp ? 0 : o.wholesaleTotalCents;
+      const shipping = comp ? 0 : o.shippingTotalCents;
+      const charge = wholesale + shipping;
+      const { available } = await getWalletSummary(tx, claim.brandId);
+      const blocker = charge > 0 && available < charge ? 'awaiting_funds' : 'none';
+      reship = { charge, blocker, comp, wholesale, shipping };
+    }
 
     let reshipOrderId: string | null = null;
     if (reship) {
