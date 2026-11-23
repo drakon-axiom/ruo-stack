@@ -260,6 +260,9 @@ model AdminUser {
   status       AdminStatus @default(active)
   mfaEnabled   Boolean     @default(false) @map("mfa_enabled")
   mfaSecret    String?     @map("mfa_secret") // encrypted at rest (AES-256-GCM)
+  mfaEnrollmentHash String? @map("mfa_enrollment_hash")
+  mfaEnrollmentExpiresAt DateTime? @map("mfa_enrollment_expires_at")
+  mfaPendingSecret String? @map("mfa_pending_secret") // encrypted; never used for login
   lastLoginAt  DateTime?   @map("last_login_at")
   createdBy    String?     @map("created_by") @db.Uuid // AdminUser.id
   createdAt    DateTime    @default(now()) @map("created_at")
