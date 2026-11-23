@@ -68,3 +68,16 @@ WHERE status <> 'resolved'
   AND (resolution IS NOT NULL OR resolved_at IS NOT NULL OR reship_order_id IS NOT NULL);
 COMMIT;
 ```
+
+## Verification and implementation decisions
+
+- Offline workspace suite: 450 passing tests (API 362, UI 59, payments 25, email 4). Other database integration suites are skipped in this mode.
+- Targeted PostgreSQL integration suites: 37 passing tests covering enrollment, security guards, claim races, ledger replay, and order reservations.
+- Workspace type checking, production builds, and diff whitespace checks passed.
+- Independent review identified initial-invitation identity ownership, triage reopening, and conflicting historical claim outcomes. Each was reproduced with failing tests and fixed; final tests passed. No independent second review of those fixes was run.
+- Work is isolated on `fix/high-severity-remediation`; the original production checkout was preserved.
+- Real local PostgreSQL transactions were used instead of mock-only financial/MFA tests. Supabase role/function stubs support migrations, while Auth requests are mocked; this does not verify hosted Auth configuration.
+- Prisma generated the additive migration from before/after schemas, and `migrate deploy` applied it only to the disposable database. Migration deployment remains required before the updated API starts.
+- A second advisory-lock namespace serializes globally unique ledger references after the per-brand wallet lock. Future callers spanning multiple wallets must retain a consistent lock order.
+- The financial fix includes adjacent triage and historical-state guards because otherwise a second outcome remained possible. No historical ledger or audit entries were rewritten.
+- Unrelated refresh/login, subscription-sweep, and last-owner races remain outside this patch. No minor review findings were deferred.

@@ -99,3 +99,7 @@
 ## Scope excluded
 
 Refresh rotation, subscription sweep races, last-owner races, broad UI refactoring, and queue/customer-rollup optimizations are intentionally separate work. No fixes or deployments have been performed by preparing this plan.
+
+## Implementation status — 2026-11-23
+
+All five code findings implemented on `fix/high-severity-remediation`, including the adjacent identity-ownership and financial-state gaps identified in independent review. Verification: 450 offline workspace tests, 37 targeted PostgreSQL integration tests, workspace typecheck, production build. See `docs/security/high-severity-remediation-rollout.md` for decisions, migration order, staging checks, and historical reconciliation queries. Release steps above remain pending; production has not been changed.
