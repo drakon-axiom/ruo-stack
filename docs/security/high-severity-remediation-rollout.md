@@ -81,3 +81,7 @@ COMMIT;
 - A second advisory-lock namespace serializes globally unique ledger references after the per-brand wallet lock. Future callers spanning multiple wallets must retain a consistent lock order.
 - The financial fix includes adjacent triage and historical-state guards because otherwise a second outcome remained possible. No historical ledger or audit entries were rewritten.
 - Unrelated refresh/login, subscription-sweep, and last-owner races remain outside this patch. No minor review findings were deferred.
+
+## Production migration follow-up — 2026-11-23
+
+At the user's request, applied `00000000000032_admin_mfa_enrollment` using the production checkout's database configuration after its Supabase project-reference guard passed. It was the only pending migration. Prisma now reports all 33 migrations up to date; a read-back verified all three nullable columns and a completed, non-rolled-back migration record. The Prisma client was regenerated in the remediation worktree. No API reload, application deployment, or account-data modification was performed. The updated application release remains pending.
