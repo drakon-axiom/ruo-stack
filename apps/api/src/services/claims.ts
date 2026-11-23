@@ -27,7 +27,15 @@ export async function resolveClaim(prisma: PrismaClient, claimId: string, input:
     const claim = await tx.claim.findUnique({ where: { id: claimId }, include: { order: { include: { items: true } } } });
     if (!claim) throw NotFound('Claim not found');
     if (claim.brandId !== key.brandId) throw Conflict('claim_changed', 'Claim changed; retry resolution');
-    if (claim.status === 'resolved') throw Conflict('resolved', 'Claim is already resolved');
+    if (claim.status === 'resolved' || claim.resolution || claim.resolvedAt || claim.reshipOrderId) {
+      throw Conflict('resolved', 'Claim already has a resolution; historical inconsistencies require review');
+    }
+    // Previous versions could commit a credit before finalizing the claim. Do
+    // not convert that financial outcome into a denial or physical replacement.
+    if (input.resolution !== 'credited') {
+      const credit = await tx.walletLedger.findUnique({ where: { externalId: `claim:${claimId}:credit` } });
+      if (credit) throw Conflict('claim_already_credited', 'Claim already has a wallet credit; review before resolving');
+    }
     const gate = await tx.claim.updateMany({
       where: { id: claimId, status: { not: 'resolved' } },
       data: { status: 'resolved' },

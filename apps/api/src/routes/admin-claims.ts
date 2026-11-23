@@ -71,11 +71,17 @@ export async function adminClaimRoutes(app: FastifyInstance): Promise<void> {
     const claim = await prisma.claim.findUnique({ where: { id } });
     if (!claim) throw NotFound('Claim not found');
     if (claim.status === 'resolved') throw Conflict('resolved', 'Claim is already resolved');
-    const updated = await prisma.claim.update({
-      where: { id },
-      data: { ...(body.status ? { status: body.status } : {}), ...(body.carrier_claim_id !== undefined ? { carrierClaimId: body.carrier_claim_id } : {}) },
+    const updated = await prisma.$transaction(async (tx) => {
+      // Recheck at write time: a resolution may have committed since the read.
+      const gate = await tx.claim.updateMany({
+        where: { id, status: { not: 'resolved' }, resolution: null, resolvedAt: null, reshipOrderId: null },
+        data: { ...(body.status ? { status: body.status } : {}), ...(body.carrier_claim_id !== undefined ? { carrierClaimId: body.carrier_claim_id } : {}) },
+      });
+      if (gate.count === 0) throw Conflict('resolved', 'Claim is already resolved');
+      const row = await tx.claim.findUniqueOrThrow({ where: { id } });
+      await writeAudit(tx, { actorType: 'admin', actorId: req.admin!.adminUserId, action: AUDIT_ACTIONS.claimUpdated, targetType: 'claim', targetId: id, after: { status: row.status, carrier_claim_id: row.carrierClaimId }, ip: req.ip });
+      return row;
     });
-    await writeAudit(prisma, { actorType: 'admin', actorId: req.admin!.adminUserId, action: AUDIT_ACTIONS.claimUpdated, targetType: 'claim', targetId: id, after: { status: updated.status, carrier_claim_id: updated.carrierClaimId }, ip: req.ip });
     return serializeClaim(updated);
   });
 

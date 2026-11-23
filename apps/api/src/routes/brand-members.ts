@@ -21,7 +21,7 @@ import { BadRequest, Conflict, NotFound } from '../errors.ts';
  * the token hook: it injects brand claims only for an `active` member, so an
  * `invited` row would mint claim-less tokens and lock the new user out of the
  * very endpoint they'd need to accept with. Creating them active is safe because
- * the underlying Supabase user has NO password until someone uses the link —
+ * the underlying Supabase user has no known password before the invite is accepted —
  * membership grants nothing to anyone who can't sign in. "Pending" is therefore
  * derived from Supabase's `last_sign_in_at`, not stored.
  */
@@ -82,20 +82,24 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
     const body = InviteSchema.parse(req.body);
     const { brandId, userId: actorId } = req.brand!;
 
-    // `generateLink` creates the auth user and returns the action link in one
-    // call. It fails when the email already exists anywhere in the pool — which
-    // includes another brand's member, so the message stays deliberately vague.
-    const link = await supabaseAdmin.auth.admin.generateLink({
-      type: 'invite',
+    // Reserve a NEW identity first. generateLink(invite) can return an existing
+    // unconfirmed user, so it cannot establish ownership for creation/cleanup.
+    const created = await supabaseAdmin.auth.admin.createUser({
       email: body.email,
-      options: { data: { full_name: body.full_name } },
+      email_confirm: false,
+      user_metadata: { full_name: body.full_name },
     });
-    if (link.error || !link.data.user) {
-      throw Conflict('invite_failed', link.error?.message ?? 'Could not create an invite for that email');
+    if (created.error || !created.data.user) {
+      throw Conflict('invite_failed', 'Could not create an invite for that email');
     }
-    const userId = link.data.user.id;
-
+    const userId = created.data.user.id;
+    let inviteLink: string;
     try {
+      const link = await supabaseAdmin.auth.admin.generateLink({ type: 'invite', email: body.email });
+      if (link.error || link.data.user?.id !== userId || !link.data.properties?.action_link) {
+        throw new Error('Could not create the invitation');
+      }
+      inviteLink = link.data.properties.action_link;
       await prisma.$transaction(async (tx) => {
         await tx.userProfile.upsert({
           where: { id: userId },
@@ -116,10 +120,10 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
           ip: req.ip,
         });
       });
-    } catch (e) {
-      // Same compensating-delete discipline as signup: no orphan auth users.
+    } catch {
+      // Only the identity this request successfully created belongs to us.
       await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => undefined);
-      throw Conflict('invite_failed', e instanceof Error ? e.message.slice(0, 160) : 'Could not create the invite');
+      throw Conflict('invite_failed', 'Could not create the invite');
     }
 
     return reply.code(201).send({
@@ -127,7 +131,7 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
       email: body.email,
       role: body.role,
       // The whole point: the owner delivers this themselves.
-      invite_link: link.data.properties?.action_link ?? null,
+      invite_link: inviteLink,
     });
   });
 
@@ -151,7 +155,9 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
     if (!email) throw BadRequest('no_email', 'That member has no email on file');
 
     const link = await supabaseAdmin.auth.admin.generateLink({ type: 'invite', email });
-    if (link.error) throw BadRequest('link_failed', 'Could not reissue the invitation');
+    if (link.error || link.data.user?.id !== userId || !link.data.properties?.action_link) {
+      throw BadRequest('link_failed', 'Could not reissue the invitation');
+    }
 
     return { user_id: userId, email, invite_link: link.data.properties?.action_link ?? null };
   });

@@ -1,3 +1,8 @@
+import Fastify from 'fastify';
+import { adminClaimRoutes } from '../../src/routes/admin-claims.ts';
+import { setClientsForTest, resetClientsForTest } from '../../src/clients.ts';
+import { signAdminAccessToken } from '../../src/auth/admin-jwt.ts';
+import { hashToken } from '../../src/crypto.ts';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getPrisma, type PrismaClient } from '@ruostack/db';
 import { resolveClaim } from '../../src/services/claims.ts';
@@ -79,6 +84,59 @@ describe.skipIf(process.env.RUN_DB_TESTS !== '1')('claim financial atomicity', (
     expect(await getBalance(db, brandId)).toBe(0);
     expect((await db.claim.findUniqueOrThrow({ where: { id: c.id } })).status).not.toBe('resolved');
     expect(await db.auditLog.count({ where: { targetId: c.id } })).toBe(0);
+  });
+  it.each(['denied', 'reshipped'] as const)('refuses %s for a legacy open claim with a committed credit', async resolution => {
+    const c = await claim();
+    await appendEntry(db, { brandId, type: 'refund_credit', amount: 700, externalId: `claim:${c.id}:credit` });
+    await expect(resolveClaim(db, c.id, { resolution, reason: 'retry', comp: true }, adminId)).rejects.toMatchObject({ statusCode: 409 });
+    expect((await db.claim.findUniqueOrThrow({ where: { id: c.id } })).status).toBe('open');
+    expect(await getBalance(db, brandId)).toBe(700);
+    expect(await db.order.count({ where: { brandId, status: 'ready_for_fulfillment' } })).toBe(0);
+    expect(await db.auditLog.count({ where: { targetId: c.id } })).toBe(0);
+  });
+  it('rejects a historically reopened reship without creating another order', async () => {
+    const c = await claim();
+    await resolveClaim(db, c.id, { resolution: 'reshipped', reason: 'original', comp: true }, adminId);
+    await db.claim.update({ where: { id: c.id }, data: { status: 'investigating' } });
+    await expect(resolveClaim(db, c.id, { resolution: 'reshipped', reason: 'again', comp: true }, adminId)).rejects.toMatchObject({ statusCode: 409 });
+    expect(await db.order.count({ where: { brandId, status: 'ready_for_fulfillment' } })).toBe(1);
+  });
+  it('can finish a legacy credit only with the same amount', async () => {
+    const c = await claim();
+    await appendEntry(db, { brandId, type: 'refund_credit', amount: 700, externalId: `claim:${c.id}:credit` });
+    await expect(resolveClaim(db, c.id, { resolution: 'credited', reason: 'retry', amountCents: 900 }, adminId)).rejects.toMatchObject({ statusCode: 409 });
+    const result = await resolveClaim(db, c.id, { resolution: 'credited', reason: 'retry', amountCents: 700 }, adminId);
+    expect(result.amountCents).toBe(700);
+    expect(await getBalance(db, brandId)).toBe(700);
+    expect(await db.walletLedger.count({ where: { brandId } })).toBe(1);
+  });
+  it('triage cannot reopen a claim resolved after its initial status read', async () => {
+    const c = await claim();
+    let release!: () => void;
+    let reached!: () => void;
+    const resume = new Promise<void>(r => { release = r; });
+    const read = new Promise<void>(r => { reached = r; });
+    let first = true;
+    const delayed = db.$extends({ query: { claim: { async findUnique({ args, query }) {
+      const result = await query(args);
+      if (first) { first = false; reached(); await resume; }
+      return result;
+    } } } }) as unknown as PrismaClient;
+    const session = await db.adminSession.create({ data: { adminUserId: adminId, refreshTokenHash: hashToken(randomToken(16)), expiresAt: new Date(Date.now() + 60000) } });
+    const token = signAdminAccessToken({ sub: adminId, role: 'operations', sid: session.id });
+    setClientsForTest({ prisma: delayed });
+    const app = Fastify();
+    await app.register(adminClaimRoutes);
+    try {
+      const triage = app.inject({ method: 'PATCH', url: `/api/admin/claims/${c.id}`, headers: { authorization: `Bearer ${token}` }, payload: { status: 'investigating' } }).then(r => r);
+      await read;
+      await resolveClaim(db, c.id, { resolution: 'reshipped', reason: 'resolved meanwhile', comp: true }, adminId);
+      release();
+      expect((await triage).statusCode).toBe(409);
+      expect((await db.claim.findUniqueOrThrow({ where: { id: c.id } })).status).toBe('resolved');
+      await expect(resolveClaim(db, c.id, { resolution: 'reshipped', reason: 'again', comp: true }, adminId)).rejects.toMatchObject({ statusCode: 409 });
+      expect(await db.order.count({ where: { brandId, status: 'ready_for_fulfillment' } })).toBe(1);
+    } finally { release(); await app.close(); resetClientsForTest(); }
   });
   it('two charged reships cannot both reserve the same funds', async () => {
     await appendEntry(db, { brandId, type: 'deposit', amount: 1500 });

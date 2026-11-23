@@ -16,7 +16,7 @@ No production deployment or production reconciliation was performed during imple
 
 ## Historical claim consistency
 
-This flags missing credits, credits associated with non-credit outcomes, and amount/brand/type mismatches. An unresolved claim with an old credit needs investigation before an operator retries it. The new code rejects a conflicting amount rather than silently reusing it.
+This flags missing credits, credits associated with non-credit outcomes, and amount/brand/type mismatches. An unresolved claim with an old credit needs investigation before an operator retries it. The new code rejects a conflicting amount, denial, or reship rather than silently converting that outcome.
 
 ```sql
 BEGIN TRANSACTION READ ONLY;
@@ -54,3 +54,17 @@ COMMIT;
 ```
 
 These queries flag anomalies for review; they do not establish why an anomaly occurred or authorize a financial correction.
+
+## Historically reopened resolutions
+
+These rows may have been reopened by a delayed triage update in older versions.
+The new resolver refuses another outcome when resolution metadata is present.
+
+```sql
+BEGIN TRANSACTION READ ONLY;
+SELECT id, brand_id, status, resolution, resolved_at, reship_order_id
+FROM claim
+WHERE status <> 'resolved'
+  AND (resolution IS NOT NULL OR resolved_at IS NOT NULL OR reship_order_id IS NOT NULL);
+COMMIT;
+```
