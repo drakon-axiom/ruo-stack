@@ -3,7 +3,7 @@ import { assertPublicHttpUrl, isPrivateAddress } from '../../src/services/ssrf-g
 
 describe('isPrivateAddress', () => {
   it('flags private / loopback / link-local / reserved ranges', () => {
-    for (const ip of ['10.0.0.5', '127.0.0.1', '169.254.169.254', '172.16.0.1', '172.31.255.1', '192.168.1.1', '100.64.0.1', '0.0.0.0', '224.0.0.1', '::1', 'fe80::1', 'fd00::1', '::ffff:10.0.0.1']) {
+    for (const ip of ['10.0.0.5', '127.0.0.1', '169.254.169.254', '172.16.0.1', '172.31.255.1', '192.168.1.1', '100.64.0.1', '0.0.0.0', '224.0.0.1', '::1', 'fe80::1', 'fd00::1', '::ffff:10.0.0.1', '::ffff:7f00:1', 'fe90::1', 'febf::1', '0:0:0:0:0:0:0:1', '::ffff:a00:1', '2001:db8::1', '198.18.0.1', '192.0.2.1', '64:ff9b::a00:1', '::2', '4000::1']) {
       expect(isPrivateAddress(ip), ip).toBe(true);
     }
   });
@@ -31,6 +31,10 @@ describe('assertPublicHttpUrl', () => {
     await expect(assertPublicHttpUrl('http://10.0.0.5/wp-json')).rejects.toThrow();
     await expect(assertPublicHttpUrl('http://localhost/')).rejects.toThrow();
     await expect(assertPublicHttpUrl('http://[::1]/')).rejects.toThrow();
+  });
+
+  it('rejects embedded URL credentials', async () => {
+    await expect(assertPublicHttpUrl('https://user:password@8.8.8.8/')).rejects.toThrow();
   });
 
   it('accepts a public IP literal (no DNS lookup needed)', async () => {

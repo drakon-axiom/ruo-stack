@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import { ZodError } from 'zod';
 import { loadConfig } from './config.ts';
 import { HttpError } from './errors.ts';
+import { closePublicHttp } from './services/public-http.ts';
 import { brandRoutes } from './routes/brand.ts';
 import { brandBillingRoutes } from './routes/brand-billing.ts';
 import { brandOrderRoutes } from './routes/brand-orders.ts';
@@ -75,6 +76,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     req.log.error({ err }, 'unhandled error');
     return reply.code(500).send({ error: 'internal_error' });
   });
+
+  app.addHook('onClose', async () => { await closePublicHttp(); });
 
   app.get('/healthz', async () => ({ ok: true }));
 

@@ -1,7 +1,7 @@
 import type { BrandStoreConnection } from '@ruostack/db';
 import { loadConfig } from '../config.ts';
 import { decryptSecret, encryptSecret } from '../crypto.ts';
-import { assertPublicHttpUrl } from './ssrf-guard.ts';
+import { publicFetch } from './public-http.ts';
 
 /**
  * WooCommerce REST connector. RUOStack is the hub: it pulls orders via webhook
@@ -44,23 +44,22 @@ const trimSlashes = (u: string) => u.replace(/\/+$/, '');
 const HTTP_TIMEOUT_MS = 15_000;
 
 export async function wooRequest<T = unknown>(creds: WooCreds, method: string, path: string, body?: unknown): Promise<T> {
-  // SSRF guard: the store URL is brand-supplied. Reject non-public hosts before
-  // we issue an authenticated request from the API's network.
-  await assertPublicHttpUrl(creds.storeUrl);
+  // publicFetch validates the destination at connection time, including DNS.
   const url = `${trimSlashes(creds.storeUrl)}/wp-json/wc/v3${path}`;
   const auth = Buffer.from(`${creds.consumerKey}:${creds.consumerSecret}`).toString('base64');
-  const res = await fetch(url, {
+  const res = await publicFetch(new URL(url), {
     method,
     headers: { authorization: `Basic ${auth}`, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
     // Don't auto-follow redirects: a public host could 3xx to an internal one,
-    // bypassing the guard above. Surface the redirect as a plain failure instead.
+    // bypassing connection validation. Surface the redirect as a plain failure instead.
     redirect: 'manual',
     signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
   });
   if (!res.ok) {
     // Do NOT reflect the upstream response body to the caller — it could carry
     // internal detail. The status is enough to diagnose a bad key / bad URL.
+    await res.body?.cancel();
     throw new Error(`Woo ${method} ${path} → ${res.status}`);
   }
   if (res.status === 204) return undefined as T;
