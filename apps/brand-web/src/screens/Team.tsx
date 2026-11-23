@@ -91,7 +91,7 @@ export function Team() {
                   {m.status === 'suspended' ? (
                     <Badge tone="danger">access revoked</Badge>
                   ) : m.pending ? (
-                    <Badge tone="warning">pending — hasn’t signed in</Badge>
+                    <Badge tone="warning">pending invitation</Badge>
                   ) : null}
                 </div>
                 <div className="mt-0.5 text-xs text-content-muted">{m.email}</div>

@@ -53,9 +53,11 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
         let email: string | null = null;
         let pending = false;
         try {
-          const { data } = await supabaseAdmin.auth.admin.getUserById(m.userId);
-          email = data.user?.email ?? null;
-          pending = !data.user?.last_sign_in_at;
+          const { data, error } = await supabaseAdmin.auth.admin.getUserById(m.userId);
+          if (!error && data.user) {
+            email = data.user.email ?? null;
+            pending = !data.user.email_confirmed_at && !data.user.confirmed_at && !data.user.last_sign_in_at;
+          }
         } catch {
           // A lookup failure must not blank the whole team list.
         }
@@ -129,8 +131,8 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // Re-mint a link for someone who lost theirs. `invite` only works for a user
-  // who has never been confirmed, so fall back to a recovery link.
+  // Reissue only an unconsumed invitation. Recovery credentials belong to the
+  // account holder and must never be returned to a team administrator.
   app.post('/api/brand/members/:userId/invite-link', { preHandler: requireBrandSurface('members') }, async (req) => {
     const { userId } = z.object({ userId: z.string().uuid() }).parse(req.params);
     const { brandId } = req.brand!;
@@ -138,13 +140,18 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
     const member = await prisma.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
     if (!member) throw NotFound('Member not found');
 
-    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
-    const email = userData.user?.email;
+    if (member.status !== 'active') throw Conflict('invite_not_pending', 'Only active pending invitations can be reissued');
+
+    const { data: userData, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (error || !userData.user) throw BadRequest('link_failed', 'Could not verify the pending invitation');
+    if (userData.user.email_confirmed_at || userData.user.confirmed_at || userData.user.last_sign_in_at) {
+      throw Conflict('invite_not_pending', 'This member must use the self-service password reset');
+    }
+    const email = userData.user.email;
     if (!email) throw BadRequest('no_email', 'That member has no email on file');
 
-    let link = await supabaseAdmin.auth.admin.generateLink({ type: 'invite', email });
-    if (link.error) link = await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email });
-    if (link.error) throw BadRequest('link_failed', link.error.message.slice(0, 160));
+    const link = await supabaseAdmin.auth.admin.generateLink({ type: 'invite', email });
+    if (link.error) throw BadRequest('link_failed', 'Could not reissue the invitation');
 
     return { user_id: userId, email, invite_link: link.data.properties?.action_link ?? null };
   });
