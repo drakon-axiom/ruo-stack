@@ -85,3 +85,9 @@ COMMIT;
 ## Production migration follow-up — 2026-11-23
 
 At the user's request, applied `00000000000032_admin_mfa_enrollment` using the production checkout's database configuration after its Supabase project-reference guard passed. It was the only pending migration. Prisma now reports all 33 migrations up to date; a read-back verified all three nullable columns and a completed, non-rolled-back migration record. The Prisma client was regenerated in the remediation worktree. No API reload, application deployment, or account-data modification was performed. The updated application release remains pending.
+
+## Production deployment — 2026-11-23
+
+Merged the remediation into production `main` and deployed application revision `dd00291` using `deploy/deploy.sh prod`. Regenerated the production checkout's Prisma client before deployment; migration deployment reported no pending migrations. Re-ran the offline workspace suite (450 passing tests) and type checking in the production checkout before deployment. Both SPA production builds and the API build succeeded; PM2 reloaded the single production API process successfully.
+
+Post-deploy verification passed for loopback API health, origin proxy health, and both public HTTPS health endpoints. Public HTML and entry-bundle hashes match the deployed brand/admin builds. Unauthenticated admin claims, brand members, and invalid-token MFA enrollment requests return 401. No real account enrollment, password reset, or financial mutation was used for smoke verification. Existing unrelated untracked planning files were preserved.
