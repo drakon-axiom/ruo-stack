@@ -17,3 +17,5 @@ SQL customer aggregation, distributed worker leases, other large-screen refactor
 ## Verification
 
 Regression tests reproduce the client-error mapping, overlapping workers, queue count materialization, and eager history payloads. Customer rollup tests preserve identity grouping, totals, phone/address fallback, and cancellation/brand query constraints. Browser tests cover on-demand history, retry, visible truncation, failed list loading, and ignoring an old customer's response after switching.
+
+Pre-deployment verification passed: **473 offline workspace tests**, workspace type checking, all application builds, and diff whitespace checks. Database integration suites were skipped in this mode; this pass changes no schema or transactional financial writes. External API calls are mocked in route/UI tests; the HTTP tests use the real assembled Fastify application.
