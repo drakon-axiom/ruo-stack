@@ -11,3 +11,5 @@ Execute with executing-plans and test-driven-development; one independent final 
 Acceptance: complete lifetime totals without sending all orders/customers to Node/browser; no new cross-tenant exposure; preserved identity/fallback semantics; bounded page sizes; old clients still work. No distributed-worker or unrelated UI changes.
 
 Implementation, review fix pass, 481 offline tests, 33 targeted database tests, typecheck/build, production migration and application deployment are complete. Origin smoke checks pass. Public verification remains blocked by the reverse proxy's expired Tailscale node key; see the rollout document for recovery requirements and deferred minors.
+
+Public verification completed after the user reauthenticated the edge node. Both public sites, deployed assets and authorization boundaries passed; rollout complete.
