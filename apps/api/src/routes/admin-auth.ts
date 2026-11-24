@@ -122,12 +122,20 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
     // Password is valid but no code supplied yet → tell the client to prompt for
     // the TOTP code (a 200, not a 401, so the UI can advance to the code step).
     if (!body.totp) return reply.code(200).send({ mfa_required: true });
-    if (!admin.mfaSecret) throw Unauthorized('MFA misconfigured');
-    const secret = decryptSecret(admin.mfaSecret, cfg.MFA_ENCRYPTION_KEY);
-    if (!authenticator.check(body.totp, secret)) throw Unauthorized('Invalid TOTP');
-
-    await prisma.adminUser.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
-    const tokens = await issueSession(req, admin.id, admin.role);
+    const tokens = await prisma.$transaction(async (tx) => {
+      // Password hashing stays outside the transaction; bind its result to the
+      // current account under the same admin -> sessions lock order as refresh
+      // and suspension. A stale credential check must never mint a new session.
+      const current = await lockedAdmin(tx, admin.id);
+      if (current.passwordHash !== admin.passwordHash || !current.mfaEnabled || current.mfaSecret !== admin.mfaSecret) {
+        throw Unauthorized('Account changed; sign in again');
+      }
+      if (!current.mfaSecret) throw Unauthorized('MFA misconfigured');
+      const secret = decryptSecret(current.mfaSecret, cfg.MFA_ENCRYPTION_KEY);
+      if (!authenticator.check(body.totp!, secret)) throw Unauthorized('Invalid TOTP');
+      await tx.adminUser.update({ where: { id: current.id }, data: { lastLoginAt: new Date() } });
+      return issueSession(req, current.id, current.role, tx);
+    });
     return reply.send(tokens);
   });
 
