@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { getClients } from '../clients.ts';
 import { requireBrand } from '../middleware/guards.ts';
+import { searchCustomers, customerHistory } from '../services/customer-rollups.ts';
 import { customerKey, foldCustomers } from '../services/customers.ts';
 
 /**
@@ -75,6 +76,26 @@ export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
     };
   }
 
+  // Full-lifetime portal APIs. Search terms and identity keys stay out of URLs.
+  app.post('/api/brand/customers/search', { preHandler: requireBrand }, async (req) => {
+    const options = z.object({
+      search: z.string().max(10000).default(''),
+      sort: z.enum(['recent', 'orders', 'spend', 'name']).default('recent'),
+      offset: z.number().int().min(0).max(1_000_000_000).default(0),
+      limit: z.number().int().min(1).max(100).default(50),
+    }).parse(req.body ?? {});
+    return searchCustomers(prisma, req.brand!.brandId, options);
+  });
+  app.post('/api/brand/customers/history/page', { preHandler: requireBrand }, async (req) => {
+    const options = z.object({
+      customer_key: z.string().min(1),
+      limit: z.number().int().min(1).max(100).default(50),
+      cursor: z.object({ created_at: z.string().datetime(), id: z.string().uuid() }).optional(),
+    }).parse(req.body);
+    return customerHistory(prisma, req.brand!.brandId, options.customer_key, options.limit, options.cursor);
+  });
+
+  // Compatibility endpoints for older clients retain their original capped contract.
   app.get('/api/brand/customers', { preHandler: requireBrand }, async (req) => {
     const query = z.object({ view: z.literal('summary').optional() }).parse(req.query);
     return readCustomers(req.brand!.brandId, query.view !== 'summary');

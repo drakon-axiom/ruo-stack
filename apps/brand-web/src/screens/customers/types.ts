@@ -42,3 +42,10 @@ export interface Totals {
 export const fmtDate = (s: string) =>
   new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
+
+export interface HistoryCursor { created_at: string; id: string }
+export interface HistoryResponse {
+  customers: Customer[];
+  totals: Totals;
+  page: { has_more: boolean; next_cursor: HistoryCursor | null };
+}

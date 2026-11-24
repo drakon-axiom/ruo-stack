@@ -1,24 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Drawer, Package } from '@ruostack/ui';
 import { api } from '../../lib/api.js';
 import { FulfillmentBadge } from '../../lib/fulfillment.js';
-import { dollars, fmtDate, type Customer, type OrderRow, type Totals } from './types.js';
+import { dollars, fmtDate, type Customer, type OrderRow, type HistoryCursor, type HistoryResponse } from './types.js';
 
 export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: Customer; onClose: () => void; onShipAgain: (customer: Customer) => void }) {
   const [details, setDetails] = useState<Customer | null>(null);
   const open = details ?? customer;
   const [history, setHistory] = useState<OrderRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [truncated, setTruncated] = useState(false);
+  const [cursor, setCursor] = useState<HistoryCursor | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState(false);
+  const generation = useRef(0);
+  const fetchingMore = useRef(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
+    generation.current++; fetchingMore.current = false;
+    setCursor(null); setLoadingMore(false); setMoreError(false);
     setHistory(null); setDetails(null); setError(null);
-    api<{ customers: Customer[]; totals: Totals }>('/api/brand/customers/history', { method: 'POST', body: { customer_key: customer.key } })
-      .then(result => { if (active) { setDetails(result.customers[0] ?? null); setHistory(result.customers[0]?.order_list ?? []); setTruncated(result.totals.truncated); } })
+    api<HistoryResponse>('/api/brand/customers/history/page', { method: 'POST', body: { customer_key: customer.key, limit: 50 } })
+      .then(result => { if (active) { setDetails(result.customers[0] ?? null); setHistory(result.customers[0]?.order_list ?? []); setCursor(result.page?.next_cursor ?? null); } })
       .catch(() => { if (active) setError('Could not load order history.'); });
-    return () => { active = false; };
+    return () => { active = false; generation.current++; };
   }, [customer.key, attempt]);
+  async function loadMore() {
+    if (!cursor || fetchingMore.current) return;
+    const current = generation.current;
+    fetchingMore.current = true; setLoadingMore(true); setMoreError(false);
+    try {
+      const result = await api<HistoryResponse>('/api/brand/customers/history/page', {
+        method: 'POST', body: { customer_key: customer.key, limit: 50, cursor },
+      });
+      if (current !== generation.current) return;
+      setDetails(result.customers[0] ?? null);
+      setHistory(previous => {
+        const byId = new Map((previous ?? []).map(order => [order.id, order]));
+        for (const order of result.customers[0]?.order_list ?? []) byId.set(order.id, order);
+        return [...byId.values()];
+      });
+      setCursor(result.page.next_cursor);
+    } catch { if (current === generation.current) setMoreError(true); }
+    finally { if (current === generation.current) { fetchingMore.current = false; setLoadingMore(false); } }
+  }
   return (
       <Drawer
         open={true}
@@ -83,8 +108,9 @@ export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: C
               </h3>
               {history === null && !error && <p role="status">Loading order history…</p>}
               {error && <div role="alert"><p>{error}</p><Button onClick={() => setAttempt(a => a + 1)}>Retry history</Button></div>}
-              {truncated && <p className="text-xs text-content-faint">History covers the most recent 5,000 orders for your brand.</p>}
-              {history?.length === 0 && <p>No orders in the current reporting window.</p>}
+              {moreError && <p role="alert">Could not load older orders.</p>}
+              {cursor && <Button disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? 'Loading older orders…' : 'Load older orders'}</Button>}
+              {history?.length === 0 && <p>No orders found.</p>}
               <div className="space-y-2">
                 {(history ?? []).map((o) => (
                   <div

@@ -11,12 +11,12 @@ beforeEach(()=>{vi.resetAllMocks();});
 afterEach(cleanup);
 const show=()=>render(<MemoryRouter><Customers /></MemoryRouter>);
 it('loads summaries first and fetches history only when a customer is opened',async()=>{
-  f.api.mockResolvedValueOnce({customers:[customer],totals:{customers:1,orders:2,spend_cents:2500,truncated:true}})
-    .mockResolvedValueOnce({customers:[{...customer,order_list:[history]}],totals:{truncated:true}});
+  f.api.mockResolvedValueOnce({customers:[customer],totals:{customers:1,orders:2,spend_cents:2500,truncated:false}})
+    .mockResolvedValueOnce({customers:[{...customer,order_list:[history]}],totals:{truncated:false}});
   show(); fireEvent.click(await screen.findByText('Dana Reyes'));
   expect(await screen.findByText('TRACK-123')).toBeTruthy();
-  expect(f.api.mock.calls).toEqual([['/api/brand/customers?view=summary'],['/api/brand/customers/history',{method:'POST',body:{customer_key:'a@test'}}]]);
-  expect(screen.getAllByText(/most recent 5,000 orders/i).length).toBeGreaterThan(0);
+  expect(f.api.mock.calls).toEqual([['/api/brand/customers/search',{method:'POST',body:{search:'',sort:'recent',offset:0,limit:50}}],['/api/brand/customers/history/page',{method:'POST',body:{customer_key:'a@test',limit:50}}]]);
+  expect(screen.queryByText(/most recent 5,000 orders/i)).toBeNull();
 });
 it('shows a history error and lets the user retry',async()=>{
   f.api.mockResolvedValueOnce({customers:[customer],totals:{customers:1,orders:2,spend_cents:2500,truncated:false}})
@@ -57,4 +57,49 @@ it('uses refreshed details and address for Ship again after history loads',async
   expect(screen.getByText('3')).toBeTruthy();
   fireEvent.click(screen.getByRole('button',{name:'Ship again'}));
   expect(ship).toHaveBeenCalledWith(latest);
+});
+
+it('pages the customer list on the server and searches outside the current page',async()=>{
+  f.api.mockResolvedValueOnce({customers:[customer],totals:{customers:51,orders:100,spend_cents:10000,truncated:false},page:{offset:0,limit:50,total:51,has_more:true}})
+    .mockResolvedValueOnce({customers:[{...customer,key:'last',name:'Last customer'}],totals:{customers:51,orders:100,spend_cents:10000,truncated:false},page:{offset:50,limit:50,total:51,has_more:false}})
+    .mockResolvedValueOnce({customers:[],totals:{customers:51,orders:100,spend_cents:10000,truncated:false},page:{offset:0,limit:50,total:0,has_more:false}});
+  show(); await screen.findByText('Dana Reyes');
+  fireEvent.click(screen.getByRole('button',{name:'Next page'}));
+  await screen.findByText('Last customer');
+  expect(f.api.mock.calls[1]![1].body.offset).toBe(50);
+  fireEvent.change(screen.getByLabelText('Search customers'),{target:{value:'no match'}});
+  await screen.findByText('No customers match “no match”');
+  expect(f.api.mock.calls[2]![1].body).toMatchObject({search:'no match',offset:0});
+  expect(screen.getByLabelText('Search customers')).toBeTruthy();
+});
+it('loads older history with a cursor and retains earlier rows when retrying',async()=>{
+  const cursor={id:'00000000-0000-4000-8000-000000000001',created_at:'2026-08-01T00:00:00.000Z'};
+  f.api.mockResolvedValueOnce({customers:[{...customer,order_list:[history]}],totals:{truncated:false},page:{has_more:true,next_cursor:cursor}})
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce({customers:[{...customer,order_list:[{...history,id:'old',tracking_number:'OLDER-TRACK'}]}],totals:{truncated:false},page:{has_more:false,next_cursor:null}});
+  render(<CustomerDrawer customer={customer} onClose={()=>{}} onShipAgain={()=>{}} />);
+  await screen.findByText('TRACK-123');
+  fireEvent.click(screen.getByRole('button',{name:'Load older orders'}));
+  await screen.findByText('Could not load older orders.');
+  expect(screen.getByText('TRACK-123')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Load older orders'}));
+  await screen.findByText('OLDER-TRACK');
+  expect(screen.getByText('TRACK-123')).toBeTruthy();
+  expect(f.api.mock.calls[2]![1].body.cursor).toEqual(cursor);
+});
+
+it('ignores an older search response when a newer query has completed',async()=>{
+  let oldResolve!: (value: unknown)=>void;
+  const totals={customers:2,orders:2,spend_cents:2500,truncated:false};
+  f.api.mockResolvedValueOnce({customers:[customer],totals,page:{total:2,has_more:false}})
+    .mockImplementationOnce(()=>new Promise(resolve=>{oldResolve=resolve;}))
+    .mockResolvedValueOnce({customers:[{...customer,name:'Current result'}],totals,page:{total:1,has_more:false}});
+  show(); await screen.findByText('Dana Reyes');
+  fireEvent.change(screen.getByLabelText('Search customers'),{target:{value:'old'}});
+  await waitFor(()=>expect(f.api).toHaveBeenCalledTimes(2));
+  fireEvent.change(screen.getByLabelText('Search customers'),{target:{value:'current'}});
+  await screen.findByText('Current result');
+  await act(async()=>{oldResolve({customers:[{...customer,name:'Stale result'}],totals,page:{total:1,has_more:false}});});
+  expect(screen.queryByText('Stale result')).toBeNull();
+  expect(screen.getByText('Current result')).toBeTruthy();
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -36,7 +36,8 @@ export function Customers() {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState<SortKey>('recent');
+  const [query, setQuery] = useState<{ search: string; sort: SortKey; offset: number }>({ search: '', sort: 'recent', offset: 0 });
+  const [page, setPage] = useState<{ total: number; has_more: boolean } | null>(null);
   const [open, setOpen] = useState<Customer | null>(null);
   const navigate = useNavigate();
 
@@ -46,40 +47,22 @@ export function Customers() {
   const shipAgain = (c: Customer) => navigate('/app/orders', { state: { shipTo: c.ship_to } });
 
   useEffect(() => {
+    const timer = setTimeout(() => setQuery(previous => previous.search === q.trim() ? previous : { ...previous, search: q.trim(), offset: 0 }), 250);
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
     let active = true;
     setError(null); setCustomers(null);
-    api<{ customers: Customer[]; totals: Totals }>('/api/brand/customers?view=summary').then((r) => {
-      if (active) { setCustomers(r.customers); setTotals(r.totals); }
+    api<{ customers: Customer[]; totals: Totals; page: { total: number; has_more: boolean } }>('/api/brand/customers/search', {
+      method: 'POST', body: { ...query, limit: 50 },
+    }).then((r) => {
+      if (active) { setCustomers(r.customers); setTotals(r.totals); setPage(r.page); }
     }).catch(() => { if (active) { setError('Could not load customers.'); setCustomers([]); } });
     return () => { active = false; };
-  }, [attempt]);
+  }, [attempt, query]);
 
-  const rows = useMemo(() => {
-    let list = customers ?? [];
-    const term = q.trim().toLowerCase();
-    if (term) {
-      list = list.filter(
-        (c) =>
-          c.name.toLowerCase().includes(term) ||
-          (c.email ?? '').toLowerCase().includes(term) ||
-          `${c.city} ${c.state}`.toLowerCase().includes(term),
-      );
-    }
-    const sorted = [...list];
-    sorted.sort((a, b) => {
-      switch (sort) {
-        case 'orders':
-          return b.orders - a.orders;
-        case 'spend':
-          return b.spend_cents - a.spend_cents;
-        case 'name':
-          return a.name.localeCompare(b.name);
-        default:
-          return new Date(b.last_order).getTime() - new Date(a.last_order).getTime();
-      }
-    });
-    return sorted;
-  }, [customers, q, sort]);
+  const rows = customers ?? [];
 
   const columns: Column<Customer>[] = [
     { key: 'name', header: 'Customer', priority: 'primary', cell: (c) => c.name },
@@ -110,7 +93,7 @@ export function Customers() {
     },
   ];
 
-  const noMatches = customers !== null && customers.length > 0 && rows.length === 0;
+  const noMatches = customers !== null && rows.length === 0 && query.search !== '';
 
   return (
     <>
@@ -119,8 +102,7 @@ export function Customers() {
         subtitle="Your customer list, built automatically from your orders. Spend shown is fulfillment cost — what you paid to ship each order."
       />
 
-      {totals?.truncated && <p role="note" className="mb-4 text-sm text-content-muted">Totals cover the most recent 5,000 orders for your brand.</p>}
-      {customers !== null && customers.length > 0 && (
+      {totals !== null && totals.customers > 0 && (
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <KpiTile label="Customers" value={totals?.customers ?? 0} />
@@ -146,8 +128,8 @@ export function Customers() {
               <span className="text-xs text-content-faint">Sort</span>
               <Select
                 className="w-40"
-                value={sort}
-                onValueChange={(v) => setSort(v as SortKey)}
+                value={query.sort}
+                onValueChange={(v) => setQuery(previous => ({ ...previous, sort: v as SortKey, offset: 0 }))}
                 options={SORTS}
               />
             </div>
@@ -164,7 +146,7 @@ export function Customers() {
         onRowClick={setOpen}
         empty={
           error ? <EmptyState title={error} action={<Button onClick={() => setAttempt(a => a + 1)}>Retry customers</Button>} /> : noMatches ? (
-            <EmptyState title={`No customers match “${q}”`} hint="Try a different search term." />
+            <EmptyState title={`No customers match “${query.search}”`} hint="Try a different search term." />
           ) : (
             <EmptyState
               title="No customers yet"
@@ -175,6 +157,13 @@ export function Customers() {
         }
       />
 
+      {customers !== null && !error && page && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <Button disabled={query.offset === 0} onClick={() => setQuery(previous => ({ ...previous, offset: Math.max(0, previous.offset - 50) }))}>Previous page</Button>
+          <p className="text-sm text-content-muted">{page.total === 0 ? '0 customers' : `${query.offset + 1}–${query.offset + customers.length} of ${page.total} customers`}</p>
+          <Button disabled={!page.has_more} onClick={() => setQuery(previous => ({ ...previous, offset: previous.offset + 50 }))}>Next page</Button>
+        </div>
+      )}
       {open && <CustomerDrawer key={open.key} customer={open} onClose={() => setOpen(null)} onShipAgain={shipAgain} />}
     </>
   );
