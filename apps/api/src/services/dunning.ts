@@ -20,9 +20,10 @@ interface SupabaseAuthAdmin {
   auth: { admin: { getUserById(id: string): Promise<{ data: { user: { email?: string | null } | null } }> } };
 }
 
-async function ownerEmail(prisma: PrismaClient, supabase: SupabaseAuthAdmin, brandId: string): Promise<string | null> {
+async function ownerEmail(prisma: PrismaClient, supabase: SupabaseAuthAdmin, brandId: string, checkpoint: () => Promise<void>): Promise<string | null> {
   const owner = await prisma.brandMember.findFirst({ where: { brandId, role: 'owner' }, select: { userId: true } });
   if (!owner) return null;
+  await checkpoint();
   return (await supabase.auth.admin.getUserById(owner.userId)).data.user?.email ?? null;
 }
 
@@ -45,7 +46,7 @@ export async function sweepDunning(prisma: PrismaClient, email: EmailAdapter, su
   let expired = 0;
   for (const s of pastDue) {
     await checkpoint();
-    const to = await ownerEmail(prisma, supabase, s.brandId).catch(() => null);
+    const to = await ownerEmail(prisma, supabase, s.brandId, checkpoint).catch(() => null);
     const planName = registry[s.plan as PlanKey].name;
     const snapshot = { brandId: s.brandId, status: 'past_due' as const, pastDueSince: s.pastDueSince, currentPeriodEnd: s.currentPeriodEnd };
 

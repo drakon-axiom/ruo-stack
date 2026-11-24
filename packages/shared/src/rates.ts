@@ -27,7 +27,7 @@ export interface RateOption {
 export interface RatesAdapter {
   /** The source identifier ('shipstation' | 'computed') — surfaced for transparency. */
   readonly source: string;
-  getRates(input: RateQuoteInput): Promise<RateOption[]>;
+  getRates(input: RateQuoteInput, checkpoint?: () => Promise<void>): Promise<RateOption[]>;
 }
 
 // ── Rate pricing model (fulfillment plan §4/§12) ──────────────────────────────

@@ -83,7 +83,7 @@ export async function sweepArchivablePrices(prisma: PrismaClient, payments: Paym
 }
 
 // ── Heal: re-dispatch stuck webhook events ─────────────────────────────────────
-async function redispatch(prisma: PrismaClient, ev: WebhookEvent): Promise<void> {
+async function redispatch(prisma: PrismaClient, ev: WebhookEvent, checkpoint: () => Promise<void>): Promise<void> {
   if (ev.source === 'stripe') {
     await dispatchStripeEvent(prisma, ev.payload as unknown as NormalizedEvent, 'reconcile');
     return;
@@ -92,7 +92,7 @@ async function redispatch(prisma: PrismaClient, ev: WebhookEvent): Promise<void>
     const connectionId = ev.externalId.split(':')[0]!;
     const conn = await prisma.brandStoreConnection.findUnique({ where: { id: connectionId } });
     if (!conn) throw new Error('store connection no longer exists');
-    await importWooOrder(prisma, conn, ev.payload as unknown as WooOrder); // idempotent
+    await importWooOrder(prisma, conn, ev.payload as unknown as WooOrder, checkpoint); // idempotent
     return;
   }
   throw new Error(`unknown webhook source ${ev.source}`);
@@ -116,7 +116,7 @@ export async function retryStuckWebhooks(prisma: PrismaClient, checkpoint: () =>
   for (const ev of stuck) {
     await checkpoint();
     try {
-      await redispatch(prisma, ev);
+      await redispatch(prisma, ev, checkpoint);
       await prisma.webhookEvent.update({ where: { id: ev.id }, data: { status: 'processed', processedAt: new Date(), attempts: { increment: 1 } } });
       healed++;
     } catch {

@@ -40,7 +40,8 @@ export class ShipStationRatesAdapter implements RatesAdapter {
     this.auth = 'Basic ' + Buffer.from(`${cfg.apiKey}:${cfg.apiSecret}`).toString('base64');
   }
 
-  private async req(path: string, init?: RequestInit): Promise<unknown> {
+  private async req(path: string, init?: RequestInit, checkpoint: () => Promise<void> = async () => {}): Promise<unknown> {
+    await checkpoint();
     const res = await fetch(`${this.base}${path}`, {
       ...init,
       headers: { authorization: this.auth, 'content-type': 'application/json', ...(init?.headers ?? {}) },
@@ -50,12 +51,12 @@ export class ShipStationRatesAdapter implements RatesAdapter {
     return res.json();
   }
 
-  private async listCarrierCodes(): Promise<string[]> {
-    const carriers = (await this.req('/carriers')) as { code: string }[];
+  private async listCarrierCodes(checkpoint: () => Promise<void>): Promise<string[]> {
+    const carriers = (await this.req('/carriers', undefined, checkpoint)) as { code: string }[];
     return carriers.map((c) => c.code);
   }
 
-  private async rateCarrier(carrierCode: string, input: RateQuoteInput): Promise<RateOption[]> {
+  private async rateCarrier(carrierCode: string, input: RateQuoteInput, checkpoint: () => Promise<void> = async () => {}): Promise<RateOption[]> {
     try {
       const rates = (await this.req('/shipments/getrates', {
         method: 'POST',
@@ -72,7 +73,7 @@ export class ShipStationRatesAdapter implements RatesAdapter {
           confirmation: 'none',
           residential: input.residential ?? true,
         }),
-      })) as SsRate[];
+      }, checkpoint)) as SsRate[];
       return rates.map((r) => ({
         carrier: CARRIER_NAMES[carrierCode] ?? carrierCode,
         service: r.serviceName,
@@ -84,9 +85,9 @@ export class ShipStationRatesAdapter implements RatesAdapter {
     }
   }
 
-  async getRates(input: RateQuoteInput): Promise<RateOption[]> {
-    const codes = this.cfg.carrierCodes?.length ? this.cfg.carrierCodes : await this.listCarrierCodes();
-    const lists = await Promise.all(codes.map((c) => this.rateCarrier(c, input)));
+  async getRates(input: RateQuoteInput, checkpoint: () => Promise<void> = async () => {}): Promise<RateOption[]> {
+    const codes = this.cfg.carrierCodes?.length ? this.cfg.carrierCodes : await this.listCarrierCodes(checkpoint);
+    const lists = await Promise.all(codes.map((c) => this.rateCarrier(c, input, checkpoint)));
     return lists.flat().sort((a, b) => a.amountCents - b.amountCents);
   }
 }

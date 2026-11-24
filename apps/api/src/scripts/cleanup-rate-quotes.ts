@@ -1,3 +1,4 @@
+import { isWorkerBusy } from '../services/worker-lock.ts';
 import { PrismaClient } from '@ruostack/db';
 import { runRateQuoteCleanup } from '../services/rate-quote.ts';
 
@@ -18,6 +19,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
+  if (isWorkerBusy(err)) {
+    console.log('[cleanup-rate-quotes] skipped: already running');
+    return;
+  }
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);
 });

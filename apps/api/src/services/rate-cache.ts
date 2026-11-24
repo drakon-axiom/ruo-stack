@@ -33,7 +33,7 @@ export function cacheKey(input: RateQuoteInput): string {
   return `${input.fromZip}|${input.toZip}|${input.toState}|${input.toCountry}|${wt}|${dims}|${res}`;
 }
 
-export async function cachedQuoteRates(input: RateQuoteInput): Promise<{ source: string; options: RateOption[]; cached: boolean }> {
+export async function cachedQuoteRates(input: RateQuoteInput, checkpoint?: () => Promise<void>): Promise<{ source: string; options: RateOption[]; cached: boolean }> {
   const ttlMs = loadConfig().RATE_CACHE_TTL_SECONDS * 1000;
   const key = cacheKey(input);
   const now = Date.now();
@@ -41,7 +41,7 @@ export async function cachedQuoteRates(input: RateQuoteInput): Promise<{ source:
   const hit = cache.get(key);
   if (hit && hit.expires > now) return { ...hit.value, cached: true };
 
-  const value = await quoteRates(input);
+  const value = await quoteRates(input, checkpoint);
   if (cache.size >= MAX_ENTRIES) cache.clear(); // simple bound; entries are short-lived
   cache.set(key, { expires: now + ttlMs, value });
   return { ...value, cached: false };

@@ -1,4 +1,4 @@
-import type { RateOption, RateQuoteInput } from '@ruostack/shared';
+import type { RateOption, RateQuoteInput, RatesAdapter } from '@ruostack/shared';
 import { loadConfig } from '../../config.ts';
 import { ComputedRatesAdapter } from './computed.ts';
 import { ShipStationRatesAdapter } from './shipstation.ts';
@@ -9,7 +9,7 @@ import { ShipStationV2RatesAdapter } from './shipstation-v2.ts';
  * API key, no secret), else the computed rater. The presence of a secret
  * distinguishes v1 from v2.
  */
-function primaryAdapter() {
+function primaryAdapter(): RatesAdapter {
   const cfg = loadConfig();
   if (cfg.SHIPSTATION_API_KEY && cfg.SHIPSTATION_API_SECRET) {
     return new ShipStationRatesAdapter({
@@ -33,14 +33,16 @@ const computed = new ComputedRatesAdapter();
  */
 export async function quoteRates(
   input: RateQuoteInput,
+  checkpoint: () => Promise<void> = async () => {},
 ): Promise<{ source: string; options: RateOption[] }> {
   const adapter = primaryAdapter();
   try {
-    const options = await adapter.getRates(input);
+    const options = await adapter.getRates(input, checkpoint);
     if (options.length > 0) return { source: adapter.source, options };
   } catch {
     /* fall through to computed */
   }
+  await checkpoint();
   return { source: 'computed', options: await computed.getRates(input) };
 }
 

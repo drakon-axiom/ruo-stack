@@ -51,6 +51,7 @@ export async function priceShipping(
   serviceCode?: string,
   pricing?: ShippingPricing,
   mappings?: ServiceMapping[],
+  checkpoint?: () => Promise<void>,
 ): Promise<ShippingQuote> {
   const pp: ShippingPricing = pricing ?? { pickpackCents: loadConfig().SHIPPING_PICKPACK_FEE_CENTS, markupCents: 0 };
   const flat = priceOption(FLAT_FALLBACK, pp, true);
@@ -70,7 +71,7 @@ export async function priceShipping(
     lengthIn: parcel.lengthIn || undefined,
     widthIn: parcel.widthIn || undefined,
     heightIn: parcel.heightIn || undefined,
-  });
+  }, checkpoint);
   // Curate through the service rules (when configured); empty → flat fallback.
   const rulesCurated = mappings ? curateRates(options, mappings, parcel.weightOz) : options;
   // Scope to the brand's allowed services when configured (empty = no restriction).

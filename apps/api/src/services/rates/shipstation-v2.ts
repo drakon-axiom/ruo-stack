@@ -42,8 +42,9 @@ export class ShipStationV2RatesAdapter implements RatesAdapter {
     return { 'API-Key': this.apiKey, 'content-type': 'application/json' };
   }
 
-  private async getCarrierIds(): Promise<string[]> {
+  private async getCarrierIds(checkpoint: () => Promise<void>): Promise<string[]> {
     if (this.carrierIds) return this.carrierIds;
+    await checkpoint();
     const res = await fetch(`${this.base}/carriers`, { headers: this.headers(), signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`ShipStation v2 /carriers → ${res.status}`);
     const d = (await res.json()) as { carriers?: { carrier_id: string }[] };
@@ -51,10 +52,11 @@ export class ShipStationV2RatesAdapter implements RatesAdapter {
     return this.carrierIds;
   }
 
-  async getRates(input: RateQuoteInput): Promise<RateOption[]> {
-    const carrierIds = await this.getCarrierIds();
+  async getRates(input: RateQuoteInput, checkpoint: () => Promise<void> = async () => {}): Promise<RateOption[]> {
+    const carrierIds = await this.getCarrierIds(checkpoint);
     if (carrierIds.length === 0) return [];
 
+    await checkpoint();
     const res = await fetch(`${this.base}/rates/estimate`, {
       method: 'POST',
       headers: this.headers(),
