@@ -35,3 +35,5 @@ Email delivery requires working Supabase Auth mail configuration. Older reposito
 Verification: 506 offline tests pass, including mocked provider races/failures and browser success/retry behavior. Typecheck and builds pass. Actual inbox delivery is not claimed. No schema migration is added by fix 3.
 
 Final review found no critical or important issues. The remaining initial-invite help text was corrected to describe recipient-only email reissues. No code-review findings remain deferred; inbox delivery remains an explicit operational verification limit.
+
+Fix 3 deployed as `707fb4d` on 2026-11-23 (America/Chicago), after fixes 1 and 2 were separately verified and pushed. All 35 migrations are applied, with none pending. PM2 is online after replacing the process. Local/origin/public health, both HTML/entry bundles, the changed Team bundle, protected routes, unsupported-content-type handling, and unauthenticated invitation rejection pass. No invitation emails were sent during production smoke tests. All three code fixes are complete; real Auth email delivery remains unverified and requires functioning mail configuration.
