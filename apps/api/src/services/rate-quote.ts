@@ -1,3 +1,4 @@
+import { withWorkerLock, guardWorkerPrisma, isWorkerBusy } from './worker-lock.ts';
 import { startPeriodicWorker } from './periodic-worker.ts';
 import { createHash } from 'node:crypto';
 import type { PrismaClient } from '@ruostack/db';
@@ -84,9 +85,9 @@ export function startRateQuoteSweeper(
   log?: (msg: string) => void,
 ): () => void {
   const sweep = () => {
-    return deleteExpiredRateQuotes(db)
+    return runRateQuoteCleanup(db)
       .then((n) => { if (n > 0) log?.(`swept ${n} expired rate quotes`); })
-      .catch((err) => log?.(`rate-quote sweep failed: ${err instanceof Error ? err.message : err}`));
+      .catch((err) => isWorkerBusy(err) ? undefined : log?.(`rate-quote sweep failed: ${err instanceof Error ? err.message : err}`));
   };
   return startPeriodicWorker(sweep, intervalMs);
 }
@@ -106,4 +107,8 @@ export async function findRateQuote(
   });
   if (!q) return null;
   return { brandCostCents: q.carrierCostCents + q.pickpackCents, serviceCode: q.serviceCode, boxId: q.boxId, billableWeightOz: q.billableWeightOz };
+}
+
+export function runRateQuoteCleanup(db: PrismaClient): Promise<number> {
+  return withWorkerLock('rate-quotes', ownership => deleteExpiredRateQuotes(guardWorkerPrisma(db, ownership)));
 }

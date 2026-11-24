@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startRateQuoteSweeper } from '../../src/services/rate-quote.ts';
 import { startSubscriptionLapseWorker } from '../../src/services/subscription.ts';
 import type { PrismaClient } from '@ruostack/db';
+vi.mock('../../src/services/worker-lock.ts', () => ({
+  withWorkerLock: (_job: string, run: (ctx: unknown) => Promise<unknown>) => run({ assertOwned: async () => {}, signal: new AbortController().signal }),
+  guardWorkerPrisma: (db: unknown) => db,
+  isWorkerBusy: () => false,
+}));
 afterEach(()=>vi.useRealTimers());
 describe('periodic worker scheduling',()=>{
   it('does not start another sweep while one is pending and resumes after completion',async()=>{

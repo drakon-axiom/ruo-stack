@@ -1,5 +1,5 @@
 import { PrismaClient } from '@ruostack/db';
-import { deleteExpiredRateQuotes } from '../services/rate-quote.ts';
+import { runRateQuoteCleanup } from '../services/rate-quote.ts';
 
 /**
  * One-shot expired-RateQuote cleanup, for an external scheduler (cron) when you'd
@@ -10,7 +10,7 @@ import { deleteExpiredRateQuotes } from '../services/rate-quote.ts';
 async function main(): Promise<void> {
   const prisma = new PrismaClient();
   try {
-    const n = await deleteExpiredRateQuotes(prisma);
+    const n = await runRateQuoteCleanup(prisma);
     console.log(`[cleanup-rate-quotes] deleted ${n} expired rate quote(s)`);
   } finally {
     await prisma.$disconnect();

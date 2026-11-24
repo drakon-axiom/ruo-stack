@@ -1,0 +1,13 @@
+# Distributed worker coordination
+
+Reconciliation (including the admin Run action), rate-quote cleanup (including CLI), subscription lapse, and dunning use dedicated PostgreSQL session advisory locks. Stable job IDs 1–4 use namespace 3; different jobs may run concurrently. Timers still wait for each run to finish. Scheduled contention is skipped; manual reconciliation returns HTTP 409 `worker_busy`.
+
+`DIRECT_URL` must point to the same database as `DATABASE_URL` using direct/session mode. Port 6543 and `pgbouncer=true` are rejected. Do not switch this connection to transaction pooling. Each active worker consumes an additional session. Session locks have no clock-based expiry; process/session termination releases them. The configured production session endpoint passed an isolated two-client probe proving exclusion and release after disconnect (no business jobs run).
+
+A heartbeat checks ownership every five seconds, and Prisma queries and external dispatch boundaries check before starting new work. Ownership failure aborts subsequent work; there is no unlocked fallback. An already dispatched database/provider operation may still finish after connection loss. This is not exactly-once execution or a replacement for provider idempotency. Live webhook deliveries do not take worker locks; existing handler idempotency still applies. A hung provider call retains its session lock until it returns or the process/session terminates.
+
+Dunning uses a conditional snapshot update for expiration, with the brand mirror and audit in the same transaction, so a renewal after candidate selection is preserved. Payment-failed email remains best effort: its notification marker is claimed before delivery; failure/crash may drop a notice, and a renewal after claim may still receive the already-dispatched notice. Reliable delivery would require an outbox, outside this change.
+
+Validation before deployment: 481 offline tests; 20 disposable PostgreSQL tests covering contention, failure/disconnect release, transaction/raw-query guards, shared production entry points, and dunning/lapse races. Workspace typecheck and build passed. No schema migration required. Never run destructive integration fixtures against production.
+
+Rollback: redeploy the previous release (`ed18c6f`) if needed. That removes distributed coordination; only in-process exclusion remains. The database schema is unchanged.

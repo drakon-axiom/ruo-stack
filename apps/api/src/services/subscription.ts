@@ -1,3 +1,4 @@
+import { withWorkerLock, guardWorkerPrisma, isWorkerBusy } from './worker-lock.ts';
 import { startPeriodicWorker } from './periodic-worker.ts';
 import type { PrismaClient, PlanTier, SubscriptionState, SubscriptionStateStatus } from '@ruostack/db';
 import { AUDIT_ACTIONS, type PlanKey } from '@ruostack/shared';
@@ -215,9 +216,13 @@ export async function sweepLapsedSubscriptions(prisma: PrismaClient, now: Date =
 /** Periodic lapse sweep (runs on start, then every interval). Unref'd. */
 export function startSubscriptionLapseWorker(prisma: PrismaClient, intervalMs: number, log?: (m: string) => void): () => void {
   const tick = () => {
-    return sweepLapsedSubscriptions(prisma)
+    return runSubscriptionLapse(prisma)
       .then((r) => { if (r.suspended) log?.(`subscription lapse: suspended ${r.suspended}`); })
-      .catch((err) => log?.(`subscription lapse sweep failed: ${err instanceof Error ? err.message : err}`));
+      .catch((err) => isWorkerBusy(err) ? undefined : log?.(`subscription lapse sweep failed: ${err instanceof Error ? err.message : err}`));
   };
   return startPeriodicWorker(tick, intervalMs);
+}
+
+export function runSubscriptionLapse(prisma: PrismaClient): Promise<LapseSweepResult> {
+  return withWorkerLock('subscription-lapse', ownership => sweepLapsedSubscriptions(guardWorkerPrisma(prisma, ownership)));
 }

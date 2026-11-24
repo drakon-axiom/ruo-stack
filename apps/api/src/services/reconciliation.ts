@@ -1,3 +1,4 @@
+import { withWorkerLock, guardWorkerPrisma, isWorkerBusy } from './worker-lock.ts';
 import { startPeriodicWorker } from './periodic-worker.ts';
 import type { PrismaClient, WebhookEvent } from '@ruostack/db';
 import { AUDIT_ACTIONS, type NormalizedEvent, type PaymentsAdapter } from '@ruostack/shared';
@@ -51,7 +52,7 @@ export interface ArchiveSweepResult {
  * — is harmless; the lookback bound exists to stop scanning forever, not to
  * prevent a harmless re-archive.
  */
-export async function sweepArchivablePrices(prisma: PrismaClient, payments: PaymentsAdapter): Promise<ArchiveSweepResult> {
+export async function sweepArchivablePrices(prisma: PrismaClient, payments: PaymentsAdapter, checkpoint: () => Promise<void> = async () => {}): Promise<ArchiveSweepResult> {
   const now = Date.now();
   const rows = await prisma.planPrice.findMany({
     where: {
@@ -68,6 +69,7 @@ export async function sweepArchivablePrices(prisma: PrismaClient, payments: Paym
   let archived = 0;
   let failed = 0;
   for (const row of rows) {
+    await checkpoint();
     try {
       await payments.archivePrice(row.stripePriceId!);
       archived++;
@@ -103,7 +105,7 @@ export interface RetryResult {
   deadLetter: number;
 }
 
-export async function retryStuckWebhooks(prisma: PrismaClient): Promise<RetryResult> {
+export async function retryStuckWebhooks(prisma: PrismaClient, checkpoint: () => Promise<void> = async () => {}): Promise<RetryResult> {
   const stuck = await prisma.webhookEvent.findMany({
     where: { status: { in: ['received', 'failed'] }, attempts: { lt: MAX_WEBHOOK_ATTEMPTS }, createdAt: { lt: new Date(Date.now() - RETRY_GRACE_MS) } },
     orderBy: { createdAt: 'asc' },
@@ -112,6 +114,7 @@ export async function retryStuckWebhooks(prisma: PrismaClient): Promise<RetryRes
   let healed = 0;
   let failed = 0;
   for (const ev of stuck) {
+    await checkpoint();
     try {
       await redispatch(prisma, ev);
       await prisma.webhookEvent.update({ where: { id: ev.id }, data: { status: 'processed', processedAt: new Date(), attempts: { increment: 1 } } });
@@ -245,24 +248,27 @@ export interface ReconciliationReport {
 }
 
 export async function runReconciliation(prisma: PrismaClient, payments: PaymentsAdapter): Promise<ReconciliationReport> {
-  const retry = await retryStuckWebhooks(prisma);
-  const drift = await scanDrift(prisma);
-  const archive = await sweepArchivablePrices(prisma, payments);
-  await writeAudit(prisma, {
-    actorType: 'system',
-    actorId: null,
-    action: AUDIT_ACTIONS.reconciliationRun,
-    after: {
-      healed: retry.healed,
-      failed: retry.failed,
-      dead_letter: retry.deadLetter,
-      drift: drift.length,
-      prices_archived: archive.archived,
-      prices_archive_failed: archive.failed,
-    },
-    ip: null,
+  return withWorkerLock('reconciliation', async (ownership) => {
+    prisma = guardWorkerPrisma(prisma, ownership);
+    const retry = await retryStuckWebhooks(prisma, ownership.assertOwned);
+    const drift = await scanDrift(prisma);
+    const archive = await sweepArchivablePrices(prisma, payments, ownership.assertOwned);
+    await writeAudit(prisma, {
+      actorType: 'system',
+      actorId: null,
+      action: AUDIT_ACTIONS.reconciliationRun,
+      after: {
+        healed: retry.healed,
+        failed: retry.failed,
+        dead_letter: retry.deadLetter,
+        drift: drift.length,
+        prices_archived: archive.archived,
+        prices_archive_failed: archive.failed,
+      },
+      ip: null,
+    });
+    return { retry, drift, archive, ranAt: new Date() };
   });
-  return { retry, drift, archive, ranAt: new Date() };
 }
 
 /** Periodic worker (runs once on start, then every interval). Unref'd. */
@@ -280,7 +286,7 @@ export function startReconciliationWorker(
             `drift ${r.drift.length}, prices archived ${r.archive.archived} (failed ${r.archive.failed})`,
         ),
       )
-      .catch((err) => log?.(`reconcile failed: ${err instanceof Error ? err.message : err}`));
+      .catch((err) => isWorkerBusy(err) ? undefined : log?.(`reconcile failed: ${err instanceof Error ? err.message : err}`));
   };
   return startPeriodicWorker(tick, intervalMs);
 }
