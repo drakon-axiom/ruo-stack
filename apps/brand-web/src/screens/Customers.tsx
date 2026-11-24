@@ -3,13 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   Button,
   DataTable,
-  Drawer,
   EmptyState,
   Input,
   KpiTile,
   LinkButton,
   PageHeader,
-  Package,
   Search,
   Select,
   Toolbar,
@@ -17,48 +15,8 @@ import {
 } from '@ruostack/ui';
 import { api } from '../lib/api.js';
 import { FulfillmentBadge } from '../lib/fulfillment.js';
-import type { ShipTo } from './Orders.js';
-
-const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
-
-interface OrderRow {
-  id: string;
-  status: string;
-  blocker: string;
-  wallet_charge_cents: number;
-  tracking_number: string | null;
-  exported_at: string | null;
-  created_at: string;
-}
-
-interface Customer {
-  key: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  city: string;
-  state: string;
-  country: string;
-  orders: number;
-  spend_cents: number;
-  first_order: string;
-  last_order: string;
-  last_status: string;
-  last_blocker: string;
-  last_exported_at: string | null;
-  /** Null when we hold no complete address for them — see `shipToFrom` on the API. */
-  ship_to: ShipTo | null;
-  order_list: OrderRow[];
-}
-
-interface Totals {
-  customers: number;
-  orders: number;
-  spend_cents: number;
-}
-
-const fmtDate = (s: string) =>
-  new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+import { CustomerDrawer } from './customers/CustomerDrawer.js';
+import { dollars, fmtDate, type Customer, type Totals } from './customers/types.js';
 
 type SortKey = 'recent' | 'orders' | 'spend' | 'name';
 
@@ -75,6 +33,8 @@ const SORTS: { value: SortKey; label: string }[] = [
 export function Customers() {
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<SortKey>('recent');
   const [open, setOpen] = useState<Customer | null>(null);
@@ -86,11 +46,13 @@ export function Customers() {
   const shipAgain = (c: Customer) => navigate('/app/orders', { state: { shipTo: c.ship_to } });
 
   useEffect(() => {
-    api<{ customers: Customer[]; totals: Totals }>('/api/brand/customers').then((r) => {
-      setCustomers(r.customers);
-      setTotals(r.totals);
-    });
-  }, []);
+    let active = true;
+    setError(null); setCustomers(null);
+    api<{ customers: Customer[]; totals: Totals }>('/api/brand/customers?view=summary').then((r) => {
+      if (active) { setCustomers(r.customers); setTotals(r.totals); }
+    }).catch(() => { if (active) { setError('Could not load customers.'); setCustomers([]); } });
+    return () => { active = false; };
+  }, [attempt]);
 
   const rows = useMemo(() => {
     let list = customers ?? [];
@@ -157,6 +119,7 @@ export function Customers() {
         subtitle="Your customer list, built automatically from your orders. Spend shown is fulfillment cost — what you paid to ship each order."
       />
 
+      {totals?.truncated && <p role="note" className="mb-4 text-sm text-content-muted">Totals cover the most recent 5,000 orders for your brand.</p>}
       {customers !== null && customers.length > 0 && (
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -200,7 +163,7 @@ export function Customers() {
         loading={customers === null}
         onRowClick={setOpen}
         empty={
-          noMatches ? (
+          error ? <EmptyState title={error} action={<Button onClick={() => setAttempt(a => a + 1)}>Retry customers</Button>} /> : noMatches ? (
             <EmptyState title={`No customers match “${q}”`} hint="Try a different search term." />
           ) : (
             <EmptyState
@@ -212,86 +175,7 @@ export function Customers() {
         }
       />
 
-      <Drawer
-        open={open !== null}
-        onOpenChange={(o) => {
-          if (!o) setOpen(null);
-        }}
-        title={open?.name ?? 'Customer'}
-        footer={
-          open?.ship_to ? (
-            <Button className="w-full" icon={Package} onClick={() => shipAgain(open)}>
-              Ship again
-            </Button>
-          ) : (
-            <p className="text-center text-xs text-content-faint">
-              No complete address on file — can't reship
-            </p>
-          )
-        }
-      >
-        {open && (
-          <div className="space-y-4">
-            <dl className="space-y-1.5 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-content-faint">Email</dt>
-                <dd>{open.email ?? '—'}</dd>
-              </div>
-              {open.phone && (
-                <div className="flex justify-between gap-3">
-                  <dt className="text-content-faint">Phone</dt>
-                  <dd>{open.phone}</dd>
-                </div>
-              )}
-              <div className="flex justify-between gap-3">
-                <dt className="text-content-faint">Location</dt>
-                <dd>
-                  {open.city}, {open.state}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-content-faint">First order</dt>
-                <dd>{fmtDate(open.first_order)}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-content-faint">Total orders</dt>
-                <dd className="tabular-nums">{open.orders}</dd>
-              </div>
-            </dl>
-
-            {open.ship_to && (
-              // Spelled out so "again" is never ambiguous: this is the address
-              // from their most recent order that had one.
-              <p className="text-xs text-content-faint">
-                Ships to {open.ship_to.address1}
-                {open.ship_to.address2 ? `, ${open.ship_to.address2}` : ''}, {open.ship_to.city}{' '}
-                {open.ship_to.state} {open.ship_to.zip}
-              </p>
-            )}
-
-            <div>
-              <h3 className="mb-2 text-2xs uppercase tracking-[0.1em] text-content-faint">
-                Order history
-              </h3>
-              <div className="space-y-2">
-                {open.order_list.map((o) => (
-                  <div
-                    key={o.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line-subtle px-3 py-2 text-xs"
-                  >
-                    <span className="text-content-muted">{fmtDate(o.created_at)}</span>
-                    <span className="font-mono tabular-nums">{dollars(o.wallet_charge_cents)}</span>
-                    <span className="font-mono text-content-muted">{o.tracking_number ?? '—'}</span>
-                    <FulfillmentBadge
-                      order={{ status: o.status, blocker: o.blocker, exported_at: o.exported_at }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </Drawer>
+      {open && <CustomerDrawer key={open.key} customer={open} onClose={() => setOpen(null)} onShipAgain={shipAgain} />}
     </>
   );
 }

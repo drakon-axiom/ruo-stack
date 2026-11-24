@@ -1,3 +1,4 @@
+import { STATUS_CODES } from 'node:http';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -70,8 +71,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     if (err instanceof ZodError) {
       return reply.code(400).send({ error: 'validation', issues: err.issues });
     }
-    if ((err as { statusCode?: number }).statusCode === 400) {
-      return reply.code(400).send({ error: 'bad_request', message: (err as Error).message });
+    const status = (err as { statusCode?: number }).statusCode;
+    if (typeof status === 'number' && Number.isInteger(status) && status >= 400 && status < 500) {
+      const codes: Record<number, string> = { 400: 'bad_request', 413: 'payload_too_large', 415: 'unsupported_media_type', 429: 'too_many_requests' };
+      return reply.code(status).send({ error: codes[status] ?? 'request_error', message: STATUS_CODES[status] ?? 'Request rejected' });
     }
     req.log.error({ err }, 'unhandled error');
     return reply.code(500).send({ error: 'internal_error' });

@@ -1,3 +1,4 @@
+import { startPeriodicWorker } from './periodic-worker.ts';
 import type { PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type EmailAdapter, type PlanKey } from '@ruostack/shared';
 import { writeAudit } from '../audit.ts';
@@ -84,12 +85,9 @@ export async function sweepDunning(prisma: PrismaClient, email: EmailAdapter, su
 /** Periodic dunning sweep (runs on start, then every interval). Unref'd. */
 export function startDunningWorker(prisma: PrismaClient, email: EmailAdapter, supabase: SupabaseAuthAdmin, graceDays: number, intervalMs: number, log?: (m: string) => void): () => void {
   const tick = () => {
-    sweepDunning(prisma, email, supabase, graceDays)
+    return sweepDunning(prisma, email, supabase, graceDays)
       .then((r) => { if (r.notified || r.expired) log?.(`dunning: notified ${r.notified}, expired ${r.expired}`); })
       .catch((err) => log?.(`dunning failed: ${err instanceof Error ? err.message : err}`));
   };
-  tick();
-  const timer = setInterval(tick, intervalMs);
-  if (typeof timer.unref === 'function') timer.unref();
-  return () => clearInterval(timer);
+  return startPeriodicWorker(tick, intervalMs);
 }

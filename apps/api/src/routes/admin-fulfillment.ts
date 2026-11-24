@@ -32,7 +32,7 @@ export async function adminFulfillmentRoutes(app: FastifyInstance): Promise<void
       where: { ...(q.status ? { status: q.status } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 200,
-      include: { brand: { select: { brandName: true } }, items: true },
+      include: { brand: { select: { brandName: true } }, _count: { select: { items: true } } },
     });
     return {
       orders: orders.map((o) => ({
@@ -41,7 +41,7 @@ export async function adminFulfillmentRoutes(app: FastifyInstance): Promise<void
         status: o.status,
         blocker: o.blocker,
         recipient: { name: o.recipientName, city: o.city, state: o.state, zip: o.zip },
-        item_count: o.items.length,
+        item_count: o._count.items,
         wallet_charge_cents: o.walletChargeCents,
         shipping_service_code: o.shippingServiceCode,
         tracking_number: o.trackingNumber,

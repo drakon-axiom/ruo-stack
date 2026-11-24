@@ -1,3 +1,4 @@
+import { startPeriodicWorker } from './periodic-worker.ts';
 import type { PrismaClient, WebhookEvent } from '@ruostack/db';
 import { AUDIT_ACTIONS, type NormalizedEvent, type PaymentsAdapter } from '@ruostack/shared';
 import { writeAudit } from '../audit.ts';
@@ -272,7 +273,7 @@ export function startReconciliationWorker(
   log?: (msg: string) => void,
 ): () => void {
   const tick = () => {
-    runReconciliation(prisma, payments)
+    return runReconciliation(prisma, payments)
       .then((r) =>
         log?.(
           `reconcile: healed ${r.retry.healed}, failed ${r.retry.failed}, dead-letter ${r.retry.deadLetter}, ` +
@@ -281,8 +282,5 @@ export function startReconciliationWorker(
       )
       .catch((err) => log?.(`reconcile failed: ${err instanceof Error ? err.message : err}`));
   };
-  tick();
-  const timer = setInterval(tick, intervalMs);
-  if (typeof timer.unref === 'function') timer.unref();
-  return () => clearInterval(timer);
+  return startPeriodicWorker(tick, intervalMs);
 }

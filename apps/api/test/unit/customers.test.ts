@@ -143,3 +143,13 @@ describe('foldCustomers', () => {
     expect(foldCustomers([])).toEqual([]);
   });
 });
+
+
+describe('summary allocation', () => {
+  it('preserves all aggregate fields without materializing order history', () => {
+    const rows=[order({id:'new',address1:'',createdAt:at('2026-08-02')}),order({id:'old',recipientPhone:'555-0100'})];
+    const full=foldCustomers(rows);
+    const summary=foldCustomers(rows, { includeHistory: false });
+    expect(summary).toEqual(full.map(c=>({...c,order_list:[]})));
+  });
+});

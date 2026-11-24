@@ -120,7 +120,7 @@ export function shipToFrom(o: CustomerOrderRow): ShipTo | null {
  * Fold orders into customers. `orders` MUST be newest-first — the first row seen
  * for a key seeds that customer's current identity and location.
  */
-export function foldCustomers(orders: CustomerOrderRow[]): Customer[] {
+export function foldCustomers(orders: CustomerOrderRow[], { includeHistory = true }: { includeHistory?: boolean } = {}): Customer[] {
   const byKey = new Map<string, Customer>();
 
   for (const o of orders) {
@@ -154,7 +154,7 @@ export function foldCustomers(orders: CustomerOrderRow[]): Customer[] {
     if (!c.phone && o.recipientPhone) c.phone = o.recipientPhone; // backfill from any order
     // Newest-first, so the first shippable address we meet is the current one.
     if (!c.ship_to) c.ship_to = shipToFrom(o);
-    c.order_list.push({
+    if (includeHistory) c.order_list.push({
       id: o.id,
       status: o.status,
       blocker: o.blocker,
