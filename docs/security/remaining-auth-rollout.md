@@ -22,6 +22,16 @@ Production metadata preflight: 72 session rows, 6 unrevoked, table plus indexes 
 
 Review found no blockers. Its idempotency coverage suggestion was added for unknown/missing logout tokens. During rollout, only the new code rejects NULL-family sessions; all old API processes must be replaced before declaring completion. The production deployment reloads the single PM2 API process and verifies it afterward.
 
+Fix 2 deployed and pushed as `220a244`. Migration 34 applied successfully (35 total migrations); PM2 replaced the API process and reported online. Local/origin/public health, deployed HTML/bundles, authentication boundaries and 415 checks passed.
+
 ## 3. Invitation reissue
 
-Pending.
+The reissue endpoint retains the legacy `/invite-link` URL for compatibility but never returns a generated credential. It asks Supabase to email the invitation to the invitee and returns only user ID, email, and delivery-request confirmation. Even if confirmation/sign-in races with the preliminary pending check, no invitation/recovery token is disclosed to the owner. Established/suspended members are rejected; Auth lookup failures fail closed; provider errors never fall back to recovery credentials; a mismatched provider identity is rejected without deleting any identity. Reissues are limited to ten per minute per client IP.
+
+The Team screen uses **Email invite**, disables duplicate submissions, and reports provider acceptance or an error rather than displaying a copied link. Initial invitations still reserve a new identity and return its first link under the existing ownership checks.
+
+Email delivery requires working Supabase Auth mail configuration. Older repository comments stated SMTP was not configured; current delivery configuration cannot be verified with the available read-only tools, and no live invitation emails were sent for testing. Provider failures surface a delivery error; there is deliberately no unsafe link-return fallback. Supabase's documented API: https://supabase.com/docs/reference/javascript/auth-admin-inviteuserbyemail . Current changelog and provider source were checked; no SDK dependency upgrade was needed.
+
+Verification: 506 offline tests pass, including mocked provider races/failures and browser success/retry behavior. Typecheck and builds pass. Actual inbox delivery is not claimed. No schema migration is added by fix 3.
+
+Final review found no critical or important issues. The remaining initial-invite help text was corrected to describe recipient-only email reissues. No code-review findings remain deferred; inbox delivery remains an explicit operational verification limit.

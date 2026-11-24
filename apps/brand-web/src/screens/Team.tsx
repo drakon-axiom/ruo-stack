@@ -3,11 +3,7 @@ import { brandRoleLabel, type BrandMemberRole } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
 import { Badge, Button, Card, Input, Select } from '@ruostack/ui';
 
-/**
- * Team (architecture §3.1). Invites are LINK-based: we mint a Supabase action
- * link and the owner delivers it themselves, because no transactional SMTP is
- * configured for brand auth mail yet.
- */
+/** Initial invites provide a link; reissues are emailed only to the invitee. */
 interface Member {
   user_id: string;
   full_name: string | null;
@@ -25,6 +21,8 @@ export function Team() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
   const [link, setLink] = useState<{ email: string; url: string } | null>(null);
 
   const isOwner = yourRole === 'owner';
@@ -49,13 +47,15 @@ export function Team() {
   }
 
   async function resend(m: Member) {
-    setErr('');
+    if (sendingInvite) return;
+    setSendingInvite(m.user_id); setErr(''); setNotice(''); setLink(null);
     try {
-      const r = await api<{ invite_link: string | null }>(`/api/brand/members/${m.user_id}/invite-link`, { method: 'POST' });
-      if (r.invite_link) setLink({ email: m.email ?? '', url: r.invite_link });
+      const r = await api<{ invite_sent: boolean; email: string }>(`/api/brand/members/${m.user_id}/invite-link`, { method: 'POST' });
+      if (!r.invite_sent) throw new Error('Invitation email was not accepted');
+      setNotice(`Invitation email requested for ${r.email}.`);
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Could not create a new link');
-    }
+      setErr(e instanceof ApiError ? e.message : 'Could not send the invitation email.');
+    } finally { setSendingInvite(null); }
   }
 
   return (
@@ -73,6 +73,7 @@ export function Team() {
       </div>
 
       {err && <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</div>}
+      {notice && <p role="status" className="mb-4 text-sm text-content-muted">{notice}</p>}
       {link && <InviteLink email={link.email} url={link.url} onClose={() => setLink(null)} />}
 
       {loading ? (
@@ -100,7 +101,7 @@ export function Team() {
               {isOwner && !m.is_you && (
                 <div className="flex flex-wrap gap-2">
                   {m.pending && m.status !== 'suspended' && (
-                    <Button variant="ghost" className="text-xs" onClick={() => resend(m)}>Get link</Button>
+                    <Button variant="ghost" className="text-xs" disabled={sendingInvite !== null} onClick={() => resend(m)}>{sendingInvite === m.user_id ? 'Sending…' : 'Email invite'}</Button>
                   )}
                   {m.status === 'suspended' ? (
                     <Button
@@ -232,7 +233,7 @@ function InviteLink({ email, url, onClose }: { email: string; url: string; onClo
       <div className="mb-1 text-base font-semibold">Send this link to {email || 'your new team member'}</div>
       <p className="mb-3 text-xs text-content-muted">
         It lets them set a password and sign in. Treat it like a password — anyone with the link can claim the account.
-        You can generate a fresh one at any time.
+        Use Email invite to request another invitation for the recipient.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Input className="flex-1 font-mono text-xs" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />

@@ -2,10 +2,10 @@ import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { brandMemberRoutes } from '../../src/routes/brand-members.ts';
 
-const f = vi.hoisted(() => ({ member: vi.fn(), user: vi.fn(), link: vi.fn(), members: vi.fn(), createUser: vi.fn(), deleteUser: vi.fn(), transaction: vi.fn() }));
+const f = vi.hoisted(() => ({ member: vi.fn(), user: vi.fn(), link: vi.fn(), sendInvite: vi.fn(), members: vi.fn(), createUser: vi.fn(), deleteUser: vi.fn(), transaction: vi.fn() }));
 vi.mock('../../src/clients.ts', () => ({ getClients: () => ({
   prisma: { $transaction: f.transaction, brandMember: { findUnique: f.member, findMany: f.members }, userProfile: { findMany: async () => [] } },
-  supabaseAdmin: { auth: { admin: { getUserById: f.user, generateLink: f.link, createUser: f.createUser, deleteUser: f.deleteUser } } },
+  supabaseAdmin: { auth: { admin: { getUserById: f.user, generateLink: f.link, inviteUserByEmail: f.sendInvite, createUser: f.createUser, deleteUser: f.deleteUser } } },
 }) }));
 // Route tests isolate the external auth guard; existing realm/role tests cover it.
 vi.mock('../../src/middleware/guards.ts', () => {
@@ -23,6 +23,7 @@ beforeEach(async () => {
   f.createUser.mockResolvedValue({ data: { user: { id: userId } }, error: null });
   f.deleteUser.mockResolvedValue({ error: null });
   f.transaction.mockImplementation(async cb => cb({ $executeRaw: async () => 1, userProfile: { upsert: async () => ({}) }, brandMember: { findUnique: async () => ({ role: 'owner', status: 'active' }), create: async () => ({}) }, brandUserRole: { create: async () => ({}) }, auditLog: { create: async () => ({}) } }));
+  f.sendInvite.mockResolvedValue({data:{user:{id:userId,email:'member@example.test'}},error:null});
   f.link.mockResolvedValue({ data: { user: { id: userId }, properties: { action_link: 'https://auth.example.test/invite' } }, error: null });
   app = Fastify();
   await app.register(brandMemberRoutes);
@@ -35,12 +36,14 @@ describe('member invitation credentials', () => {
     f.user.mockResolvedValue({ data: { user: { email: 'member@example.test', [field]: '2026-01-01T00:00:00Z' } }, error: null });
     expect((await reissue()).statusCode).toBe(409);
     expect(f.link).not.toHaveBeenCalled();
+    expect(f.sendInvite).not.toHaveBeenCalled();
     expect((await app.inject('/api/brand/members')).json().members[0].pending).toBe(false);
   });
   it('rejects suspended members', async () => {
     f.member.mockResolvedValue({ userId, status: 'suspended' });
     expect((await reissue()).statusCode).toBe(409);
     expect(f.link).not.toHaveBeenCalled();
+    expect(f.sendInvite).not.toHaveBeenCalled();
   });
   it('does not resolve Auth users outside the requesting brand', async () => {
     f.member.mockResolvedValue(null);
@@ -51,21 +54,32 @@ describe('member invitation credentials', () => {
     f.user.mockResolvedValue({ data: { user: { email: 'member@example.test' } }, error: new Error('upstream') });
     expect((await reissue()).statusCode).toBe(400);
     expect(f.link).not.toHaveBeenCalled();
+    expect(f.sendInvite).not.toHaveBeenCalled();
     expect((await app.inject('/api/brand/members')).json().members[0].pending).toBe(false);
   });
-  it('never substitutes recovery credentials when invite generation fails', async () => {
-    f.link.mockResolvedValueOnce({ error: new Error('already confirmed') });
+  it('never substitutes recovery credentials when invitation email fails', async () => {
+    f.sendInvite.mockResolvedValueOnce({ error: new Error('already confirmed') });
     const res = await reissue();
     expect(res.statusCode).toBe(400);
     expect(res.body).not.toContain('https://auth');
-    expect(f.link.mock.calls.map(([arg]) => arg.type)).toEqual(['invite']);
+    expect(f.link).not.toHaveBeenCalled();
   });
-  it('reissues an invitation for an active unconfirmed invitee', async () => {
+  it('emails an invitation without returning credentials to the owner', async () => {
     const res = await reissue();
     expect(res.statusCode).toBe(200);
-    expect(res.json().invite_link).toBe('https://auth.example.test/invite');
+    expect(res.json()).toEqual({user_id:userId,email:'member@example.test',invite_sent:true});
+    expect(f.sendInvite).toHaveBeenCalledWith('member@example.test');
+    expect(f.link).not.toHaveBeenCalled();
     expect((await app.inject('/api/brand/members')).json().members[0].pending).toBe(true);
   });
+  it('does not expose credentials if confirmation races with email delivery',async()=>{
+    f.sendInvite.mockImplementation(async()=>({data:{user:{id:userId,email:'member@example.test',email_confirmed_at:'2026-01-01',action_link:'must-never-be-returned'}},error:null}));
+    const response=await reissue();expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain('must-never-be-returned');expect(response.json().invite_link).toBeUndefined();
+    expect(f.link).not.toHaveBeenCalled();
+  });
+
+
 });
 
 const invite = () => app.inject({ method: 'POST', url: '/api/brand/members', payload: { email: 'member@example.test', full_name: 'Member', role: 'staff' } });
@@ -92,8 +106,8 @@ describe('initial invitation identity ownership', () => {
     expect(f.transaction).not.toHaveBeenCalled();
     expect(f.deleteUser.mock.calls).toEqual([[userId]]);
   });
-  it('does not return a reissued link if its identity differs from the requested member', async () => {
-    f.link.mockResolvedValue({ data: { user: { id: 'other-user' }, properties: { action_link: 'https://auth.example.test/other' } }, error: null });
+  it('rejects reissue delivery for a different identity without deleting it', async () => {
+    f.sendInvite.mockResolvedValue({ data: { user: { id: 'other-user' } }, error: null });
     expect((await reissue()).statusCode).toBe(400);
     expect(f.deleteUser).not.toHaveBeenCalled();
   });

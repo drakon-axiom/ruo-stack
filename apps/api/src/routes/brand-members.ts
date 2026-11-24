@@ -12,11 +12,10 @@ import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.ts';
  * without a migration"). The schema was built for this from day one; these are
  * the endpoints it was waiting for.
  *
- * INVITES ARE LINK-BASED, deliberately. Brand auth mail is Supabase's, and no
- * transactional SMTP is configured (see the note in the signup handler), so an
- * emailed invite would dead-end. Instead we mint a Supabase action link and hand
- * it back to the owner to deliver however they like. When SMTP lands this can
- * switch to `inviteUserByEmail` with no change to the data model.
+ * Initial invites reserve a new identity and return its first link to the owner.
+ * Reissues are delivered by Supabase directly to the recipient: account state
+ * can change between reads, so an owner must never receive regenerated credentials.
+ * Reissue delivery requires working Supabase Auth email configuration.
  *
  * The invited member is created ACTIVE, which looks surprising until you follow
  * the token hook: it injects brand claims only for an `active` member, so an
@@ -145,7 +144,7 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
 
   // Reissue only an unconsumed invitation. Recovery credentials belong to the
   // account holder and must never be returned to a team administrator.
-  app.post('/api/brand/members/:userId/invite-link', { preHandler: requireBrandSurface('members') }, async (req) => {
+  app.post('/api/brand/members/:userId/invite-link', { preHandler: requireBrandSurface('members'), config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
     const { userId } = z.object({ userId: z.string().uuid() }).parse(req.params);
     const { brandId } = req.brand!;
 
@@ -162,12 +161,15 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
     const email = userData.user.email;
     if (!email) throw BadRequest('no_email', 'That member has no email on file');
 
-    const link = await supabaseAdmin.auth.admin.generateLink({ type: 'invite', email });
-    if (link.error || link.data.user?.id !== userId || !link.data.properties?.action_link) {
-      throw BadRequest('link_failed', 'Could not reissue the invitation');
+    // Checking "pending" and then returning a fresh credential is inherently
+    // racy with confirmation/sign-in at the Auth service. Never return one:
+    // the provider delivers only to the invitee, even if that state changes.
+    const sent = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
+    if (sent.error || sent.data.user?.id !== userId) {
+      throw BadRequest('invite_email_failed', 'Could not send the invitation email. Check Auth email delivery or ask the member to use password reset.');
     }
 
-    return { user_id: userId, email, invite_link: link.data.properties?.action_link ?? null };
+    return { user_id: userId, email, invite_sent: true };
   });
 
   // Change a member's role. Demoting the last owner is refused.
