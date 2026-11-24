@@ -8,15 +8,22 @@ const API_BASE =
 
 const ACCESS_KEY = 'ruostack_admin_access';
 const REFRESH_KEY = 'ruostack_admin_refresh';
+// Changes on login/logout, not on rotation within the same authenticated session.
+let sessionEpoch = 0;
 
 export function getAccess(): string | null {
   return localStorage.getItem(ACCESS_KEY);
 }
-export function setTokens(access: string, refresh: string): void {
+function storeTokens(access: string, refresh: string): void {
   localStorage.setItem(ACCESS_KEY, access);
   localStorage.setItem(REFRESH_KEY, refresh);
 }
+export function setTokens(access: string, refresh: string): void {
+  sessionEpoch++;
+  storeTokens(access, refresh);
+}
 export function clearTokens(): void {
+  sessionEpoch++;
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
 }
@@ -34,24 +41,37 @@ export class ApiError extends Error {
   }
 }
 
-async function refresh(): Promise<boolean> {
+let refreshing: { epoch: number; promise: Promise<boolean> } | undefined;
+async function refresh(failedAccess: string | null, epoch: number): Promise<boolean> {
+  if (epoch !== sessionEpoch) return false;
+  // Another request already rotated while this request's 401 was in flight.
+  if (getAccess() !== failedAccess) return getAccess() !== null;
+  if (refreshing?.epoch === epoch) return refreshing.promise;
   const refreshToken = localStorage.getItem(REFRESH_KEY);
   if (!refreshToken) return false;
-  const res = await fetch(`${API_BASE}/auth/admin/refresh`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  if (!res.ok) return false;
-  const data = await res.json();
-  setTokens(data.access_token, data.refresh_token);
-  return true;
+  const promise = (async () => {
+    const res = await fetch(`${API_BASE}/auth/admin/refresh`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    // A logout or new login while the response was in flight takes precedence.
+    if (epoch !== sessionEpoch || localStorage.getItem(REFRESH_KEY) !== refreshToken) return false;
+    storeTokens(data.access_token, data.refresh_token);
+    return true;
+  })();
+  refreshing = { epoch, promise };
+  try { return await promise; }
+  finally { if (refreshing?.promise === promise) refreshing = undefined; }
 }
 
 export async function api<T = unknown>(
   path: string,
   opts: { method?: string; body?: unknown; auth?: boolean; retry?: boolean } = {},
 ): Promise<T> {
+  const epoch = sessionEpoch;
   const { method = 'GET', body, auth = true, retry = true } = opts;
   const hasBody = body !== undefined;
   const headers: Record<string, string> = {};
@@ -68,7 +88,7 @@ export async function api<T = unknown>(
     body: hasBody ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401 && auth && retry && (await refresh())) {
+  if (res.status === 401 && auth && retry && (await refresh(headers.authorization?.slice(7) ?? null, epoch))) {
     return api<T>(path, { ...opts, retry: false });
   }
   if (!res.ok) {
@@ -155,12 +175,13 @@ export function downloadText(filename: string, text: string, type = 'text/csv;ch
  * an export doesn't fail on a token that expired while the operator was reading.
  */
 export async function apiDownload(path: string, filename: string, retry = true): Promise<void> {
+  const epoch = sessionEpoch;
   const headers: Record<string, string> = {};
   const token = getAccess();
   if (token) headers.authorization = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, { headers });
-  if (res.status === 401 && retry && (await refresh())) return apiDownload(path, filename, false);
+  if (res.status === 401 && retry && (await refresh(headers.authorization?.slice(7) ?? null, epoch))) return apiDownload(path, filename, false);
   if (!res.ok) {
     let code = 'download_failed';
     let message = 'Download failed';

@@ -174,20 +174,23 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
 
   // ── Refresh (rotate session) ──────────────────────────────────────────────
   app.post('/auth/admin/refresh', async (req, reply) => {
-    const { refresh_token } = (req.body ?? {}) as { refresh_token?: string };
-    if (!refresh_token) throw Unauthorized('Missing refresh token');
+    const { refresh_token } = (req.body ?? {}) as { refresh_token?: unknown };
+    if (typeof refresh_token !== 'string' || !refresh_token) throw Unauthorized('Missing refresh token');
     const session = await prisma.adminSession.findUnique({
       where: { refreshTokenHash: hashToken(refresh_token) },
     });
-    if (!session || session.revokedAt || session.expiresAt < new Date()) {
-      throw Unauthorized('Invalid refresh token');
-    }
-    const admin = await prisma.adminUser.findUnique({ where: { id: session.adminUserId } });
-    if (!admin || admin.status !== 'active') throw Unauthorized('Admin inactive');
-
-    // Rotate: revoke the old session, issue a new one.
-    await prisma.adminSession.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
-    const tokens = await issueSession(req, admin.id, admin.role);
+    if (!session) throw Unauthorized('Invalid refresh token');
+    const tokens = await prisma.$transaction(async (tx) => {
+      // Match suspension's admin -> session lock order. A stale active-admin
+      // read must not issue a fresh session after suspension revoked the old one.
+      const admin = await lockedAdmin(tx, session.adminUserId);
+      const consumed = await tx.adminSession.updateMany({
+        where: { id: session.id, adminUserId: admin.id, revokedAt: null, expiresAt: { gt: new Date() } },
+        data: { revokedAt: new Date() },
+      });
+      if (consumed.count !== 1) throw Unauthorized('Invalid refresh token');
+      return issueSession(req, admin.id, admin.role, tx);
+    });
     return reply.send(tokens);
   });
 

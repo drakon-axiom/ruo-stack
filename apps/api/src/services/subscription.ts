@@ -177,28 +177,38 @@ export async function sweepLapsedSubscriptions(prisma: PrismaClient, now: Date =
       status: { in: ['active', 'past_due'] },
       currentPeriodEnd: { not: null, lt: cutoff },
     },
-    select: { brandId: true, plan: true, status: true, currentPeriodEnd: true },
+    select: { brandId: true, status: true, currentPeriodEnd: true },
   });
 
+  let suspended = 0;
   for (const s of lapsed) {
-    await upsertSubscriptionState(prisma, { brandId: s.brandId, status: 'expired', plan: s.plan });
-    await writeAudit(prisma, {
-      actorType: 'system',
-      actorId: null,
-      action: AUDIT_ACTIONS.subscriptionStatusChanged,
-      targetType: 'brand',
-      targetId: s.brandId,
-      before: { status: s.status },
-      after: {
-        status: 'expired',
-        reason: 'paid_through_lapsed',
-        paid_through: s.currentPeriodEnd?.toISOString() ?? null,
-        grace_days: LAPSE_GRACE_DAYS,
-      },
-      ip: null,
+    const changed = await prisma.$transaction(async (tx) => {
+      const result = await tx.subscriptionState.updateMany({
+        where: { brandId: s.brandId, status: s.status, currentPeriodEnd: s.currentPeriodEnd },
+        data: { status: 'expired' },
+      });
+      if (result.count !== 1) return false;
+      await tx.brand.update({ where: { id: s.brandId }, data: { subscriptionStatus: 'none' } });
+      await writeAudit(tx, {
+        actorType: 'system',
+        actorId: null,
+        action: AUDIT_ACTIONS.subscriptionStatusChanged,
+        targetType: 'brand',
+        targetId: s.brandId,
+        before: { status: s.status },
+        after: {
+          status: 'expired',
+          reason: 'paid_through_lapsed',
+          paid_through: s.currentPeriodEnd?.toISOString() ?? null,
+          grace_days: LAPSE_GRACE_DAYS,
+        },
+        ip: null,
+      });
+      return true;
     });
+    if (changed) suspended++;
   }
-  return { examined: lapsed.length, suspended: lapsed.length };
+  return { examined: lapsed.length, suspended };
 }
 
 /** Periodic lapse sweep (runs on start, then every interval). Unref'd. */

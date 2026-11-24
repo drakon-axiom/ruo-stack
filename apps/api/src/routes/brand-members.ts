@@ -1,10 +1,11 @@
+import type { Prisma } from '@ruostack/db';
 import type { FastifyInstance } from 'fastify';
 import { AUDIT_ACTIONS, BRAND_MEMBER_ROLES, EmailSchema, wouldOrphanBrand } from '@ruostack/shared';
 import { z } from 'zod';
 import { getClients } from '../clients.ts';
 import { writeAudit } from '../audit.ts';
 import { requireBrand, requireBrandSurface } from '../middleware/guards.ts';
-import { BadRequest, Conflict, NotFound } from '../errors.ts';
+import { BadRequest, Conflict, Forbidden, NotFound } from '../errors.ts';
 
 /**
  * Brand team management (architecture §3.1 — "invite-staff UI lands later
@@ -34,8 +35,15 @@ const InviteSchema = z.object({
 export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
   const { prisma, supabaseAdmin } = getClients();
 
-  /** Owner count for the brand — the last-owner guard's input. */
-  const ownerCount = (brandId: string) => prisma.brandMember.count({ where: { brandId, role: 'owner', status: 'active' } });
+  // Namespace 2 serializes membership writers, independently of wallet/ledger locks.
+  // Recheck the actor after waiting: the request guard may predate a revocation.
+  const asOwner = <T>(brandId: string, actorId: string, action: (tx: Prisma.TransactionClient) => Promise<T>) =>
+    prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${brandId}), 2)`;
+      const actor = await tx.brandMember.findUnique({ where: { brandId_userId: { brandId, userId: actorId } } });
+      if (actor?.status !== 'active' || actor.role !== 'owner') throw Forbidden('Only an active brand owner can do that');
+      return action(tx);
+    });
 
   // Any active member can SEE the team; only an owner can change it.
   app.get('/api/brand/members', { preHandler: requireBrand }, async (req) => {
@@ -100,7 +108,7 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
         throw new Error('Could not create the invitation');
       }
       inviteLink = link.data.properties.action_link;
-      await prisma.$transaction(async (tx) => {
+      await asOwner(brandId, actorId, async (tx) => {
         await tx.userProfile.upsert({
           where: { id: userId },
           create: { id: userId, fullName: body.full_name },
@@ -168,15 +176,15 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
     const { role } = z.object({ role: z.enum(BRAND_MEMBER_ROLES) }).parse(req.body);
     const { brandId, userId: actorId } = req.brand!;
 
-    const member = await prisma.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
-    if (!member) throw NotFound('Member not found');
-    if (member.role === role) return { user_id: userId, role };
+    const updated = await asOwner(brandId, actorId, async (tx) => {
+      const member = await tx.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
+      if (!member) throw NotFound('Member not found');
+      if (member.role === role) return member;
+  
+      if (wouldOrphanBrand({ ownerCount: await tx.brandMember.count({ where: { brandId, role: 'owner', status: 'active' } }), targetIsOwner: member.role === 'owner' && member.status === 'active', losingOwner: role !== 'owner' })) {
+        throw BadRequest('last_owner', 'A brand must keep at least one owner — promote someone else first');
+      }
 
-    if (wouldOrphanBrand({ ownerCount: await ownerCount(brandId), targetIsOwner: member.role === 'owner', losingOwner: role !== 'owner' })) {
-      throw BadRequest('last_owner', 'A brand must keep at least one owner — promote someone else first');
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
       const m = await tx.brandMember.update({ where: { brandId_userId: { brandId, userId } }, data: { role } });
       await writeAudit(tx, {
         actorType: 'brand',
@@ -205,13 +213,13 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
 
     if (userId === actorId) throw BadRequest('self_removal', 'You cannot remove your own access');
 
-    const member = await prisma.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
-    if (!member) throw NotFound('Member not found');
-    if (wouldOrphanBrand({ ownerCount: await ownerCount(brandId), targetIsOwner: member.role === 'owner', losingOwner: true })) {
-      throw BadRequest('last_owner', 'A brand must keep at least one owner');
-    }
+    await asOwner(brandId, actorId, async (tx) => {
+      const member = await tx.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
+      if (!member) throw NotFound('Member not found');
+      if (wouldOrphanBrand({ ownerCount: await tx.brandMember.count({ where: { brandId, role: 'owner', status: 'active' } }), targetIsOwner: member.role === 'owner' && member.status === 'active', losingOwner: true })) {
+        throw BadRequest('last_owner', 'A brand must keep at least one owner');
+      }
 
-    await prisma.$transaction(async (tx) => {
       await tx.brandMember.update({ where: { brandId_userId: { brandId, userId } }, data: { status: 'suspended' } });
       await writeAudit(tx, {
         actorType: 'brand',
@@ -232,11 +240,11 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
     const { userId } = z.object({ userId: z.string().uuid() }).parse(req.params);
     const { brandId, userId: actorId } = req.brand!;
 
-    const member = await prisma.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
-    if (!member) throw NotFound('Member not found');
-    if (member.status === 'active') return { user_id: userId, status: 'active' };
+    await asOwner(brandId, actorId, async (tx) => {
+      const member = await tx.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
+      if (!member) throw NotFound('Member not found');
+      if (member.status === 'active') return;
 
-    await prisma.$transaction(async (tx) => {
       await tx.brandMember.update({ where: { brandId_userId: { brandId, userId } }, data: { status: 'active' } });
       await writeAudit(tx, {
         actorType: 'brand',

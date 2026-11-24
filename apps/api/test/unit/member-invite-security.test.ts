@@ -22,7 +22,7 @@ beforeEach(async () => {
   f.user.mockResolvedValue({ data: { user: { id: userId, email: 'member@example.test', email_confirmed_at: null, confirmed_at: null, last_sign_in_at: null } }, error: null });
   f.createUser.mockResolvedValue({ data: { user: { id: userId } }, error: null });
   f.deleteUser.mockResolvedValue({ error: null });
-  f.transaction.mockImplementation(async cb => cb({ userProfile: { upsert: async () => ({}) }, brandMember: { create: async () => ({}) }, brandUserRole: { create: async () => ({}) }, auditLog: { create: async () => ({}) } }));
+  f.transaction.mockImplementation(async cb => cb({ $executeRaw: async () => 1, userProfile: { upsert: async () => ({}) }, brandMember: { findUnique: async () => ({ role: 'owner', status: 'active' }), create: async () => ({}) }, brandUserRole: { create: async () => ({}) }, auditLog: { create: async () => ({}) } }));
   f.link.mockResolvedValue({ data: { user: { id: userId }, properties: { action_link: 'https://auth.example.test/invite' } }, error: null });
   app = Fastify();
   await app.register(brandMemberRoutes);

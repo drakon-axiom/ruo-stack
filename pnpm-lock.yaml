@@ -51,6 +51,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.20
         version: 10.5.0(postcss@8.5.15)
+      jsdom:
+        specifier: 25.0.1
+        version: 25.0.1
       postcss:
         specifier: ^8.4.49
         version: 8.5.15
@@ -63,6 +66,9 @@ importers:
       vite:
         specifier: ^5.4.11
         version: 5.4.21(@types/node@22.19.21)
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.19.21)(jsdom@25.0.1)
 
   apps/api:
     dependencies:
