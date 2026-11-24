@@ -61,7 +61,7 @@ export function requireAdmin(surface: Surface, access: 'view' | 'write' = 'view'
 
     // Session must exist, not be revoked, and not be expired.
     const session = await prisma.adminSession.findUnique({ where: { id: principal.sessionId } });
-    if (!session || session.revokedAt || session.expiresAt < new Date()) {
+    if (!session?.familyId || session.revokedAt || session.expiresAt < new Date()) {
       throw Unauthorized('Session revoked or expired');
     }
 

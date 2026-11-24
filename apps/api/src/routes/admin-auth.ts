@@ -25,12 +25,13 @@ interface SessionTokens {
 }
 
 /** Issue an AdminSession (revocable refresh) + a short-lived access token. */
-async function issueSession(req: FastifyRequest, adminUserId: string, role: string, db: PrismaClient | Prisma.TransactionClient = getClients().prisma): Promise<SessionTokens> {
+async function issueSession(req: FastifyRequest, adminUserId: string, role: string, db: PrismaClient | Prisma.TransactionClient = getClients().prisma, familyId?: string): Promise<SessionTokens> {
   const cfg = loadConfig();
   const refresh = randomToken(48);
   const session = await db.adminSession.create({
     data: {
       adminUserId,
+      ...(familyId ? { familyId } : {}),
       refreshTokenHash: hashToken(refresh),
       expiresAt: new Date(Date.now() + cfg.JWT_ADMIN_REFRESH_TTL * 1000),
       ip: req.ip,
@@ -187,7 +188,7 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
     const session = await prisma.adminSession.findUnique({
       where: { refreshTokenHash: hashToken(refresh_token) },
     });
-    if (!session) throw Unauthorized('Invalid refresh token');
+    if (!session?.familyId) throw Unauthorized('Invalid refresh token; sign in again');
     const tokens = await prisma.$transaction(async (tx) => {
       // Match suspension's admin -> session lock order. A stale active-admin
       // read must not issue a fresh session after suspension revoked the old one.
@@ -197,19 +198,30 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
         data: { revokedAt: new Date() },
       });
       if (consumed.count !== 1) throw Unauthorized('Invalid refresh token');
-      return issueSession(req, admin.id, admin.role, tx);
+      return issueSession(req, admin.id, admin.role, tx, session.familyId!);
     });
     return reply.send(tokens);
   });
 
-  // ── Logout (revoke the presented session) ─────────────────────────────────
+  // ── Logout (revoke the complete rotation family, including descendants) ──
   app.post('/auth/admin/logout', async (req, reply) => {
-    const { refresh_token } = (req.body ?? {}) as { refresh_token?: string };
-    if (refresh_token) {
-      await prisma.adminSession.updateMany({
-        where: { refreshTokenHash: hashToken(refresh_token), revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+    const { refresh_token } = (req.body ?? {}) as { refresh_token?: unknown };
+    if (refresh_token !== undefined && (typeof refresh_token !== 'string' || !refresh_token)) {
+      throw BadRequest('invalid_refresh_token', 'Invalid refresh token');
+    }
+    if (typeof refresh_token === 'string') {
+      const session = await prisma.adminSession.findUnique({ where: { refreshTokenHash: hashToken(refresh_token) } });
+      if (session?.familyId) {
+        await prisma.$transaction(async tx => {
+          // Do not require an active account for logout; match refresh's lock
+          // order so it cannot create a descendant after family revocation.
+          await tx.$queryRaw`SELECT id FROM admin_user WHERE id = ${session.adminUserId}::uuid FOR UPDATE`;
+          await tx.adminSession.updateMany({
+            where: { adminUserId: session.adminUserId, familyId: session.familyId, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+        });
+      }
     }
     return reply.send({ ok: true });
   });
