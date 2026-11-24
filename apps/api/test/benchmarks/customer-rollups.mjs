@@ -1,5 +1,5 @@
 /** Run only against disposable PostgreSQL:
- * RUN_DB_TESTS=1 DATABASE_URL=postgresql://review@127.0.0.1:55439/postgres node apps/api/test/benchmarks/customer-rollups.mts
+ * RUN_DB_TESTS=1 DATABASE_URL=postgresql://review@127.0.0.1:55439/postgres node apps/api/test/benchmarks/customer-rollups.mjs
  * Creates and removes synthetic fixtures; refuses remote/non-test targets.
  */
 import { PrismaClient } from '@ruostack/db';
