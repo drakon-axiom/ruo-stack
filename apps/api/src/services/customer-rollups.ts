@@ -32,7 +32,7 @@ function summaryCtes(brandId: string, key?: string): Prisma.Sql {
       SELECT DISTINCT ON (key) * FROM keyed ORDER BY key, created_at DESC, id DESC
     ), summaries AS (
       SELECT g.*, l.recipient_name AS name,
-        nullif(lower(public.ruostack_js_trim(l.recipient_email) COLLATE "und-x-icu"), '') AS email,
+        nullif(public.ruostack_js_lower(public.ruostack_js_trim(l.recipient_email)), '') AS email,
         l.city, l.state, l.country, l.status AS last_status, l.blocker AS last_blocker,
         l.exported_at AS last_exported_at
       FROM grouped g JOIN latest l USING (key)
@@ -88,14 +88,14 @@ function checked(result: RollupResult): RollupResult {
 }
 
 export async function searchCustomers(db: PrismaClient, brandId: string, options: CustomerPageOptions): Promise<RollupResult> {
-  const term = options.search.trim().toLowerCase();
+  const term = Prisma.sql`public.ruostack_js_lower(${options.search.trim()})`;
   const sort = ordering(options.sort);
   const [row] = await db.$queryRaw<Array<{ result: RollupResult }>>(Prisma.sql`
     WITH ${summaryCtes(brandId)}, filtered AS (
       SELECT * FROM summaries WHERE ${term} = ''
-        OR strpos(lower(name COLLATE "und-x-icu"), ${term}) > 0
+        OR strpos(public.ruostack_js_lower(name), ${term}) > 0
         OR strpos(coalesce(email, ''), ${term}) > 0
-        OR strpos(lower((city || ' ' || state) COLLATE "und-x-icu"), ${term}) > 0
+        OR strpos(public.ruostack_js_lower(city || ' ' || state), ${term}) > 0
     ), page AS (SELECT * FROM filtered ORDER BY ${sort} LIMIT ${options.limit} OFFSET ${options.offset}),
     profiles AS (SELECT p.*, ${customerJson} AS data FROM page p ${profileJoins(brandId)})
     SELECT jsonb_build_object('customers', coalesce((SELECT jsonb_agg(data ORDER BY ${sort}) FROM profiles), '[]'::jsonb),

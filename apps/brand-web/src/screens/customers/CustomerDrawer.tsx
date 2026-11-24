@@ -6,7 +6,8 @@ import { dollars, fmtDate, type Customer, type OrderRow, type HistoryCursor, typ
 
 export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: Customer; onClose: () => void; onShipAgain: (customer: Customer) => void }) {
   const [details, setDetails] = useState<Customer | null>(null);
-  const open = details ?? customer;
+  const [missing, setMissing] = useState(false);
+  const open = missing ? null : details ?? customer;
   const [history, setHistory] = useState<OrderRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<HistoryCursor | null>(null);
@@ -19,9 +20,9 @@ export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: C
     let active = true;
     generation.current++; fetchingMore.current = false;
     setCursor(null); setLoadingMore(false); setMoreError(false);
-    setHistory(null); setDetails(null); setError(null);
+    setHistory(null); setDetails(null); setError(null); setMissing(false);
     api<HistoryResponse>('/api/brand/customers/history/page', { method: 'POST', body: { customer_key: customer.key, limit: 50 } })
-      .then(result => { if (active) { setDetails(result.customers[0] ?? null); setHistory(result.customers[0]?.order_list ?? []); setCursor(result.page?.next_cursor ?? null); } })
+      .then(result => { if (active) { setMissing(result.customers.length === 0); setDetails(result.customers[0] ?? null); setHistory(result.customers[0]?.order_list ?? []); setCursor(result.page?.next_cursor ?? null); } })
       .catch(() => { if (active) setError('Could not load order history.'); });
     return () => { active = false; generation.current++; };
   }, [customer.key, attempt]);
@@ -34,6 +35,10 @@ export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: C
         method: 'POST', body: { customer_key: customer.key, limit: 50, cursor },
       });
       if (current !== generation.current) return;
+      if (result.customers.length === 0) {
+        setMissing(true); setDetails(null); setHistory([]); setCursor(null); return;
+      }
+      setMissing(false);
       setDetails(result.customers[0] ?? null);
       setHistory(previous => {
         const byId = new Map((previous ?? []).map(order => [order.id, order]));
@@ -52,8 +57,8 @@ export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: C
         }}
         title={open?.name ?? 'Customer'}
         footer={
-          details?.ship_to ? (
-            <Button className="w-full" icon={Package} onClick={() => onShipAgain(open)}>
+          missing ? undefined : details?.ship_to ? (
+            <Button className="w-full" icon={Package} onClick={() => onShipAgain(details)}>
               Ship again
             </Button>
           ) : (
@@ -63,6 +68,7 @@ export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: C
           )
         }
       >
+        {missing && <p role="status">This customer no longer has any qualifying orders.</p>}
         {open && (
           <div className="space-y-4">
             <dl className="space-y-1.5 text-sm">

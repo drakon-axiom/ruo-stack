@@ -26,6 +26,10 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='1')('lifetime customer database roll
   const res=await search();expect(res.statusCode).toBe(200);
   expect(res.json().totals).toEqual({customers:2,orders:5101,spend_cents:637625,truncated:false});
   expect(res.json().customers.map((c:any)=>c.key)).toContain('old@test');
+  const old=(await history({customer_key:'old@test'})).json();expect(old.customers[0].orders).toBe(1);expect(old.customers[0].order_list).toHaveLength(1);expect(old.page.has_more).toBe(false);
+  const whale=(await history({customer_key:'dana@test',limit:100})).json();expect(whale.customers[0].orders).toBe(5100);expect(whale.customers[0].order_list).toHaveLength(100);expect(whale.page.has_more).toBe(true);
+  const finalPage=(await history({customer_key:'dana@test',limit:100,cursor:{created_at:'2026-01-02T00:00:01.000Z',id:'00000000-0000-4000-8000-000000000000'}})).json();
+  expect(finalPage.customers[0].order_list).toHaveLength(1);expect(finalPage.page.next_cursor).toBeNull();
  });
  it('matches JS grouping and summary fallback including Unicode and blank email',async()=>{
   for(const [i,name] of ['\t İΟΣ\u00a0','\ufeff İΟΣ\u2029','Other','Other'].entries())
@@ -85,6 +89,18 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='1')('lifetime customer database roll
   expect(next.customers[0].orders).toBe(4);expect(next.customers[0].ship_to.address1).toBe('New address');
   expect(next.customers[0].order_list).toHaveLength(1);
   expect(first.customers[0].order_list.map((o:any)=>o.id)).not.toContain(next.customers[0].order_list[0].id);
+ });
+
+ it('does not split newer Unicode case pairs and can search their uppercase orders',async()=>{
+  await db.order.createMany({data:[order({recipientEmail:'Ɤ@test',recipientName:'Ɤ'}),order({recipientEmail:'ɤ@test',recipientName:'Ɤ'})] as any});
+  const result=(await search({search:'ɤ'})).json();expect(result.customers).toHaveLength(1);expect(result.customers[0].orders).toBe(2);
+ });
+ it('matches JavaScript lowercase across all cased codepoints and sigma contexts',async()=>{
+  const cased=/\p{Cased}/u; const ignored=/\p{Case_Ignorable}/u; const samples=[];
+  for(let cp=1;cp<=0x10ffff;cp++){if(cp>=0xd800&&cp<=0xdfff)continue;const text=String.fromCodePoint(cp);if(cased.test(text))samples.push(text,text+'Σ','AΣ'+text);else if(ignored.test(text))samples.push(text+'Σ','AΣ'+text,'AΣ'+text+'B');}
+  samples.push('ꟋΣ','ᲉΣ','AΣ\u0345','\u0345Σ','ΣꟋ','AΣꟋ','İΣ','ΟΣ','AΣ\u200d','AΣ\u200dB');
+  const rows=await db.$queryRaw<Array<{value:string;normalized:string}>>`SELECT value, public.ruostack_customer_key('',value,'') AS normalized FROM unnest(${samples}::text[]) value`;
+  expect(rows.map(r=>[r.value,r.normalized]).filter(([value,normalized])=>normalized!==value!.trim().toLowerCase())).toEqual([]);
  });
 
 });

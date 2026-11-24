@@ -103,3 +103,15 @@ it('ignores an older search response when a newer query has completed',async()=>
   expect(screen.queryByText('Stale result')).toBeNull();
   expect(screen.getByText('Current result')).toBeTruthy();
 });
+
+it.each(['initial','older'] as const)('clears stale customer data when the %s response says the customer is gone',async kind=>{
+  const existing={...customer,name:'Gone customer',ship_to:{recipient_name:'Gone',recipient_email:null,address1:'Stale address',address2:null,city:'Austin',state:'TX',zip:'78701',country:'US'},order_list:[history]};
+  const missing={customers:[],totals:{customers:0,orders:0,spend_cents:0,truncated:false},page:{has_more:false,next_cursor:null}};
+  if(kind==='older')f.api.mockResolvedValueOnce({customers:[existing],totals:{truncated:false},page:{has_more:true,next_cursor:{id:'o1',created_at:'2026-01-01T00:00:00.000Z'}}});
+  f.api.mockResolvedValueOnce(missing);
+  render(<CustomerDrawer customer={existing} onClose={()=>{}} onShipAgain={()=>{}} />);
+  if(kind==='older'){await screen.findByText('TRACK-123');fireEvent.click(screen.getByRole('button',{name:'Load older orders'}));}
+  await screen.findByText('This customer no longer has any qualifying orders.');
+  expect(screen.queryByText(/Stale address/)).toBeNull();expect(screen.queryByText('TRACK-123')).toBeNull();
+  expect(screen.queryByRole('button',{name:'Ship again'})).toBeNull();
+});
