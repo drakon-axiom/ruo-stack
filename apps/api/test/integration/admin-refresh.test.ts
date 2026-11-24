@@ -60,7 +60,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== '1')('atomic admin refresh', () => 
         ready(); await resume; return query(args);
       } } } }) as unknown as PrismaClient;
       await build(client);
-      const exchange = refresh().then(r => r);
+      const exchange = Promise.resolve(refresh());
       await reached;
       // Same admin -> sessions order used by the suspension route.
       const suspension = db.$transaction(async tx => {
