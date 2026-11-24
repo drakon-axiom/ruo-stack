@@ -32,3 +32,9 @@ Final verification after review fixes: **476 offline tests passed**, workspace t
 Deferred minor: the 429 test constructs the framework-shaped error and Retry-After header; add an end-to-end rate-limit plugin threshold test in a follow-up. Existing coverage proves the handler preserves the status/header, not the plugin's threshold behavior.
 
 Scope decisions: lifetime SQL aggregation remains deferred to preserve grouping semantics and the existing bounded window; high-volume brands still have partial totals, now visibly labeled. Worker coordination remains per process; multiple instances/manual runs can overlap. The drawer uses one current response for its details and action, but does not maintain a historical snapshot across list and drawer requests. The synthetic payload result is not a production latency benchmark.
+
+## Production deployment — 2026-11-23
+
+Merged and deployed application revision `ac8a68d` through `deploy/deploy.sh prod`, after frozen dependency installation and Prisma generation in the production checkout. No migrations were pending. API and both SPAs built successfully; PM2 reloaded the API and reported online (restart count 3).
+
+Post-deployment smoke checks passed for loopback, both origin proxies, and both public HTTPS health endpoints. Both public HTML documents and entry bundles matched deployed build artifacts. Invalid/absent authentication was rejected on admin claims, brand members, MFA enrollment, and the new customer-history endpoint. The formerly failing form-content request now returns **415 unsupported_media_type**. No real customer history or financial data was read or modified by smoke checks. Existing unrelated untracked planning documents were preserved.

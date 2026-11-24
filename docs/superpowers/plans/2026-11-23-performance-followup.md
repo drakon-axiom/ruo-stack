@@ -8,3 +8,5 @@ Scope: preserve endpoint authorization and business rules while reducing avoidab
 4. Run workspace tests/typecheck/build and one independent final review; fix blockers, commit, deploy, verify health/assets/client error/auth status, push.
 
 Constraints: in-process worker guard is not a distributed lease. Keep customer scan cap (5000); full database rollup and other large-screen refactors remain follow-up. Never run tests against production. Preserve unrelated untracked documents.
+
+Completed: implementation, regression coverage, independent review and its fix pass, 476-test suite, typecheck/build, production deployment and smoke checks. See `docs/security/performance-followup-rollout.md` for verification, scope decisions and deferred work.
