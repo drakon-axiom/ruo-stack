@@ -45,4 +45,31 @@ describe('admin refresh coordination', () => {
     await expect(api('/first')).rejects.toMatchObject({status:401});
     expect(await api('/second')).toEqual({ok:true}); expect(rotations).toBe(2);
   });
+  it('preserves a new login while an earlier refresh is outstanding', async () => {
+    const started=deferred<void>(); const reply=deferred<Response>();
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if(url.endsWith('/auth/admin/refresh')) { started.resolve(); return reply.promise; }
+      return json({},401);
+    }));
+    const pending=api('/resource'); const rejected=expect(pending).rejects.toMatchObject({status:401});
+    await started.promise; setTokens('other-access','other-refresh');
+    reply.resolve(json({access_token:'stale-access',refresh_token:'stale-refresh'}));
+    await rejected;
+    expect(getAccess()).toBe('other-access');
+    expect(localStorage.getItem('ruostack_admin_refresh')).toBe('other-refresh');
+  });
+  it('releases a refresh flight after a network rejection', async () => {
+    let rotations=0;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if(url.endsWith('/auth/admin/refresh')) {
+        if(++rotations === 1) throw new TypeError('network failed');
+        return json({access_token:'new-access',refresh_token:'new-refresh'});
+      }
+      return (init?.headers as Record<string,string>).authorization === 'Bearer old-access' ? json({},401) : json({ok:true});
+    }));
+    await expect(api('/first')).rejects.toThrow('network failed');
+    expect(await api('/second')).toEqual({ok:true});
+    expect(rotations).toBe(2);
+  });
+
 });

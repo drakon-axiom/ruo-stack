@@ -50,6 +50,43 @@ describe.skipIf(process.env.RUN_DB_TESTS !== '1')('atomic admin refresh', () => 
   it('rejects malformed refresh tokens without server errors', async () => {
     await build(); expect((await refresh(123)).statusCode).toBe(401);
   });
+  it.each(['refresh', 'suspension'] as const)('leaves no live session when %s acquires the admin lock first', async first => {
+    let ready!: () => void;
+    let release!: () => void;
+    const reached = new Promise<void>(r => { ready = r; });
+    const resume = new Promise<void>(r => { release = r; });
+    if (first === 'refresh') {
+      const client = db.$extends({ query: { adminSession: { async create({ args, query }) {
+        ready(); await resume; return query(args);
+      } } } }) as unknown as PrismaClient;
+      await build(client);
+      const exchange = refresh().then(r => r);
+      await reached;
+      // Same admin -> sessions order used by the suspension route.
+      const suspension = db.$transaction(async tx => {
+        const update = tx.adminUser.update({ where: { id: adminId }, data: { status: 'suspended' } });
+        release();
+        await update;
+        await tx.adminSession.updateMany({ where: { adminUserId: adminId, revokedAt: null }, data: { revokedAt: new Date() } });
+      });
+      expect((await exchange).statusCode).toBe(200);
+      await suspension;
+    } else {
+      const suspension = db.$transaction(async tx => {
+        await tx.adminUser.update({ where: { id: adminId }, data: { status: 'suspended' } });
+        ready(); await resume;
+        await tx.adminSession.updateMany({ where: { adminUserId: adminId, revokedAt: null }, data: { revokedAt: new Date() } });
+      });
+      await reached;
+      const client = db.$extends({ query: { adminSession: { async findUnique({ args, query }) {
+        const session = await query(args); release(); return session;
+      } } } }) as unknown as PrismaClient;
+      await build(client);
+      expect((await refresh()).statusCode).toBe(401);
+      await suspension;
+    }
+    expect(await db.adminSession.count({ where: { adminUserId: adminId, revokedAt: null } })).toBe(0);
+  });
   it('returns a usable replacement and rejects later replay', async () => {
     await build(); const first = await refresh(); expect(first.statusCode).toBe(200);
     expect((await refresh()).statusCode).toBe(401);

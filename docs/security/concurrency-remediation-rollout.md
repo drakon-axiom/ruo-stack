@@ -10,7 +10,9 @@ No schema changes or migration are needed. The per-brand lock covers application
 
 ## Verification
 
-The prior behavior was reproduced with failing tests before each implementation change. The offline workspace suite passed 454 tests, and eight targeted PostgreSQL suites passed 57 tests. Workspace type checking and all application builds passed. Database tests ran against disposable local PostgreSQL, not production; external Supabase Auth verification was mocked in membership route tests.
+The prior behavior was reproduced with failing tests before each implementation change. The offline workspace suite passed 456 tests, and eight targeted PostgreSQL suites passed 59 tests. Workspace type checking and all application builds passed. Database tests ran against disposable local PostgreSQL, not production; external Supabase Auth verification was mocked in membership route tests.
+
+Independent review found no blocking issue. Its suggested regression tests were added for both refresh/suspension lock orders, login during refresh, and a network-rejected refresh. The known whitespace issue was corrected. Cross-tab coordination, invitation reissue against external Auth, and session-family revocation on logout are separate protocol concerns outside these three findings.
 
 ## Historical reconciliation
 

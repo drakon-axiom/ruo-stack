@@ -12,9 +12,9 @@
 - [x] Refresh: add failing PostgreSQL tests for simultaneous exchanges, rollback, expiry, and suspension. Atomically consume and replace sessions. Add admin-web Vitest tests for overlapping/late 401s and logout during refresh; implement shared in-flight refresh and stale-response protection.
 - [x] Expiry: add failing interleaving tests for renewal after candidate selection, parallel sweeps, and audit failure. Conditional transaction updates must preserve renewed plan/status/date, keep the brand mirror consistent, and count only actual expirations.
 - [x] Membership: add failing route tests with real PostgreSQL for concurrent demotion/removal and stale actor authorization. Serialize per-brand writes, recheck active-owner actor and target, count active owners inside transaction, and keep audit atomic. Include invite/reactivation writes in the same discipline.
-- [ ] Verify offline workspace suite, targeted database suites, typecheck/build, and independent final review. Fix blocking review findings with regression tests.
+- [x] Verify offline workspace suite, targeted database suites, typecheck/build, and independent final review. Fix blocking review findings with regression tests.
 - [ ] Commit and merge into production main, deploy with guarded script, verify health/assets/auth boundaries, push main. Preserve unrelated untracked documents.
-- [ ] Run prepared historical reconciliation queries in a read-only production transaction; report aggregate anomaly counts and make no financial corrections.
+- [x] Run prepared historical reconciliation queries in a read-only production transaction; report aggregate anomaly counts and make no financial corrections.
 
 ## Constraints and acceptance
 
