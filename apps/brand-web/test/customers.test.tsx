@@ -15,7 +15,7 @@ it('loads summaries first and fetches history only when a customer is opened',as
     .mockResolvedValueOnce({customers:[{...customer,order_list:[history]}],totals:{truncated:true}});
   show(); fireEvent.click(await screen.findByText('Dana Reyes'));
   expect(await screen.findByText('TRACK-123')).toBeTruthy();
-  expect(f.api.mock.calls.map(c=>c[0])).toEqual(['/api/brand/customers?view=summary','/api/brand/customers?view=history&customer_key=a%40test']);
+  expect(f.api.mock.calls).toEqual([['/api/brand/customers?view=summary'],['/api/brand/customers/history',{method:'POST',body:{customer_key:'a@test'}}]]);
   expect(screen.getAllByText(/most recent 5,000 orders/i).length).toBeGreaterThan(0);
 });
 it('shows a history error and lets the user retry',async()=>{
@@ -42,4 +42,19 @@ it('ignores a previous customer history response after switching customers',asyn
   await act(async()=>{resolveOld({customers:[{...customer,order_list:[history]}],totals:{truncated:false}});});
   expect(screen.queryByText('TRACK-123')).toBeNull();
   expect(screen.getByText('NEW-TRACK')).toBeTruthy();
+});
+
+it('uses refreshed details and address for Ship again after history loads',async()=>{
+  let complete!: (value: unknown)=>void;
+  f.api.mockImplementationOnce(()=>new Promise(resolve=>{complete=resolve;}));
+  const address={recipient_name:'Dana Reyes',recipient_email:'a@test',address1:'Old address',address2:null,city:'Austin',state:'TX',zip:'78701',country:'US'};
+  const initial={...customer,ship_to:address};
+  const latest={...initial,orders:3,ship_to:{...address,address1:'New address'},order_list:[history]};
+  const ship=vi.fn();
+  render(<CustomerDrawer customer={initial} onClose={()=>{}} onShipAgain={ship} />);
+  expect(screen.queryByRole('button',{name:'Ship again'})).toBeNull();
+  await act(async()=>{complete({customers:[latest],totals:{truncated:false}});});
+  expect(screen.getByText('3')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Ship again'}));
+  expect(ship).toHaveBeenCalledWith(latest);
 });

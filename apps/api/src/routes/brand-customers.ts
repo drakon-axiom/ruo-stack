@@ -24,13 +24,7 @@ const MAX_ORDER_SCAN = 5000;
 export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
   const { prisma } = getClients();
 
-  app.get('/api/brand/customers', { preHandler: requireBrand }, async (req) => {
-    const { brandId } = req.brand!;
-    const query = z.object({
-      view: z.enum(['summary', 'history']).optional(),
-      customer_key: z.string().min(1).max(1000).optional(),
-    }).refine(q => q.view !== 'history' || q.customer_key !== undefined, { message: 'History requires a customer key' }).parse(req.query);
-
+  async function readCustomers(brandId: string, includeHistory: boolean, key?: string) {
     // Cancelled orders released their reservation and never fulfilled — exclude
     // them so counts + spend reflect real transactions.
     const orders = await prisma.order.findMany({
@@ -65,8 +59,8 @@ export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
 
     // Filter only after the shared scan cap, so a drawer describes the same
     // reporting window as the list. Never accept a caller-supplied brand id.
-    const selected = query.view === 'history' ? orders.filter(o => customerKey(o) === query.customer_key) : orders;
-    const customers = foldCustomers(selected, { includeHistory: query.view !== 'summary' });
+    const selected = key !== undefined ? orders.filter(o => customerKey(o) === key) : orders;
+    const customers = foldCustomers(selected, { includeHistory });
 
     return {
       customers,
@@ -79,5 +73,17 @@ export async function brandCustomerRoutes(app: FastifyInstance): Promise<void> {
         truncated,
       },
     };
+  }
+
+  app.get('/api/brand/customers', { preHandler: requireBrand }, async (req) => {
+    const query = z.object({ view: z.literal('summary').optional() }).parse(req.query);
+    return readCustomers(req.brand!.brandId, query.view !== 'summary');
+  });
+
+  // Read-only POST: the grouping key can contain email/name/ZIP. Keeping it in
+  // the body avoids persisting customer PII in ordinary request/access URLs.
+  app.post('/api/brand/customers/history', { preHandler: requireBrand }, async (req) => {
+    const { customer_key } = z.object({ customer_key: z.string().min(1) }).parse(req.body);
+    return readCustomers(req.brand!.brandId, true, customer_key);
   });
 }

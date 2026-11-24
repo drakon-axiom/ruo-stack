@@ -4,19 +4,21 @@ import { api } from '../../lib/api.js';
 import { FulfillmentBadge } from '../../lib/fulfillment.js';
 import { dollars, fmtDate, type Customer, type OrderRow, type Totals } from './types.js';
 
-export function CustomerDrawer({ customer: open, onClose, onShipAgain }: { customer: Customer; onClose: () => void; onShipAgain: (customer: Customer) => void }) {
+export function CustomerDrawer({ customer, onClose, onShipAgain }: { customer: Customer; onClose: () => void; onShipAgain: (customer: Customer) => void }) {
+  const [details, setDetails] = useState<Customer | null>(null);
+  const open = details ?? customer;
   const [history, setHistory] = useState<OrderRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    setHistory(null); setError(null);
-    api<{ customers: Customer[]; totals: Totals }>(`/api/brand/customers?view=history&customer_key=${encodeURIComponent(open.key)}`)
-      .then(result => { if (active) { setHistory(result.customers[0]?.order_list ?? []); setTruncated(result.totals.truncated); } })
+    setHistory(null); setDetails(null); setError(null);
+    api<{ customers: Customer[]; totals: Totals }>('/api/brand/customers/history', { method: 'POST', body: { customer_key: customer.key } })
+      .then(result => { if (active) { setDetails(result.customers[0] ?? null); setHistory(result.customers[0]?.order_list ?? []); setTruncated(result.totals.truncated); } })
       .catch(() => { if (active) setError('Could not load order history.'); });
     return () => { active = false; };
-  }, [open.key, attempt]);
+  }, [customer.key, attempt]);
   return (
       <Drawer
         open={true}
@@ -25,13 +27,13 @@ export function CustomerDrawer({ customer: open, onClose, onShipAgain }: { custo
         }}
         title={open?.name ?? 'Customer'}
         footer={
-          open?.ship_to ? (
+          details?.ship_to ? (
             <Button className="w-full" icon={Package} onClick={() => onShipAgain(open)}>
               Ship again
             </Button>
           ) : (
             <p className="text-center text-xs text-content-faint">
-              No complete address on file — can't reship
+              {history === null ? 'Load order history before shipping again.' : "No complete address on file — can't reship"}
             </p>
           )
         }

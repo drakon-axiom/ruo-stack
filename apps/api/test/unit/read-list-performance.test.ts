@@ -26,13 +26,13 @@ describe('bounded read views',()=>{
   });
   it('history returns only the selected normalized customer within the scoped scan',async()=>{
     f.orders.mockResolvedValue([row(' A@test '),row('b@test','order-2')]);
-    const res=await app.inject('/api/brand/customers?view=history&customer_key=a%40test');
+    const res=await app.inject({method:'POST',url:'/api/brand/customers/history',payload:{customer_key:'a@test'}});
     expect(res.json().customers).toHaveLength(1);
     expect(res.json().customers[0].order_list.map((o:any)=>o.id)).toEqual(['order-1']);
     expect(f.orders.mock.calls[0]![0].where.brandId).toBe('brand-a');
   });
   it('requires a customer key for history requests',async()=>{
-    const res=await app.inject('/api/brand/customers?view=history');
+    const res=await app.inject({method:'POST',url:'/api/brand/customers/history',payload:{}});
     expect(res.statusCode).toBe(400); expect(f.orders).not.toHaveBeenCalled();
   });
   it('keeps legacy history and reports the scan limit accurately',async()=>{
@@ -41,4 +41,10 @@ describe('bounded read views',()=>{
     expect(res.json().totals).toMatchObject({orders:5000,truncated:true});
     expect(res.json().customers[0].order_list).toHaveLength(5000);
   });
+  it('handles a long imported customer key without putting it in the URL',async()=>{
+    const key='a'.repeat(1200)+'@test'; f.orders.mockResolvedValue([row(key)]);
+    const res=await app.inject({method:'POST',url:'/api/brand/customers/history',payload:{customer_key:key}});
+    expect(res.statusCode).toBe(200); expect(res.json().customers[0].key).toBe(key);
+  });
+
 });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { startRateQuoteSweeper } from '../../src/services/rate-quote.ts';
 import { startSubscriptionLapseWorker } from '../../src/services/subscription.ts';
 import type { PrismaClient } from '@ruostack/db';
 afterEach(()=>vi.useRealTimers());
@@ -31,6 +32,16 @@ describe('periodic worker scheduling',()=>{
     const stop=startSubscriptionLapseWorker({subscriptionState:{findMany:scan}} as unknown as PrismaClient,100);
     stop(); release([]); await vi.advanceTimersByTimeAsync(500);
     expect(scan).toHaveBeenCalledTimes(1);
+  });
+
+  it('also prevents overlapping rate-quote deletions',async()=>{
+    vi.useFakeTimers();
+    let release!: (result: { count: number })=>void;
+    const remove=vi.fn().mockImplementationOnce(()=>new Promise(r=>{release=r;})).mockResolvedValue({count:0});
+    const stop=startRateQuoteSweeper({rateQuote:{deleteMany:remove}} as unknown as PrismaClient,100);
+    await vi.advanceTimersByTimeAsync(500); expect(remove).toHaveBeenCalledTimes(1);
+    release({count:2}); await vi.advanceTimersByTimeAsync(100); expect(remove).toHaveBeenCalledTimes(2);
+    stop();
   });
 
 });

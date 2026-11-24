@@ -3,9 +3,9 @@
 ## Changes
 
 - Preserve HTTP client-error statuses in the uniform error handler, including unsupported content types (415), oversized bodies (413), and rate limits (429). Framework error responses use public status descriptions, not diagnostic messages. Application errors and validation keep their established contracts; unexpected errors remain sanitized 500 responses.
-- Schedule reconciliation, subscription lapse, and dunning workers after each run completes. A slow run cannot overlap itself in the same process, and stopping during a run prevents rescheduling. This is not a distributed lease and does not serialize manual invocations with timer work.
+- Schedule reconciliation, subscription lapse, dunning, and rate-quote cleanup workers after each run completes. A slow run cannot overlap itself in the same process, and stopping during a run prevents rescheduling. This is not a distributed lease and does not serialize manual invocations with timer work.
 - Fetch relation counts in the fulfillment queue instead of materializing item rows solely to calculate their count. Order detail still fetches its items.
-- Add opt-in customer summary/history views. Summary folding avoids allocating per-order history objects. The portal fetches history only when a customer drawer opens, with retry and stale-response protection. The default API response remains compatible with existing clients. Both views use the same brand-scoped, newest-first 5,000-order reporting window, with a stable ID tie-breaker. The portal now displays the truncation notice.
+- Add opt-in customer summary/history views. Summary folding avoids allocating per-order history objects. The portal fetches history only when a customer drawer opens, with retry and stale-response protection. History uses a read-only POST with the customer key in a JSON body, so emails and name/ZIP grouping keys do not enter access-log URLs. The loaded details and Ship again address come from that same response. The default API response remains compatible with existing clients. Both views use the same brand-scoped, newest-first 5,000-order reporting window, with a stable ID tie-breaker. The portal now displays the truncation notice.
 - Extract the customer drawer and its types from the main screen.
 
 ## Measurement and limits
@@ -19,3 +19,16 @@ SQL customer aggregation, distributed worker leases, other large-screen refactor
 Regression tests reproduce the client-error mapping, overlapping workers, queue count materialization, and eager history payloads. Customer rollup tests preserve identity grouping, totals, phone/address fallback, and cancellation/brand query constraints. Browser tests cover on-demand history, retry, visible truncation, failed list loading, and ignoring an old customer's response after switching.
 
 Pre-deployment verification passed: **473 offline workspace tests**, workspace type checking, all application builds, and diff whitespace checks. Database integration suites were skipped in this mode; this pass changes no schema or transactional financial writes. External API calls are mocked in route/UI tests; the HTTP tests use the real assembled Fastify application.
+
+
+## Independent review
+
+The reviewer identified customer keys entering logged URLs and an omitted rate-quote timer. Both were reproduced with failing tests and fixed. The key now travels in the request body without an arbitrary 1,000-character limit; long imported keys are covered. Rate-quote cleanup uses the same non-overlapping scheduler.
+
+The drawer snapshot finding was treated as important because an old address could prefill Ship again after newer history loaded. A failing regression test now verifies refreshed details and address, and the action waits for history to load successfully.
+
+Final verification after review fixes: **476 offline tests passed**, workspace type checks and production builds passed. No second independent review was performed; the fixes were verified with regression tests and the full suite.
+
+Deferred minor: the 429 test constructs the framework-shaped error and Retry-After header; add an end-to-end rate-limit plugin threshold test in a follow-up. Existing coverage proves the handler preserves the status/header, not the plugin's threshold behavior.
+
+Scope decisions: lifetime SQL aggregation remains deferred to preserve grouping semantics and the existing bounded window; high-volume brands still have partial totals, now visibly labeled. Worker coordination remains per process; multiple instances/manual runs can overlap. The drawer uses one current response for its details and action, but does not maintain a historical snapshot across list and drawer requests. The synthetic payload result is not a production latency benchmark.

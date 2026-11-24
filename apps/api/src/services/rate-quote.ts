@@ -1,3 +1,4 @@
+import { startPeriodicWorker } from './periodic-worker.ts';
 import { createHash } from 'node:crypto';
 import type { PrismaClient } from '@ruostack/db';
 import type { PricedRateOption, ShippingPricing } from '@ruostack/shared';
@@ -83,14 +84,11 @@ export function startRateQuoteSweeper(
   log?: (msg: string) => void,
 ): () => void {
   const sweep = () => {
-    deleteExpiredRateQuotes(db)
+    return deleteExpiredRateQuotes(db)
       .then((n) => { if (n > 0) log?.(`swept ${n} expired rate quotes`); })
       .catch((err) => log?.(`rate-quote sweep failed: ${err instanceof Error ? err.message : err}`));
   };
-  sweep();
-  const timer = setInterval(sweep, intervalMs);
-  if (typeof timer.unref === 'function') timer.unref();
-  return () => clearInterval(timer);
+  return startPeriodicWorker(sweep, intervalMs);
 }
 
 /** Look up a still-valid quote for this cart + chosen service. Null if none/expired. */
