@@ -48,3 +48,5 @@ Deployed application revision `528abce` through the guarded production deploymen
 ## Edge recovery and completed public verification
 
 The user reauthenticated `srv1153350`. The edge tunnel now responds (48 ms direct ping). Re-ran the full post-deployment smoke script successfully: loopback, both origin proxies and both public HTTPS health endpoints pass; public HTML and entry bundles match both deployed builds; admin/brand/MFA and both lifetime customer endpoints reject missing or invalid authentication. Unsupported form content returns 415. Public verification is complete; the expired-key blocker above is resolved. No application changes were needed for recovery.
+
+Follow-up: the deferred minor findings above are addressed in [review-followups-rollout.md](review-followups-rollout.md). Later customer-rollup and distributed-worker releases supersede the earlier bounded-total and per-process-worker limitations.

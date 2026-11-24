@@ -115,3 +115,36 @@ it.each(['initial','older'] as const)('clears stale customer data when the %s re
   expect(screen.queryByText(/Stale address/)).toBeNull();expect(screen.queryByText('TRACK-123')).toBeNull();
   expect(screen.queryByRole('button',{name:'Ship again'})).toBeNull();
 });
+
+it.each([49,0])('recovers an empty last page when the matched count shrinks to %s',async remaining=>{
+  const totals={customers:51,orders:100,spend_cents:10000,truncated:false};
+  f.api.mockResolvedValueOnce({customers:[customer],totals,page:{total:51,has_more:true}})
+    .mockResolvedValueOnce({customers:[],totals,page:{total:remaining,has_more:false}})
+    .mockResolvedValueOnce({customers:remaining?[{...customer,name:'Recovered customer'}]:[],totals,page:{total:remaining,has_more:false}});
+  show();await screen.findByText('Dana Reyes');
+  fireEvent.click(screen.getByRole('button',{name:'Next page'}));
+  await waitFor(()=>expect(f.api).toHaveBeenCalledTimes(3));
+  expect(f.api.mock.calls[2]![1].body.offset).toBe(0);
+  if(remaining)await screen.findByText('Recovered customer');
+  else await screen.findByText('0 customers');
+  expect((screen.getByRole('button',{name:'Previous page'}) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByText(/51–50/)).toBeNull();
+});
+
+it('recovers to a nonzero last page when several pages disappear',async()=>{
+  const totals={customers:151,orders:151,spend_cents:10000,truncated:false};
+  const page=(total:number,has_more:boolean)=>({customers:[customer],totals,page:{total,has_more}});
+  f.api.mockResolvedValueOnce(page(151,true))
+    .mockResolvedValueOnce(page(151,true))
+    .mockResolvedValueOnce(page(151,true))
+    .mockResolvedValueOnce({customers:[],totals,page:{total:100,has_more:false}})
+    .mockResolvedValueOnce(page(100,false));
+  show();await screen.findByText('Dana Reyes');
+  for(const expectedStart of [51,101]){
+    fireEvent.click(screen.getByRole('button',{name:'Next page'}));
+    await screen.findByText(`${expectedStart}–${expectedStart} of 151 customers`);
+  }
+  fireEvent.click(screen.getByRole('button',{name:'Next page'}));
+  await screen.findByText('51–51 of 100 customers');
+  expect(f.api.mock.calls.map(call=>call[1].body.offset)).toEqual([0,50,100,150,50]);
+});

@@ -22,6 +22,18 @@ describe('HTTP error mapping', () => {
     expect(res.statusCode).toBe(429); expect(res.headers['retry-after']).toBe('10');
     expect(res.json()).toEqual({error:'too_many_requests',message:'Too Many Requests'});
   });
+  it('enforces the real plugin threshold per client and preserves Retry-After',async()=>{
+    app=await buildApp();
+    let calls=0;
+    app.get('/test-real-limit',{config:{rateLimit:{max:2,timeWindow:'1 minute'}}},async()=>{calls++;return {ok:true};});
+    for(let n=0;n<2;n++)expect((await app.inject({url:'/test-real-limit',remoteAddress:'192.0.2.1'})).statusCode).toBe(200);
+    const blocked=await app.inject({url:'/test-real-limit',remoteAddress:'192.0.2.1'});
+    expect(blocked.statusCode).toBe(429);
+    expect(blocked.json()).toEqual({error:'too_many_requests',message:'Too Many Requests'});
+    expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+    expect(calls).toBe(2);
+    expect((await app.inject({url:'/test-real-limit',remoteAddress:'192.0.2.2'})).statusCode).toBe(200);
+  });
   it('sanitizes unknown errors and invalid status codes',async()=>{
     app=await buildApp();
     app.get('/test-error',async()=>{throw Object.assign(new Error('private diagnostic'),{statusCode:200});});

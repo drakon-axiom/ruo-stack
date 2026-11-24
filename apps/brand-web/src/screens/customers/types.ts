@@ -1,6 +1,11 @@
 import type { ShipTo } from '../Orders.js';
 
-export const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
+/** The API supplies safe integer cents; avoid rounding while converting to dollars. */
+export const dollars = (c: number) => {
+  const cents = BigInt(c);
+  const magnitude = cents < 0n ? -cents : cents;
+  return `$${cents < 0n ? '-' : ''}${magnitude / 100n}.${String(magnitude % 100n).padStart(2, '0')}`;
+};
 
 export interface OrderRow {
   id: string;

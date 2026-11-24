@@ -57,7 +57,15 @@ export function Customers() {
     api<{ customers: Customer[]; totals: Totals; page: { total: number; has_more: boolean } }>('/api/brand/customers/search', {
       method: 'POST', body: { ...query, limit: 50 },
     }).then((r) => {
-      if (active) { setCustomers(r.customers); setTotals(r.totals); setPage(r.page); }
+      if (!active) return;
+      // Orders can disappear between pages. Recover the last valid offset before
+      // publishing rows/range, and let the effect fetch that page normally.
+      if (query.offset > 0 && r.page && query.offset >= r.page.total) {
+        const offset = Math.max(0, Math.ceil(r.page.total / 50) - 1) * 50;
+        setQuery(previous => previous === query ? { ...previous, offset } : previous);
+        return;
+      }
+      setCustomers(r.customers); setTotals(r.totals); setPage(r.page);
     }).catch(() => { if (active) { setError('Could not load customers.'); setCustomers([]); } });
     return () => { active = false; };
   }, [attempt, query]);
