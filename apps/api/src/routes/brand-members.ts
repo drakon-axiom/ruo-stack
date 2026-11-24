@@ -180,7 +180,7 @@ export async function brandMemberRoutes(app: FastifyInstance): Promise<void> {
       const member = await tx.brandMember.findUnique({ where: { brandId_userId: { brandId, userId } } });
       if (!member) throw NotFound('Member not found');
       if (member.role === role) return member;
-  
+
       if (wouldOrphanBrand({ ownerCount: await tx.brandMember.count({ where: { brandId, role: 'owner', status: 'active' } }), targetIsOwner: member.role === 'owner' && member.status === 'active', losingOwner: role !== 'owner' })) {
         throw BadRequest('last_owner', 'A brand must keep at least one owner — promote someone else first');
       }
