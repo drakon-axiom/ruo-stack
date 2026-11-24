@@ -29,3 +29,11 @@ These results describe that snapshot and those checks; they are not a complete f
 ## Remaining scope
 
 Performance work on queues and customer aggregation, and refactoring large UI screens, remain follow-up items.
+
+## Production deployment
+
+Deployed application revision `ee1bf4c` on November 23, 2026 using the guarded `deploy/deploy.sh prod` workflow. The production checkout's Prisma client was regenerated and the offline suite passed all 456 tests before deployment. The deployment found no pending migrations, built both SPAs and the API, and reloaded `ruostack-api-prod` successfully (online, restart count 2).
+
+Post-deployment checks passed for loopback, both origin proxies, and both public health endpoints. Public HTML and entry-bundle hashes matched the deployed artifacts. Unauthenticated admin claims and brand members requests, plus invalid-token JSON MFA enrollment, returned 401. No real account or financial mutation was used in smoke tests. Unrelated untracked planning documents were preserved.
+
+An initial smoke request accidentally used urllib's form content type and received 500; repeating with the supported JSON format returned 401. Track unsupported-content-type error mapping as a separate minor error-handling follow-up. It did not grant access.
