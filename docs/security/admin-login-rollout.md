@@ -9,3 +9,5 @@ Eight disposable-PostgreSQL regression tests cover suspension, password/MFA chan
 Separate remaining follow-ups: cross-tab browser refresh coordination, logout session-family semantics, invitation reissue races, and optional large-screen refactoring. This patch does not claim to resolve them.
 
 Independent review found no critical or important issues. Its suggested contention test was added: a separate transaction receives PostgreSQL `55P03` when trying to lock the admin while session creation is paused. All targeted tests, workspace typecheck/build, and whitespace checks pass. No review findings remain deferred for this patch.
+
+Production rollout: application revision `97927c3` deployed through `deploy/deploy.sh prod` on 2026-11-23 (America/Chicago). All 34 migrations remain current. PM2 is online after reload. Loopback/origin/public health, both application HTML/entry bundles, protected-route authentication, and HTTP 415 handling pass. A synthetic nonexistent admin login returns 401. No real credentials or production identity mutations were used for verification.
