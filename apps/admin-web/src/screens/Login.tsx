@@ -19,8 +19,8 @@ export function Login() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  function finish(access: string, refreshToken: string) {
-    setTokens(access, refreshToken);
+  async function finish(access: string, refreshToken: string) {
+    await setTokens(access, refreshToken);
     refresh();
     navigate('/overview');
   }
@@ -39,7 +39,7 @@ export function Login() {
         setOtpauthUri(enrolled.otpauth_uri);
         setStage('enroll');
       } else if (r.access_token && r.refresh_token) {
-        finish(r.access_token, r.refresh_token);
+        await finish(r.access_token, r.refresh_token);
       } else if (r.mfa_required) {
         // Password OK; MFA already enrolled → prompt for the 6-digit code.
         setStage('totp');
@@ -59,7 +59,7 @@ export function Login() {
     setBusy(true);
     try {
       const r = await login(email, password, totp);
-      if (r.access_token && r.refresh_token) finish(r.access_token, r.refresh_token);
+      if (r.access_token && r.refresh_token) await finish(r.access_token, r.refresh_token);
       else setErr('Invalid code');
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : 'Verification failed');
@@ -74,7 +74,7 @@ export function Login() {
     setBusy(true);
     try {
       const r = await mfaVerify(enrollToken, totp);
-      if (r.access_token && r.refresh_token) finish(r.access_token, r.refresh_token);
+      if (r.access_token && r.refresh_token) await finish(r.access_token, r.refresh_token);
       else setErr('Invalid code');
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : 'Verification failed');

@@ -26,7 +26,6 @@ import {
   type NavItem,
 } from '@ruostack/ui';
 import { useAuth } from '../lib/auth.js';
-import { logout } from '../lib/api.js';
 
 // The 13 flat links are now grouped. Same destinations, same routes.
 const GROUPS: NavGroup[] = [
@@ -81,7 +80,6 @@ export function Shell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   function handleSignOut() {
-    logout();
     signOut();
     navigate('/login');
   }

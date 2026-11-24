@@ -1,6 +1,6 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AdminRole } from '@ruostack/shared';
-import { getAccess, clearTokens } from './api.js';
+import { getAccess, logout, TOKEN_CHANGE_EVENT } from './api.js';
 
 interface AdminClaims {
   sub: string;
@@ -30,12 +30,21 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(getAccess());
+  useEffect(() => {
+    const update = () => setToken(getAccess());
+    window.addEventListener('storage', update);
+    window.addEventListener(TOKEN_CHANGE_EVENT, update);
+    return () => {
+      window.removeEventListener('storage', update);
+      window.removeEventListener(TOKEN_CHANGE_EVENT, update);
+    };
+  }, []);
   const value = useMemo<AuthCtx>(
     () => ({
       claims: decode(token),
       refresh: () => setToken(getAccess()),
       signOut: () => {
-        clearTokens();
+        void logout().catch(() => {});
         setToken(null);
       },
     }),

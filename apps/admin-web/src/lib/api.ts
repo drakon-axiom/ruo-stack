@@ -6,26 +6,41 @@
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:3901`;
 
-const ACCESS_KEY = 'ruostack_admin_access';
+const ACCESS_KEY = 'ruostack_admin_access'; // legacy, migrated on rotation/login
 const REFRESH_KEY = 'ruostack_admin_refresh';
-// Changes on login/logout, not on rotation within the same authenticated session.
+const SESSION_KEY = 'ruostack_admin_session';
+const LOCK_NAME = 'ruostack-admin-session';
+export const TOKEN_CHANGE_EVENT = 'ruostack-admin-token-change';
+interface StoredSession { access: string; refresh: string; generation: string }
 let sessionEpoch = 0;
-
-export function getAccess(): string | null {
-  return localStorage.getItem(ACCESS_KEY);
+function readSession(): StoredSession | null {
+  const stored = localStorage.getItem(SESSION_KEY);
+  if (stored !== null) {
+    try {
+      const value = JSON.parse(stored) as StoredSession | null;
+      return value && typeof value.access === 'string' && typeof value.refresh === 'string' && typeof value.generation === 'string' ? value : null;
+    } catch { return null; }
+  }
+  const access = localStorage.getItem(ACCESS_KEY), refresh = localStorage.getItem(REFRESH_KEY);
+  return access && refresh ? { access, refresh, generation: `legacy:${refresh}` } : null;
 }
-function storeTokens(access: string, refresh: string): void {
-  localStorage.setItem(ACCESS_KEY, access);
-  localStorage.setItem(REFRESH_KEY, refresh);
+export function getAccess(): string | null { return readSession()?.access ?? null; }
+async function sessionLock<T>(work: () => Promise<T>): Promise<T> {
+  return navigator.locks ? await navigator.locks.request(LOCK_NAME, work) : await work();
 }
-export function setTokens(access: string, refresh: string): void {
+function writeSession(value: StoredSession | null): void {
+  // A single storage record prevents other tabs observing mixed token pairs.
+  localStorage.setItem(SESSION_KEY, JSON.stringify(value));
+  localStorage.removeItem(ACCESS_KEY); localStorage.removeItem(REFRESH_KEY);
+  window.dispatchEvent(new Event(TOKEN_CHANGE_EVENT));
+}
+export async function setTokens(access: string, refresh: string): Promise<void> {
   sessionEpoch++;
-  storeTokens(access, refresh);
+  await sessionLock(async () => { writeSession({ access, refresh, generation: Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('') }); });
 }
-export function clearTokens(): void {
+export async function clearTokens(): Promise<void> {
   sessionEpoch++;
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+  await sessionLock(async () => { writeSession(null); });
 }
 
 export class ApiError extends Error {
@@ -42,26 +57,29 @@ export class ApiError extends Error {
 }
 
 let refreshing: { epoch: number; promise: Promise<boolean> } | undefined;
-async function refresh(failedAccess: string | null, epoch: number): Promise<boolean> {
-  if (epoch !== sessionEpoch) return false;
-  // Another request already rotated while this request's 401 was in flight.
+async function refresh(failedAccess: string | null, epoch: number, generation: string | undefined): Promise<boolean> {
+  const unchanged = () => epoch === sessionEpoch && generation !== undefined && readSession()?.generation === generation;
+  if (!unchanged()) return false;
   if (getAccess() !== failedAccess) return getAccess() !== null;
   if (refreshing?.epoch === epoch) return refreshing.promise;
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
-  if (!refreshToken) return false;
-  const promise = (async () => {
+  // Without origin-wide locking, require a new sign-in instead of racing tabs.
+  if (!navigator.locks) return false;
+  const promise = sessionLock(async () => {
+    if (!unchanged()) return false;
+    const session = readSession();
+    if (!session) return false;
+    if (session.access !== failedAccess) return true;
     const res = await fetch(`${API_BASE}/auth/admin/refresh`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refresh_token: session.refresh }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return false;
     const data = await res.json();
-    // A logout or new login while the response was in flight takes precedence.
-    if (epoch !== sessionEpoch || localStorage.getItem(REFRESH_KEY) !== refreshToken) return false;
-    storeTokens(data.access_token, data.refresh_token);
+    if (!unchanged() || readSession()?.refresh !== session.refresh) return false;
+    writeSession({ access: data.access_token, refresh: data.refresh_token, generation: session.generation });
     return true;
-  })();
+  });
   refreshing = { epoch, promise };
   try { return await promise; }
   finally { if (refreshing?.promise === promise) refreshing = undefined; }
@@ -70,8 +88,12 @@ async function refresh(failedAccess: string | null, epoch: number): Promise<bool
 export async function api<T = unknown>(
   path: string,
   opts: { method?: string; body?: unknown; auth?: boolean; retry?: boolean } = {},
+  expectedGeneration?: string,
 ): Promise<T> {
   const epoch = sessionEpoch;
+  const session = readSession();
+  if (expectedGeneration !== undefined && session?.generation !== expectedGeneration) throw new ApiError(401, 'unauthorized', 'Session changed; sign in again');
+  const generation = session?.generation;
   const { method = 'GET', body, auth = true, retry = true } = opts;
   const hasBody = body !== undefined;
   const headers: Record<string, string> = {};
@@ -79,7 +101,7 @@ export async function api<T = unknown>(
   // an empty body when content-type is application/json (e.g. bodyless POSTs like publish).
   if (hasBody) headers['content-type'] = 'application/json';
   if (auth) {
-    const token = getAccess();
+    const token = session?.access;
     if (token) headers.authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${API_BASE}${path}`, {
@@ -88,8 +110,8 @@ export async function api<T = unknown>(
     body: hasBody ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401 && auth && retry && (await refresh(headers.authorization?.slice(7) ?? null, epoch))) {
-    return api<T>(path, { ...opts, retry: false });
+  if (res.status === 401 && auth && retry && (await refresh(headers.authorization?.slice(7) ?? null, epoch, generation)) && readSession()?.generation === generation) {
+    return api<T>(path, { ...opts, retry: false }, generation);
   }
   if (!res.ok) {
     let code = 'error';
@@ -141,16 +163,20 @@ export async function mfaVerify(enrollmentToken: string, totp: string): Promise<
   return res.json();
 }
 
-export function logout(): void {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
+export async function logout(): Promise<void> {
+  sessionEpoch++;
+  const refreshToken = await sessionLock(async () => {
+    const token = readSession()?.refresh;
+    writeSession(null);
+    return token;
+  });
   if (refreshToken) {
-    void fetch(`${API_BASE}/auth/admin/logout`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
+    await fetch(`${API_BASE}/auth/admin/logout`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
-    });
+      signal: AbortSignal.timeout(15_000),
+    }).catch(() => {});
   }
-  clearTokens();
 }
 
 /**
@@ -174,14 +200,17 @@ export function downloadText(filename: string, text: string, type = 'text/csv;ch
  * but keeps the response as a blob, and retries once through the refresh flow so
  * an export doesn't fail on a token that expired while the operator was reading.
  */
-export async function apiDownload(path: string, filename: string, retry = true): Promise<void> {
+export async function apiDownload(path: string, filename: string, retry = true, expectedGeneration?: string): Promise<void> {
   const epoch = sessionEpoch;
+  const session = readSession();
+  if (expectedGeneration !== undefined && session?.generation !== expectedGeneration) throw new ApiError(401, 'unauthorized', 'Session changed; sign in again');
+  const generation = session?.generation;
   const headers: Record<string, string> = {};
-  const token = getAccess();
+  const token = session?.access;
   if (token) headers.authorization = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, { headers });
-  if (res.status === 401 && retry && (await refresh(headers.authorization?.slice(7) ?? null, epoch))) return apiDownload(path, filename, false);
+  if (res.status === 401 && retry && (await refresh(headers.authorization?.slice(7) ?? null, epoch, generation)) && readSession()?.generation === generation) return apiDownload(path, filename, false, generation);
   if (!res.ok) {
     let code = 'download_failed';
     let message = 'Download failed';
