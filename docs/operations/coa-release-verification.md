@@ -1,6 +1,6 @@
 # COA release verification — 2026-11-27
 
-Status: implementation and independent review fixes complete; production deployment pending backup approval. No production inventory, certificates, or SKU tracking were created or enabled.
+Status: deployed to production on 2026-11-27. Implementation and independent review fixes complete. No production inventory, certificates, or SKU tracking were created or enabled.
 
 ## Verification
 
@@ -37,9 +37,18 @@ coa-storage-policy, coa-cleanup, coa-impact, and coa-mapping test suites.
 
 ## Remaining rollout gates
 
-- Approve a private local production database backup or confirm an existing provider backup. Automatic approval review rejected exporting the production public schema to `/tmp/ruostack-coa-predeploy-backup` because the sensitive data copy to that destination lacked explicit authorization. No export was performed.
-- Deploy additive migrations/application, provision the private bucket, install origin proxy configuration, and verify live endpoints and Storage access.
+- Complete authenticated Storage access validation with an authorized staging account and real-object checks before operational acceptance. Production RLS/effective-policy audit passed; anonymous bucket and nonexistent-object probes were denied. No test user or test PDF was created.
 - Install WooCommerce plugin 0.2.0 on an identified staging store; verify actual theme/order display and HTML/plain-text test emails.
 - Operator supplies real reviewed PDFs and reconciled opening quantities, then validates one warehouse pilot before expanding tracked SKUs.
 
 See [rollout runbook](coa-lot-rollout.md) for operational steps and rollback boundaries.
+
+## Production deployment evidence
+
+User explicitly approved the private local backup after the initial automatic-review rejection. Public-schema custom archive saved at `/tmp/ruostack-coa-predeploy-backup/public.dump` (directory mode 0700, archive 0600; 1,017,881 bytes). Archive catalog and full archive decoding passed; a database restoration was not performed. This is a database backup, not a Storage-object backup.
+
+Migrations 35–40 applied. Private `coa-private` PDF bucket configured after RLS, effective-role, and policy audit. Origin nginx change added only `/coa/` forwarding on both application hosts; config test and reload passed. API and both SPAs built and published, PM2 reload succeeded. Live health, HTML/bundle hashes, authentication boundaries, and COA proxy routes passed.
+
+The first deploy build exposed a missing Prisma generation step with cached dependencies. Deployment now explicitly generates the client before migration/build; the rerun succeeded. Application implementation release: `af6f361`.
+
+Read-only report: 77 products, 0 tracking-enabled, 77 without opening lots/reviewed documents; 0 untracked shipped orders, traceability exceptions, unresolved open Woo origin mappings, or failed writebacks. Private report retained alongside the backup. Production configuration also reports missing `RESEND_API_KEY`; admin invitations and dunning notices are not delivered until email configuration is completed.

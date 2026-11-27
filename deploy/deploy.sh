@@ -66,6 +66,10 @@ cd "$ROOT"
 # rather than trying to hand-roll a rollback.
 pnpm install --frozen-lockfile
 
+# Cached installs do not regenerate the client after schema changes.
+echo "==> generating database client"
+pnpm --filter @ruostack/db run generate
+
 # Migrations run before the build. If the build then fails, the database is
 # left ahead of the deployed code. That ordering is a recorded project
 # decision, not an oversight here -- it is flagged for deliberate review
