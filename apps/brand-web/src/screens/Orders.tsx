@@ -45,6 +45,7 @@ export interface ShipTo {
 const dollars = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 interface OrderItem {
+  order_item_id?:string;
   product_id: string;
   qty: number;
   unit_wholesale_cents: number;
@@ -275,8 +276,8 @@ function OrderDrawer({
   onSaved: () => void;
 }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
-  const [lines, setLines] = useState<{ product_id: string; qty: number }[]>(
-    editing ? editing.items.map((i) => ({ product_id: i.product_id, qty: i.qty })) : [],
+  const [lines, setLines] = useState<{ order_item_id?: string; product_id: string; qty: number }[]>(
+    editing ? editing.items.map((i) => ({ order_item_id: i.order_item_id, product_id: i.product_id, qty: i.qty })) : [],
   );
   const [r, setR] = useState(
     editing
@@ -387,7 +388,7 @@ function OrderDrawer({
   function addLine() {
     if (catalog[0]) setLines([...lines, { product_id: catalog[0].id, qty: 1 }]);
   }
-  function setLine(i: number, patch: Partial<{ product_id: string; qty: number }>) {
+  function setLine(i: number, patch: Partial<{ order_item_id?: string; product_id: string; qty: number }>) {
     setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
 

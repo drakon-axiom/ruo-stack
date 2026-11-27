@@ -1,3 +1,4 @@
+import { startCoaWritebackWorker } from './services/coa-writeback.ts';
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { getClients } from './clients.ts';
@@ -53,6 +54,7 @@ async function main() {
   );
   // Background: dunning — notify on past-due, suspend after the grace window.
   const c = getClients();
+  startCoaWritebackWorker(c.prisma,(m)=>app.log.info(m));
   startDunningWorker(
     c.prisma,
     c.email,

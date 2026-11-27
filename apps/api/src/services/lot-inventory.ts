@@ -1,3 +1,4 @@
+import {enqueueCoaWriteback} from './coa-outbox.ts';
 import { createHash } from 'node:crypto';
 import type { Prisma, ProductLot } from '@ruostack/db';
 import { z } from 'zod';
@@ -25,7 +26,7 @@ export async function receiveLot(tx:LotTx,raw:z.infer<typeof ReceiveLotSchema>,a
  const input=ReceiveLotSchema.parse(raw);const op=await operation(tx,key,{kind:'receive',...input});if(op.prior)return tx.productLot.findUniqueOrThrow({where:{id:op.prior.resultId!}});
  await lockProducts(tx,[input.productId]);await approvedRevision(tx,input.coaRevisionId,input.productId);
  const lot=await tx.productLot.create({data:{productId:input.productId,lotCode:input.lotCode,coaRevisionId:input.coaRevisionId,onHand:input.qty,expiresAt:input.expiresAt?new Date(input.expiresAt):null}});
- await tx.lotMovement.create({data:{lotId:lot.id,kind:'receipt',onHandDelta:input.qty,reservedDelta:0,actorId:actor,reason:'Opening receipt',operationKey:key}});await saveOperation(tx,key,op.fingerprint,lot.id);return lot;
+ await tx.lotMovement.create({data:{lotId:lot.id,kind:'receipt',onHandDelta:input.qty,reservedDelta:0,actorId:actor,reason:'Opening receipt',operationKey:key}});await saveOperation(tx,key,op.fingerprint,lot.id);await enqueueCoaWriteback(tx,'product',lot.productId);return lot;
 }
 export async function adjustLot(tx:LotTx,id:string,delta:number,reason:string,actor:string,key:string){
  z.number().int().min(-2147483647).max(2147483647).refine(n=>n!==0).parse(delta);z.string().trim().min(1).max(1000).parse(reason);
@@ -33,13 +34,13 @@ export async function adjustLot(tx:LotTx,id:string,delta:number,reason:string,ac
  const found=await tx.productLot.findUnique({where:{id}});if(!found)throw NotFound();await lockProducts(tx,[found.productId]);
  const lot=await tx.productLot.findUniqueOrThrow({where:{id}});const next=lot.onHand+delta;
  if(next<lot.reserved||next>2147483647)throw Conflict('inventory_balance','Adjustment exceeds the available balance');
- await tx.productLot.update({where:{id},data:{onHand:next}});await tx.lotMovement.create({data:{lotId:id,kind:'adjustment',onHandDelta:delta,reservedDelta:0,actorId:actor,reason,operationKey:key}});await saveOperation(tx,key,op.fingerprint,id);
+ await tx.productLot.update({where:{id},data:{onHand:next}});await tx.lotMovement.create({data:{lotId:id,kind:'adjustment',onHandDelta:delta,reservedDelta:0,actorId:actor,reason,operationKey:key}});await saveOperation(tx,key,op.fingerprint,id);await enqueueCoaWriteback(tx,'product',lot.productId);
 }
 export async function setLotState(tx:LotTx,id:string,state:'released'|'quarantined'|'recalled',reason:string,actor:string){
  z.enum(['released','quarantined','recalled']).parse(state);z.string().trim().min(1).max(1000).parse(reason);
  const lot=await tx.productLot.findUnique({where:{id}});if(!lot)throw NotFound();await lockProducts(tx,[lot.productId]);
  if(state==='released'){await approvedRevision(tx,lot.coaRevisionId,lot.productId);if(lot.expiresAt&&lot.expiresAt<=new Date())throw Conflict('lot_expired','Expired lot cannot be released');}
- await tx.productLot.update({where:{id},data:{state}});await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lot.state_changed',targetType:'product_lot',targetId:id,after:{state},reason});
+ await tx.productLot.update({where:{id},data:{state}});await enqueueCoaWriteback(tx,'product',lot.productId);await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lot.state_changed',targetType:'product_lot',targetId:id,after:{state},reason});
 }
 export function eligibleLot(lot:ProductLot){return lot.state==='released'&&(!lot.expiresAt||lot.expiresAt>new Date());}
 export async function reserveLots(tx:LotTx,orderId:string,raw:AllocationInput[],actor:string,key:string){
@@ -49,6 +50,7 @@ export async function reserveLots(tx:LotTx,orderId:string,raw:AllocationInput[],
  if(!['ready_for_fulfillment','processing'].includes(order.status)||order.blocker!=='none')throw Conflict('order_not_released','Resolve order blockers before allocating lots');
  await lockProducts(tx,order.items.map(i=>i.productId));
  order=await lockOrder(tx,orderId);
+ if(await tx.order.count({where:{traceabilityStatus:'exception',items:{some:{productId:{in:order.items.filter(i=>i.product.lotTracking).map(i=>i.productId)}}}}}))throw Conflict('inventory_exception','Resolve outstanding shipment lot exceptions for this SKU first');
  if(await tx.orderLotAllocation.count({where:{orderId,state:'reserved'}}))throw Conflict('already_allocated','Release previous reservations before allocating');
  const seen=new Set<string>();const totals=new Map<string,number>();
  for(const a of allocations){const pair=`${a.orderItemId}:${a.lotId}`;if(seen.has(pair))throw Conflict('duplicate_allocation','Combine quantities for the same item and lot');seen.add(pair);totals.set(a.orderItemId,(totals.get(a.orderItemId)??0)+a.qty);}
@@ -61,7 +63,7 @@ export async function reserveLots(tx:LotTx,orderId:string,raw:AllocationInput[],
   await tx.orderLotAllocation.create({data:{orderId,orderItemId:item.id,lotId:lot.id,coaRevisionId:lot.coaRevisionId,lotCode:lot.lotCode,sku:item.product.canonicalSku,wooLineId:item.wooLineId,qty:a.qty}});
   await tx.lotMovement.create({data:{lotId:lot.id,kind:'reserve',onHandDelta:0,reservedDelta:a.qty,orderId,actorId:actor,reason:'Order allocation',operationKey:key}});
  }
- await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'needs_confirmation'}});await saveOperation(tx,key,op.fingerprint,orderId);
+ await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'needs_confirmation'}});await saveOperation(tx,key,op.fingerprint,orderId);for(const productId of new Set(order.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
 }
 export async function releaseLotReservations(tx:LotTx,orderId:string,actor:string,key:string){
  const order=await lockOrder(tx,orderId);
@@ -70,8 +72,18 @@ export async function releaseLotReservations(tx:LotTx,orderId:string,actor:strin
  await lockProducts(tx,rows.map(r=>r.lot.productId));
  for(const r of rows){await tx.productLot.update({where:{id:r.lotId},data:{reserved:{decrement:r.qty}}});await tx.orderLotAllocation.update({where:{id:r.id},data:{state:'released'}});await tx.lotMovement.create({data:{lotId:r.lotId,kind:'release',onHandDelta:0,reservedDelta:-r.qty,orderId,actorId:actor,reason:'Order reservation released',operationKey:key}});}
  if(!['shipped','delivered'].includes(order.status))await tx.order.update({where:{id:orderId},data:{traceabilityStatus:order.items.some(i=>i.product.lotTracking)?'needs_allocation':'untracked'}});
- await saveOperation(tx,key,op.fingerprint,orderId);
+ await saveOperation(tx,key,op.fingerprint,orderId);for(const productId of new Set(order.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
 }
-export async function availableProductUnits(tx:Pick<LotTx,'productLot'>,productId:string){
+export async function availableProductUnits(tx:Pick<LotTx,'productLot'|'order'>,productId:string){
+ if(await tx.order.count({where:{traceabilityStatus:'exception',items:{some:{productId}}}}))return 0;
  const rows=await tx.productLot.findMany({where:{productId,state:'released',OR:[{expiresAt:null},{expiresAt:{gt:new Date()}}],coaRevision:{status:{in:['reviewed','published']}}}});return rows.reduce((sum,l)=>sum+l.onHand-l.reserved,0);
+}
+
+/** Batch projection for catalog and provisioning; no full shared quantity is
+ * copied independently into each store. */
+export async function applyLotAvailability<T extends {id:string;status:string;lotTracking?:boolean}>(tx:Pick<LotTx,'productLot'|'order'>,products:T[]):Promise<T[]>{
+ const ids=products.filter(p=>p.lotTracking&&p.status==='in_stock').map(p=>p.id);if(!ids.length)return products;
+ const [lots,exceptions]=await Promise.all([tx.productLot.findMany({where:{productId:{in:ids},state:'released',OR:[{expiresAt:null},{expiresAt:{gt:new Date()}}],coaRevision:{status:{in:['reviewed','published']}}}}),tx.order.findMany({where:{traceabilityStatus:'exception',items:{some:{productId:{in:ids}}}},select:{items:{select:{productId:true}}}})]);
+ const blocked=new Set(exceptions.flatMap(o=>o.items.map(i=>i.productId)));const available=new Set(lots.filter(l=>l.onHand>l.reserved).map(l=>l.productId));
+ return products.map(p=>p.lotTracking&&p.status==='in_stock'&&(!available.has(p.id)||blocked.has(p.id))?{...p,status:'out_of_stock'}:p);
 }

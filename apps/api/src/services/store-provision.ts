@@ -1,3 +1,4 @@
+import {publicCoaUrl} from './coa-views.ts';
 import type { BrandStoreConnection, PrismaClient } from '@ruostack/db';
 import { batchProducts, decryptStoreCreds, getProductIdBySku, type WooProductInput, type WooProductUpdate } from './woo.ts';
 
@@ -64,7 +65,8 @@ const SKU_META_KEY = '_ruostack_canonical_sku';
  * matching back to canonical) — writing canonical here would undo that choice.
  */
 export function platformOwnedUpdate(_p: ProvisionProduct, wooId: number, skuToWrite: string): WooProductUpdate {
-  return { id: wooId, sku: skuToWrite };
+  const url=publicCoaUrl(`products/${_p.id}`);
+  return { id: wooId, sku: skuToWrite, ...(url?{meta_data:[{key:'_ruostack_coa_url',value:url}]}:{}) };
 }
 
 /** New product → created as a draft (the brand reviews + publishes). */
@@ -79,7 +81,7 @@ export function newWooProductInput(p: ProvisionProduct): WooProductInput {
     manage_stock: false,
     stock_status: p.status === 'in_stock' ? 'instock' : 'outofstock',
     images: p.images.map((src) => ({ src })),
-    meta_data: [{ key: SKU_META_KEY, value: p.canonicalSku }],
+    meta_data: [{ key: SKU_META_KEY, value: p.canonicalSku },...(publicCoaUrl(`products/${p.id}`)?[{key:'_ruostack_coa_url',value:publicCoaUrl(`products/${p.id}`)!}]:[])],
   };
 }
 

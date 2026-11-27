@@ -40,7 +40,7 @@ export const OrderShipSchema = z.object({
  * but `items` (when present) REPLACES the line items. Re-prices + re-reserves. */
 export const OrderEditSchema = z
   .object({
-    items: z.array(OrderItemInputSchema).min(1).max(50).optional(),
+    items: z.array(OrderItemInputSchema.extend({order_item_id:z.string().uuid().optional()})).min(1).max(50).optional(),
     recipient_name: z.string().min(1).max(120).optional(),
     recipient_email: z.string().email().or(z.literal('')).optional(),
     recipient_phone: z.string().max(40).optional(),

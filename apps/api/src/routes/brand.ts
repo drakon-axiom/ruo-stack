@@ -1,3 +1,4 @@
+import {applyLotAvailability} from '../services/lot-inventory.ts';
 import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
@@ -262,6 +263,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
           status: true,
           images: true,
           coaId: true,
+          lotTracking:true,
         },
       }),
       prisma.brandProductPrice.findMany({ where: { brandId }, select: { productId: true, retailCents: true } }),
@@ -270,7 +272,7 @@ export async function brandRoutes(app: FastifyInstance): Promise<void> {
 
     return {
       plan,
-      products: products.map((p) => ({
+      products: (await applyLotAvailability(prisma,products)).map((p) => ({
         id: p.id,
         canonicalSku: p.canonicalSku,
         name: p.name,

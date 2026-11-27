@@ -1095,3 +1095,17 @@ model OrderLotAllocation {
  @@index([lotId,state])
  @@map("order_lot_allocation")
 }
+
+model CoaWritebackJob {
+ key String @id
+ kind String
+ targetId String @map("target_id") @db.Uuid
+ status String @default("pending")
+ attempts Int @default(0)
+ nextAttemptAt DateTime @default(now()) @map("next_attempt_at")
+ lastError String? @map("last_error")
+ createdAt DateTime @default(now()) @map("created_at")
+ completedAt DateTime? @map("completed_at")
+ @@index([status,nextAttemptAt])
+ @@map("coa_writeback_job")
+}

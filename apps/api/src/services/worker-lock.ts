@@ -3,7 +3,7 @@ import type { PrismaClient } from '@ruostack/db';
 import { Conflict } from '../errors.ts';
 
 // Namespace 3 is reserved for workers (wallet, ledger, membership use 0–2).
-const jobs = { reconciliation: 1, 'rate-quotes': 2, 'subscription-lapse': 3, dunning: 4 } as const;
+const jobs = { reconciliation: 1, 'rate-quotes': 2, 'subscription-lapse': 3, dunning: 4, 'coa-writeback': 5 } as const;
 export interface WorkerOwnership {
   signal: AbortSignal;
   assertOwned(): Promise<void>;

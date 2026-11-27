@@ -39,3 +39,20 @@ pick-&-pack fee and your markup; the fee is never itemized.
 
 > Note: this is a thin client. All rating, fee/markup, and the flat fallback live
 > in RUOStack (`/api/shipping/rates`).
+
+## COA display (0.2.0)
+
+Install the whole plugin directory, including `includes/coas.php`. Product pages
+render `_ruostack_coa_url` as a reference-library link. Woo order details and
+HTML/plain-text email templates render each order item's
+`_ruostack_coa_allocations` (`lot_code`, `qty`, `certificate_url`). Custom themes
+and block email templates must preserve `woocommerce_order_item_meta_end`.
+
+The API stores Woo line IDs at intake and writes certificate metadata before
+marking orders completed. Missing line identity produces a failed job for operator
+reconciliation; it never guesses from array order. Older orders are not backfilled.
+A link to a subsequently withdrawn report shows a withdrawal notice.
+
+Run `php integrations/woocommerce/tests/coas.php` from the repository root.
+Before customer rollout, test product, authenticated order details, and synthetic
+completion email on a staging store. No live customer email is part of this test.

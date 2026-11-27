@@ -1,3 +1,4 @@
+import {CoaJobs} from './catalog/CoaJobs.js';
 import { ProductLots } from './catalog/ProductLots.js';
 import { ProductCoas } from './catalog/ProductCoas.js';
 import { useEffect, useMemo, useState } from 'react';
@@ -407,6 +408,7 @@ export function Catalog() {
         </div>
       )}
 
+      <CoaJobs writable={writable} />
       <DataTable
         caption="Catalog products with tiered wholesale pricing"
         mode="scroll"

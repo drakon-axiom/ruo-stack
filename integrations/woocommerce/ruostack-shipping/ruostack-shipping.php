@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RUOStack Shipping
  * Description: Live shipping rates from RUOStack at checkout — real, named carrier services (with the $12.99 flat fallback when rates are unavailable).
- * Version: 0.1.0
+ * Version: 0.2.0
  * Author: RUOStack
  * Requires Plugins: woocommerce
  *
@@ -15,6 +15,8 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+require_once __DIR__ . '/includes/coas.php';
 
 add_action('woocommerce_shipping_init', function () {
     if (class_exists('RUOStack_Shipping_Method')) {

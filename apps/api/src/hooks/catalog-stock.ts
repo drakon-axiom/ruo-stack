@@ -1,4 +1,5 @@
-import type { CatalogProduct } from '@ruostack/db';
+import { availableProductUnits } from '../services/lot-inventory.ts';
+import type { PrismaClient, CatalogProduct } from '@ruostack/db';
 import { AUDIT_ACTIONS, isStoreSellable } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
 import { writeAudit } from '../audit.ts';
@@ -16,13 +17,13 @@ import { decryptStoreCreds, getProductIdBySku, updateProductStock } from '../ser
  *
  * TODO: move to a queue when store counts grow (this fans out inline).
  */
-export async function onCatalogStockChanged(product: CatalogProduct): Promise<void> {
-  const { prisma } = getClients();
+export async function onCatalogStockChanged(product: CatalogProduct, strict=false, db?:PrismaClient): Promise<void> {
+  const prisma = db ?? getClients().prisma;
   // Sellability, not raw stock state: an unpublished or archived product must be
   // out-of-stock in every store, and must STAY that way if someone later toggles
   // its stock status.
-  const inStock = isStoreSellable(product);
-  const conns = await prisma.brandStoreConnection.findMany({ where: { platform: 'woocommerce', status: 'active' } });
+  const inStock = isStoreSellable(product) && (!product.lotTracking || await availableProductUnits(prisma,product.id)>0);
+  const conns = await prisma.brandStoreConnection.findMany({ where: { platform: 'woocommerce', status: {in: strict?['active','error']:['active']} } });
   if (conns.length === 0) return;
 
   // A brand may carry this product under its canonical SKU AND/or aliased SKUs.
@@ -69,6 +70,7 @@ export async function onCatalogStockChanged(product: CatalogProduct): Promise<vo
       ip: null,
     });
   }
+  if(strict&&failed)throw new Error('Stock writeback incomplete');
   // eslint-disable-next-line no-console
   console.log(`[stock-push] ${product.canonicalSku} → ${inStock ? 'instock' : 'outofstock'}: pushed=${pushed} missing=${missing} failed=${failed}`);
 }

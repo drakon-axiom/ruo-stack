@@ -1,3 +1,4 @@
+import {enqueueCoaWriteback} from './coa-outbox.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PrismaClient, CoaRevision } from '@ruostack/db';
 import { canView, canWrite, CoaUploadSchema, COA_MAX_BYTES, type AdminRole, type CoaUploadInput } from '@ruostack/shared';
@@ -54,6 +55,8 @@ export class CoaDocuments {
   return this.db.$transaction(async tx=>{
    const changed=await tx.coaRevision.updateMany({where:{id,status:{in:from},objectKey:{not:null}},data:{status,...(status==='reviewed'||status==='rejected'?{reviewedBy:actor.id,reviewedAt:new Date()}:{}),...(status==='published'?{publishedAt:new Date()}:{}),...(status==='withdrawn'?{withdrawalReason:reason}: {})}});
    if(changed.count!==1)throw Conflict('coa_state','Certificate is not in the required state; reload');
+   const revision=await tx.coaRevision.findUniqueOrThrow({where:{id},include:{document:true}});
+   if(['published','withdrawn'].includes(status))await enqueueCoaWriteback(tx,'product',revision.document.productId);
    await writeAudit(tx,{actorType:'admin',actorId:actor.id,action:`coa.${status}`,targetType:'coa_revision',targetId:id,reason});
    return coaDto(await tx.coaRevision.findUniqueOrThrow({where:{id}}));
   });

@@ -1,3 +1,4 @@
+import {adminCoaJobRoutes} from './routes/admin-coa-jobs.ts';
 import { brandCoaRoutes } from './routes/brand-coas.ts';
 import { publicCoaRoutes } from './routes/public-coas.ts';
 import { adminOrderLotRoutes } from './routes/admin-order-lots.ts';
@@ -105,6 +106,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
   await app.register(adminCoaRoutes);
+  await app.register(adminCoaJobRoutes);
   await app.register(adminLotRoutes);
   await app.register(adminOrderLotRoutes);
   await app.register(adminCatalogImportRoutes);

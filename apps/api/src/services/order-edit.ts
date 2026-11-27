@@ -30,6 +30,7 @@ export async function applyOrderEdit(
   order: OrderWithItems,
   edit: OrderEdit,
   actor: Actor,
+  sourceLines?: {product_id:string;qty:number;wooLineId:string|null}[],
 ): Promise<OrderWithItems> {
   if (order.status === 'shipped' || order.status === 'delivered') {
     throw Conflict('already_shipped', 'A shipped order can no longer be edited');
@@ -44,7 +45,8 @@ export async function applyOrderEdit(
   const wf = wholesaleFieldFor(plan);
 
   // Items: edit.items REPLACES; otherwise keep the existing lines.
-  const desired = edit.items ?? order.items.map((i) => ({ product_id: i.productId, qty: i.qty }));
+  const desired = sourceLines ?? edit.items ?? order.items.map((i) => ({ product_id: i.productId, qty: i.qty, order_item_id:i.id }));
+  const usedSourceIds=new Set<string>();
   const products = await prisma.catalogProduct.findMany({
     where: { id: { in: desired.map((i) => i.product_id) }, isPublished: true },
     select: { id: true, wholesaleStarter: true, wholesalePro: true, wholesaleVolume: true, weight: true, length: true, width: true, height: true },
@@ -53,7 +55,14 @@ export async function applyOrderEdit(
   const lines = desired.map((i) => {
     const p = byId.get(i.product_id);
     if (!p) throw BadRequest('unknown_product', `Product ${i.product_id} is not available`);
-    return { productId: i.product_id, qty: i.qty, unitWholesaleCents: p[wf] };
+    const id='order_item_id' in i?i.order_item_id:undefined;
+    const candidates=order.items.filter(old=>old.productId===i.product_id);
+    const original=id?order.items.find(old=>old.id===id):candidates.length===1?candidates[0]:undefined;
+    if(id&&(!original||original.productId!==i.product_id))throw BadRequest('line_identity','Order item identity does not match this product');
+    if(original){if(usedSourceIds.has(original.id))throw BadRequest('duplicate_line','Order line identity reused');usedSourceIds.add(original.id);}
+    if(order.source==='woocommerce'&&!sourceLines&&!original&&candidates.length>1)throw BadRequest('line_identity','Choose an explicit order item ID for duplicate SKU lines');
+    const wooLineId='wooLineId' in i?i.wooLineId:original?.wooLineId??null;
+    return { productId: i.product_id, qty: i.qty, unitWholesaleCents: p[wf], wooLineId };
   });
   const wholesaleTotal = lines.reduce((s, l) => s + l.unitWholesaleCents * l.qty, 0);
 

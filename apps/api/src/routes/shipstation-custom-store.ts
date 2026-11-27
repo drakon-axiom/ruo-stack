@@ -1,3 +1,4 @@
+import { enqueueCoaWriteback } from '../services/coa-outbox.ts';
 import { consumeConfirmedOrderLots, getOrderLotReadiness } from '../services/order-lots.ts';
 import { lockOrder } from '../services/lot-inventory.ts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -194,6 +195,7 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
         },
       });
       if (g.count === 0) return null;
+      await enqueueCoaWriteback(tx,'shipment',order.id,`shipment:${order.id}`);
       return tx.order.findUniqueOrThrow({ where: { id: order.id } });
     });
 

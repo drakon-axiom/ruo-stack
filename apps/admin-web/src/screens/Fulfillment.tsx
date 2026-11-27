@@ -231,7 +231,7 @@ interface OrderDetail {
   box_dims: { l: number; w: number; h: number } | null;
   wallet_charge_cents: number;
   exported_at: string | null;
-  items: { product_id: string; qty: number; unit_wholesale_cents: number }[];
+  items: { order_item_id?: string; product_id: string; qty: number; unit_wholesale_cents: number }[];
 }
 interface AdminProduct { id: string; name: string }
 
@@ -239,7 +239,7 @@ interface AdminProduct { id: string; name: string }
 function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => void; onSaved: () => void }) {
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [catalog, setCatalog] = useState<AdminProduct[]>([]);
-  const [lines, setLines] = useState<{ product_id: string; qty: number }[]>([]);
+  const [lines, setLines] = useState<{ order_item_id?: string; product_id: string; qty: number }[]>([]);
   const [r, setR] = useState({ recipient_name: '', recipient_email: '', recipient_phone: '', address1: '', address2: '', city: '', state: '', zip: '', country: 'US' });
   const [service, setService] = useState('');
   const [err, setErr] = useState('');
@@ -248,7 +248,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
   useEffect(() => {
     api<OrderDetail>(`/api/admin/orders/${order.id}`).then((d) => {
       setDetail(d);
-      setLines(d.items.map((i) => ({ product_id: i.product_id, qty: i.qty })));
+      setLines(d.items.map((i) => ({ order_item_id: i.order_item_id, product_id: i.product_id, qty: i.qty })));
       setR({
         recipient_name: d.recipient.name,
         recipient_email: d.recipient.email ?? '',
@@ -265,7 +265,7 @@ function EditDrawer({ order, onClose, onSaved }: { order: Order; onClose: () => 
     api<{ products: AdminProduct[] }>('/api/admin/catalog').then((x) => setCatalog(x.products));
   }, [order.id]);
 
-  function setLine(i: number, patch: Partial<{ product_id: string; qty: number }>) {
+  function setLine(i: number, patch: Partial<{ order_item_id?: string; product_id: string; qty: number }>) {
     setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
   function addLine() { if (catalog[0]) setLines([...lines, { product_id: catalog[0].id, qty: 1 }]); }

@@ -7,6 +7,7 @@ import { BadRequest, NotFound } from '../errors.ts';
 
 interface SourceItem {
   sku: string;
+  wooLineId?:string|null;
   qty: number;
 }
 
@@ -32,17 +33,12 @@ export async function remapStoreOrder(
   const source = (order.sourceItems as unknown as SourceItem[] | null) ?? [];
   const resolved = await resolveSkus(prisma, order.brandId, source.map((i) => i.sku));
 
-  const qtyByProduct = new Map<string, number>();
-  const unmatched: string[] = [];
-  for (const it of source) {
-    const p = resolved.get(it.sku) ?? null;
-    if (!p) unmatched.push(it.sku);
-    else qtyByProduct.set(p.id, (qtyByProduct.get(p.id) ?? 0) + it.qty);
-  }
-  const items = [...qtyByProduct.entries()].map(([product_id, qty]) => ({ product_id, qty }));
+  const unmatched: string[]=[];
+  const sourceLines=source.flatMap(it=>{const p=resolved.get(it.sku);if(!p){unmatched.push(it.sku);return [];}return [{product_id:p.id,qty:it.qty,wooLineId:it.wooLineId??null}];});
+  const items=sourceLines.map(({product_id,qty})=>({product_id,qty}));
 
   // Re-price + re-box + re-reserve the resolved items (when any resolved).
-  if (items.length > 0) await applyOrderEdit(prisma, order, { items }, { type: 'admin', id: adminId, ip });
+  if (items.length > 0) await applyOrderEdit(prisma, order, { items }, { type: 'admin', id: adminId, ip }, sourceLines);
 
   await prisma.$transaction(async (tx) => {
     const current = await tx.order.findUnique({ where: { id: orderId }, select: { blocker: true } });

@@ -1,3 +1,4 @@
+import {applyLotAvailability} from '../services/lot-inventory.ts';
 import type { FastifyInstance } from 'fastify';
 import type { BrandStoreConnection } from '@ruostack/db';
 import { z } from 'zod';
@@ -216,12 +217,12 @@ export async function brandStoreRoutes(app: FastifyInstance): Promise<void> {
       prisma.catalogProduct.findMany({
         where: { isPublished: true, archived: false, ...(ids && ids.length ? { id: { in: ids } } : {}) },
         orderBy: { name: 'asc' },
-        select: { id: true, canonicalSku: true, name: true, descriptionTemplate: true, status: true, images: true, suggestedRetail: true },
+        select: { id: true, canonicalSku: true, name: true, descriptionTemplate: true, status: true, lotTracking:true, images: true, suggestedRetail: true },
       }),
       prisma.brandProductPrice.findMany({ where: { brandId }, select: { productId: true, retailCents: true } }),
     ]);
     const retail = new Map(prices.map((p) => [p.productId, p.retailCents]));
-    return products.map((p) => ({
+    return (await applyLotAvailability(prisma,products)).map((p) => ({
       id: p.id,
       canonicalSku: p.canonicalSku,
       name: p.name,

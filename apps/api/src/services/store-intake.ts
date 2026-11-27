@@ -10,6 +10,7 @@ import { Prisma } from '@ruostack/db';
 import { loadConfig } from '../config.ts';
 
 interface WooLineItem {
+  id?: number|string;
   sku?: string;
   quantity?: number;
   name?: string;
@@ -84,11 +85,11 @@ export async function importWooOrder(
   const wf = wholesaleFieldFor(plan);
 
   const lineItems = woo.line_items ?? [];
-  const sourceItems = lineItems.map((li) => ({ sku: (li.sku ?? '').trim(), qty: Math.max(1, li.quantity ?? 1) })).filter((i) => i.sku);
+  const sourceItems = lineItems.map((li) => ({ wooLineId: li.id != null ? String(li.id) : null, sku: (li.sku ?? '').trim(), qty: Math.max(1, li.quantity ?? 1) })).filter((i) => i.sku);
   // Resolve by canonical SKU, then per-brand alias; unresolved → No-Match.
   const resolved = await resolveSkus(prisma, brandId, sourceItems.map((i) => i.sku));
 
-  const lines: { productId: string; qty: number; unitWholesaleCents: number }[] = [];
+  const lines: { productId: string; qty: number; unitWholesaleCents: number; wooLineId:string|null }[] = [];
   const parcelItems: ParcelProduct[] = [];
   const unmatchedSkus: string[] = [];
   for (const it of sourceItems) {
@@ -97,7 +98,7 @@ export async function importWooOrder(
       unmatchedSkus.push(it.sku);
       continue;
     }
-    lines.push({ productId: p.id, qty: it.qty, unitWholesaleCents: p[wf] });
+    lines.push({ wooLineId:it.wooLineId, productId: p.id, qty: it.qty, unitWholesaleCents: p[wf] });
     parcelItems.push({ qty: it.qty, weight: p.weight, length: p.length, width: p.width, height: p.height });
   }
   const unmatched = unmatchedSkus.length;

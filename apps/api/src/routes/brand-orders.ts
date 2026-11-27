@@ -315,7 +315,7 @@ function serializeOrder(o: OrderRow) {
     created_at: o.createdAt,
     items: (o.items ?? []).map((i) => ({
       id: i.id,
-      product_id: i.productId,
+      order_item_id: i.id, product_id: i.productId,
       qty: i.qty,
       unit_wholesale_cents: i.unitWholesaleCents,
     })),

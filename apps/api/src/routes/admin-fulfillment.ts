@@ -1,3 +1,4 @@
+import { enqueueCoaWriteback } from '../services/coa-outbox.ts';
 import { consumeConfirmedOrderLots } from '../services/order-lots.ts';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -89,7 +90,7 @@ export async function adminFulfillmentRoutes(app: FastifyInstance): Promise<void
       carrier: o.carrier,
       exported_at: o.exportedAt,
       created_at: o.createdAt,
-      items: o.items.map((i) => ({ id: i.id, product_id: i.productId, qty: i.qty, unit_wholesale_cents: i.unitWholesaleCents })),
+      items: o.items.map((i) => ({ id: i.id, order_item_id: i.id, product_id: i.productId, qty: i.qty, unit_wholesale_cents: i.unitWholesaleCents })),
     };
   });
 
@@ -158,6 +159,7 @@ export async function adminFulfillmentRoutes(app: FastifyInstance): Promise<void
         data: { status: 'shipped', blocker: 'none', trackingNumber: body.tracking_number, carrier, shippedAt: new Date() },
       });
       if (gate.count === 0) throw Conflict('not_shippable', 'Order can no longer be shipped — it may have been cancelled');
+      await enqueueCoaWriteback(tx,'shipment',id,`shipment:${id}`);
       const o = await tx.order.findUniqueOrThrow({ where: { id } });
       await writeAudit(tx, {
         actorType: 'admin',

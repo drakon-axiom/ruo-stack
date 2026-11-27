@@ -1,3 +1,4 @@
+import {enqueueCoaWriteback} from './coa-outbox.ts';
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@ruostack/db';
 import { Conflict } from '../errors.ts';
@@ -11,6 +12,7 @@ export async function getOrderLotReadiness(tx:Reader,orderId:string){
  const rows=await tx.orderLotAllocation.findMany({where:{orderId,state:terminal?'shipped':'reserved'},include:{lot:{include:{coaRevision:true,product:true}}}});
  if(terminal)return rows.length?'ready':'untracked';
  const tracked=o.items.filter(i=>i.product.lotTracking);if(!tracked.length)return 'untracked';
+ if(await tx.order.count({where:{traceabilityStatus:'exception',items:{some:{productId:{in:tracked.map(i=>i.productId)}}}}}))return 'exception';
  if(!rows.length)return 'needs_allocation';
  for(const i of tracked)if(rows.filter(r=>r.orderItemId===i.id).reduce((s,r)=>s+r.qty,0)!==i.qty)return 'needs_allocation';
  if(rows.some(r=>!eligibleLot(r.lot)||!['reviewed','published'].includes(r.lot.coaRevision.status)||r.lot.product.status!=='in_stock'||!r.lot.product.isPublished||r.lot.product.archived))return 'exception';
@@ -39,6 +41,7 @@ export async function consumeConfirmedOrderLots(tx:LotTx,orderId:string,shipment
   if(!physicalShipment)throw Conflict('lots_not_ready','Confirm eligible physical lots before shipping');
   await releaseLotReservations(tx,orderId,'system',`exception-release:${orderId}:${randomUUID()}`);
   await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'exception',traceabilityReason:'Shipment reported without complete eligible warehouse lot confirmation'}});
+  for(const productId of new Set(o.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
   await writeAudit(tx,{actorType:'system',actorId:null,action:'lots.shipment_exception',targetType:'order',targetId:orderId,after:{shipmentKey}});return;
  }
  for(const r of rows){
@@ -47,6 +50,7 @@ export async function consumeConfirmedOrderLots(tx:LotTx,orderId:string,shipment
   await tx.lotMovement.create({data:{lotId:r.lotId,kind:'ship',onHandDelta:-r.qty,reservedDelta:-r.qty,orderId,reason:'Confirmed shipment',operationKey:shipmentKey}});
  }
  await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'ready'}});
+ for(const productId of new Set(o.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
 }
 
 /** Audited late warehouse evidence, only for a shipment with no prior shipped
@@ -65,5 +69,7 @@ export async function resolveShipmentLotException(tx:LotTx,orderId:string,alloca
  await tx.lotMovement.create({data:{lotId:lot.id,kind:'ship',onHandDelta:-a.qty,reservedDelta:0,orderId,actorId:actor,reason:`Late warehouse evidence: ${reason}`,operationKey:`resolve:${orderId}`}});
  }
  await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'ready',traceabilityReason:`Late confirmation: ${reason}`}});
+ await enqueueCoaWriteback(tx,'shipment',orderId,`late-evidence:${orderId}`);
+ for(const productId of new Set(o.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
  await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lots.exception_resolved',targetType:'order',targetId:orderId,reason,after:{allocations}});
 }
