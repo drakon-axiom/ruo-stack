@@ -61,6 +61,7 @@ server {
     # unmodified, which /api/payments/webhook needs for Stripe signature
     # verification -- do not add any body-rewriting directive here.
     location /api/      { proxy_pass http://${API_UPSTREAM}; }
+    location /coa/      { proxy_pass http://${API_UPSTREAM}; }
     location = /healthz { proxy_pass http://${API_UPSTREAM}; }
 
     # Hashed assets are immutable; the HTML shell must never be cached, or a
@@ -120,6 +121,7 @@ server {
     proxy_read_timeout 60s;
 
     location /api/      { proxy_pass http://${API_UPSTREAM}; }
+    location /coa/      { proxy_pass http://${API_UPSTREAM}; }
     location /auth/     { proxy_pass http://${API_UPSTREAM}; }   # admin login / refresh / mfa
     location = /healthz { proxy_pass http://${API_UPSTREAM}; }
 

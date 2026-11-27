@@ -304,5 +304,9 @@ for f in "$O_DEV" "$E_DEV" "$O_PRD" "$E_PRD"; do
   rm -rf "$work"
 done
 
+for f in "$O_DEV" "$O_PRD"; do
+  assert_count "$f" "location /coa/" 2 "public certificate routes reach API on both portals"
+done
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
