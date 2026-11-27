@@ -7,7 +7,7 @@ Review records operator approval, not independent verification by this software.
 
 ## Deployment and storage
 
-Deploy additive migrations 35–39 with the guarded production deployment script.
+Deploy additive migrations 35–40 with the guarded production deployment script.
 No migration assigns a certificate, creates stock or enables a SKU. Existing
 shipped orders remain explicitly untracked. Application public URLs use
 `PUBLIC_API_BASE_URL` (production `https://backend.ruostack.io`).
@@ -29,7 +29,8 @@ issued signed URL can remain valid until its five-minute expiry.
 The admin catalog now has Documents and Lots sections; document management can
 be used with inventory tracking disabled. Upload a PDF and lab/report/test-date,
 finalize, download and inspect it, approve review, then explicitly publish if it
-should be public. A replacement is a new revision. Older revisions and shipment
+should be public. A replacement is a new revision. Brands can download reviewed private reports
+only through their own shipped-order view; public sharing still requires publication. Older revisions and shipment
 references remain unchanged. Never overwrite a finalized object.
 
 ## Opening-stock pilot (operator gate)
@@ -53,7 +54,9 @@ references remain unchanged. Never overwrite a finalized object.
 Unknown-lot shipment callbacks retain tracking and existing wallet behavior but
 record a traceability exception. No certificate is invented. Affected SKUs remain
 unavailable for new reservations until warehouse evidence resolves the exception.
-Record evidence in Fulfillment → Lots / COAs; reconciliation deducts actual lots
+Use the paged Traceability exceptions list to find older holds, and Affected orders
+on a catalog lot to inspect reservations, shipments and amendments.
+Record the exact evidenced report revision in Fulfillment → Lots / COAs; reconciliation deducts actual lots
 once and writes an audit event. Existing shipped assignments are immutable.
 For a mistaken historical assignment, select the corrected lot and record warehouse
 evidence using Record correction. This moves the full allocation quantity between
@@ -72,11 +75,19 @@ Do not send real customer email for validation.
 
 Woo line IDs are retained from intake. Duplicate SKUs map by explicit line ID,
 not array position. Legacy orders lacking identity require operator reconciliation;
-writeback will fail rather than attach a certificate to the wrong line. Only
+writeback will fail rather than attach a certificate to the wrong line.
+Use Reconcile store mapping on a shipment job to verify the originating store and
+actual Woo line IDs. The API also verifies remote customer/address, SKU and
+quantities. Reconnecting another store never redirects pending old shipment jobs. Only
 platform-owned metadata is updated; merchant descriptions are preserved.
 
 The durable worker writes allocation metadata before completing the Woo order.
-Retries update the same metadata and do not append duplicate customer notes.
+Retries replace the same metadata (including clearing stale certificate links)
+and check a stable shipment marker before appending customer-visible tracking notes.
+Stock withdrawal is isolated from certificate metadata failures on other stores.
+Tracking activation queues stock reconciliation, and expiry is swept every 30 seconds.
+Staging PDF cleanup also runs in the worker, with deletion retries and recorded
+completion so a backlog drains across bounded batches.
 There are eight automatic attempts with exponential delay (capped at one hour).
 Admin Catalog → Certificate store synchronization shows pending/failed jobs and
 allows retry after repairing a connection or mapping. Monitor exception counts,

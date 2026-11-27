@@ -7,7 +7,7 @@ import { writeAudit } from '../audit.ts';
 export type LotTx=Prisma.TransactionClient;
 export const Quantity=z.number().int().positive().max(2147483647);
 export const ReceiveLotSchema=z.object({productId:z.string().uuid(),lotCode:z.string().trim().min(1).max(120),coaRevisionId:z.string().uuid(),qty:Quantity,expiresAt:z.string().datetime().optional()});
-export const AllocationSchema=z.object({orderItemId:z.string().uuid(),lotId:z.string().uuid(),qty:Quantity});
+export const AllocationSchema=z.object({orderItemId:z.string().uuid(),lotId:z.string().uuid(),qty:Quantity,coaRevisionId:z.string().uuid().optional()});
 export type AllocationInput=z.infer<typeof AllocationSchema>;
 export async function lockOrder(tx:LotTx,id:string){await tx.$queryRaw`SELECT id FROM "order" WHERE id=${id}::uuid FOR UPDATE`;return tx.order.findUniqueOrThrow({where:{id},include:{items:{include:{product:true}}}});}
 export async function lockProducts(tx:LotTx,ids:string[]){for(const id of [...new Set(ids)].sort())await tx.$queryRaw`SELECT id FROM catalog_product WHERE id=${id}::uuid FOR UPDATE`;}
@@ -50,7 +50,7 @@ export async function reserveLots(tx:LotTx,orderId:string,raw:AllocationInput[],
  if(!['ready_for_fulfillment','processing'].includes(order.status)||order.blocker!=='none')throw Conflict('order_not_released','Resolve order blockers before allocating lots');
  await lockProducts(tx,order.items.map(i=>i.productId));
  order=await lockOrder(tx,orderId);
- if(await tx.order.count({where:{traceabilityStatus:'exception',items:{some:{productId:{in:order.items.filter(i=>i.product.lotTracking).map(i=>i.productId)}}}}}))throw Conflict('inventory_exception','Resolve outstanding shipment lot exceptions for this SKU first');
+ if(await tx.order.count({where:{traceabilityStatus:'exception',traceabilityItems:{some:{productId:{in:order.items.filter(i=>i.product.lotTracking).map(i=>i.productId)}}}}}))throw Conflict('inventory_exception','Resolve outstanding shipment lot exceptions for this SKU first');
  if(await tx.orderLotAllocation.count({where:{orderId,state:'reserved'}}))throw Conflict('already_allocated','Release previous reservations before allocating');
  const seen=new Set<string>();const totals=new Map<string,number>();
  for(const a of allocations){const pair=`${a.orderItemId}:${a.lotId}`;if(seen.has(pair))throw Conflict('duplicate_allocation','Combine quantities for the same item and lot');seen.add(pair);totals.set(a.orderItemId,(totals.get(a.orderItemId)??0)+a.qty);}
@@ -75,7 +75,7 @@ export async function releaseLotReservations(tx:LotTx,orderId:string,actor:strin
  await saveOperation(tx,key,op.fingerprint,orderId);for(const productId of new Set(order.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
 }
 export async function availableProductUnits(tx:Pick<LotTx,'productLot'|'order'>,productId:string){
- if(await tx.order.count({where:{traceabilityStatus:'exception',items:{some:{productId}}}}))return 0;
+ if(await tx.order.count({where:{traceabilityStatus:'exception',traceabilityItems:{some:{productId}}}}))return 0;
  const rows=await tx.productLot.findMany({where:{productId,state:'released',OR:[{expiresAt:null},{expiresAt:{gt:new Date()}}],coaRevision:{status:{in:['reviewed','published']}}}});return rows.reduce((sum,l)=>sum+l.onHand-l.reserved,0);
 }
 
@@ -83,8 +83,8 @@ export async function availableProductUnits(tx:Pick<LotTx,'productLot'|'order'>,
  * copied independently into each store. */
 export async function applyLotAvailability<T extends {id:string;status:string;lotTracking?:boolean}>(tx:Pick<LotTx,'productLot'|'order'>,products:T[]):Promise<T[]>{
  const ids=products.filter(p=>p.lotTracking&&p.status==='in_stock').map(p=>p.id);if(!ids.length)return products;
- const [lots,exceptions]=await Promise.all([tx.productLot.findMany({where:{productId:{in:ids},state:'released',OR:[{expiresAt:null},{expiresAt:{gt:new Date()}}],coaRevision:{status:{in:['reviewed','published']}}}}),tx.order.findMany({where:{traceabilityStatus:'exception',items:{some:{productId:{in:ids}}}},select:{items:{select:{productId:true}}}})]);
- const blocked=new Set(exceptions.flatMap(o=>o.items.map(i=>i.productId)));const available=new Set(lots.filter(l=>l.onHand>l.reserved).map(l=>l.productId));
+ const [lots,exceptions]=await Promise.all([tx.productLot.findMany({where:{productId:{in:ids},state:'released',OR:[{expiresAt:null},{expiresAt:{gt:new Date()}}],coaRevision:{status:{in:['reviewed','published']}}}}),tx.order.findMany({where:{traceabilityStatus:'exception',traceabilityItems:{some:{productId:{in:ids}}}},select:{traceabilityItems:{select:{productId:true}}}})]);
+ const blocked=new Set(exceptions.flatMap(o=>o.traceabilityItems.map(i=>i.productId)));const available=new Set(lots.filter(l=>l.onHand>l.reserved).map(l=>l.productId));
  return products.map(p=>p.lotTracking&&p.status==='in_stock'&&(!available.has(p.id)||blocked.has(p.id))?{...p,status:'out_of_stock'}:p);
 }
 
@@ -92,4 +92,10 @@ export async function changeLotCertificate(tx:LotTx,id:string,revisionId:string,
  z.string().trim().min(1).max(1000).parse(reason);const initial=await tx.productLot.findUniqueOrThrow({where:{id}});await lockProducts(tx,[initial.productId]);const lot=await tx.productLot.findUniqueOrThrow({where:{id}});
  if(lot.state!=='quarantined'||lot.reserved)throw Conflict('lot_in_use','Quarantine the lot and release reservations before changing its current certificate');await approvedRevision(tx,revisionId,lot.productId);
  await tx.productLot.update({where:{id},data:{coaRevisionId:revisionId}});await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lot.certificate_changed',targetType:'product_lot',targetId:id,before:{revisionId:lot.coaRevisionId},after:{revisionId},reason});await enqueueCoaWriteback(tx,'product',lot.productId);
+}
+
+export async function enableLotTracking(tx:LotTx,id:string,reason:string,actor:string){
+ await lockProducts(tx,[id]);if(!await tx.productLot.count({where:{productId:id}}))throw Conflict('opening_stock_required','Receive reconciled opening stock before enabling tracking');
+ if(await tx.order.count({where:{items:{some:{productId:id}},status:{in:['ready_for_fulfillment','processing']},exportedAt:{not:null}}}))throw Conflict('exported_orders','Resolve exported open orders before enabling lot tracking');
+ await tx.catalogProduct.update({where:{id},data:{lotTracking:true}});await enqueueCoaWriteback(tx,'product',id);await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lot.tracking_enabled',targetType:'catalog_product',targetId:id,reason});
 }

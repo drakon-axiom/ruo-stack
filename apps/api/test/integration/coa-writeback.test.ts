@@ -28,8 +28,9 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='1')('durable COA writeback',()=>{
  const f=await lotFixture();const o=await f.order(3);
  await db.coaRevision.update({where:{id:f.c.id},data:{publishedAt:new Date(),status:'published'}});
  await db.orderLotAllocation.create({data:{orderId:o.id,orderItemId:o.items[0]!.id,lotId:f.lot.id,coaRevisionId:f.c.id,lotCode:f.lot.lotCode,sku:f.p.canonicalSku,wooLineId:'72',qty:3,state:'shipped'}});await db.order.update({where:{id:o.id},data:{source:'woocommerce',externalOrderId:'52',status:'shipped',trackingNumber:'TRACK'}});
- await db.brandStoreConnection.create({data:{brandId:f.b.id,storeUrl:'https://store.test',...encryptStoreCreds('ck_test','cs_test'),webhookSecret:'test'}});
+ const conn=await db.brandStoreConnection.create({data:{brandId:f.b.id,storeUrl:'https://store.test',...encryptStoreCreds('ck_test','cs_test'),webhookSecret:'test'}});
+ await db.order.update({where:{id:o.id},data:{originStoreId:conn.id,originStoreUrl:conn.storeUrl}});
  await enqueueCoaWriteback(db,'shipment',o.id,`test:${o.id}`);const job=await db.coaWritebackJob.findUniqueOrThrow({where:{key:`test:${o.id}`}});
- const request=vi.fn().mockResolvedValue({});await performCoaWriteback(db,job,request);expect(request.mock.calls[0]![3]).toMatchObject({line_items:[{id:72}]});expect(request.mock.calls[1]![3]).toMatchObject({status:'completed'});expect(request.mock.calls.some(c=>c[2].includes('/notes'))).toBe(false);
+ const request=vi.fn().mockImplementation(async(_c,method)=>method==='GET'?[]:{});await performCoaWriteback(db,job,request);expect(request.mock.calls[0]![3]).toMatchObject({line_items:[{id:72}]});expect(request.mock.calls[1]![3]).toMatchObject({status:'completed'});expect(request.mock.calls.filter(c=>c[1]==='POST'&&c[2].includes('/notes'))).toHaveLength(1);
  });
 });

@@ -754,6 +754,9 @@ model Order {
   source             OrderSource  @default(manual)
   status             OrderStatus  @default(ready_for_fulfillment)
   blocker            OrderBlocker @default(none)
+  originStoreId String? @map("origin_store_id") @db.Uuid
+  originStoreUrl String? @map("origin_store_url")
+  traceabilityItems OrderTraceabilityItem[]
   externalOrderId    String?      @map("external_order_id") // store order id (Woo/Wix; Phase 1.5)
   sourceItems        Json?        @map("source_items") // raw store line items [{sku,qty}] for re-mapping
   unmatchedSkus      String[]     @default([]) @map("unmatched_skus") // No-Match SKUs awaiting an alias
@@ -1011,6 +1014,9 @@ model CoaRevision {
  id String @id @default(uuid()) @db.Uuid
  documentId String @map("document_id") @db.Uuid
  publicId String @unique @default(uuid()) @map("public_id") @db.Uuid
+ uploadCleanedAt DateTime? @map("upload_cleaned_at")
+ cleanupAttempts Int @default(0) @map("cleanup_attempts")
+ nextCleanupAt DateTime? @map("next_cleanup_at")
  uploadKey String @unique @map("upload_key")
  objectKey String? @unique @map("object_key")
  filename String
@@ -1127,4 +1133,16 @@ model LotAllocationAmendment {
  coaRevision CoaRevision @relation(fields:[coaRevisionId],references:[id],onDelete:Restrict)
  @@index([allocationId,createdAt])
  @@map("lot_allocation_amendment")
+}
+
+model OrderTraceabilityItem {
+ id String @id @default(uuid()) @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ orderItemId String @map("order_item_id") @db.Uuid
+ productId String @map("product_id") @db.Uuid
+ qty Int
+ order Order @relation(fields:[orderId],references:[id],onDelete:Restrict)
+ @@unique([orderId,orderItemId])
+ @@index([productId])
+ @@map("order_traceability_item")
 }

@@ -1,3 +1,4 @@
+import {LotExceptions} from './fulfillment/LotExceptions.js';
 import { OrderLots } from './fulfillment/OrderLots.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
@@ -157,6 +158,7 @@ export function Fulfillment() {
         />
       </div>
 
+      <LotExceptions onOpen={setLotOrder}/>
       <DataTable
         caption="Fulfillment queue"
         mode="scroll"

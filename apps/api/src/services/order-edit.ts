@@ -57,11 +57,11 @@ export async function applyOrderEdit(
     if (!p) throw BadRequest('unknown_product', `Product ${i.product_id} is not available`);
     const id='order_item_id' in i?i.order_item_id:undefined;
     const candidates=order.items.filter(old=>old.productId===i.product_id);
-    const original=id?order.items.find(old=>old.id===id):candidates.length===1?candidates[0]:undefined;
-    if(id&&(!original||original.productId!==i.product_id))throw BadRequest('line_identity','Order item identity does not match this product');
+    const original=sourceLines?undefined:id?order.items.find(old=>old.id===id):candidates.length===1&&!usedSourceIds.has(candidates[0]!.id)?candidates[0]:undefined;
+    if(id&&!original)throw BadRequest('line_identity','Order item identity is stale');
     if(original){if(usedSourceIds.has(original.id))throw BadRequest('duplicate_line','Order line identity reused');usedSourceIds.add(original.id);}
     if(order.source==='woocommerce'&&!sourceLines&&!original&&candidates.length>1)throw BadRequest('line_identity','Choose an explicit order item ID for duplicate SKU lines');
-    const wooLineId='wooLineId' in i?i.wooLineId:original?.wooLineId??null;
+    const wooLineId='wooLineId' in i?i.wooLineId:original?.productId===i.product_id?original.wooLineId:null;
     return { productId: i.product_id, qty: i.qty, unitWholesaleCents: p[wf], wooLineId };
   });
   const wholesaleTotal = lines.reduce((s, l) => s + l.unitWholesaleCents * l.qty, 0);

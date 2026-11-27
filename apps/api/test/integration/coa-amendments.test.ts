@@ -17,7 +17,7 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='1')('immutable historical correction
  it('appends a correction and adjusts the two balances once, preserving original evidence',async()=>{
  const f=await lotFixture();const b=await db.$transaction(tx=>receiveLot(tx,{...f.input,lotCode:'B',qty:200},'test',randomUUID()));const o=await f.order(3);
  await db.$transaction(async tx=>{await confirmOrderLots(tx,o.id,[{orderItemId:o.items[0]!.id,lotId:f.lot.id,qty:3}],'test',randomUUID());await consumeConfirmedOrderLots(tx,o.id,'ship');await tx.order.update({where:{id:o.id},data:{status:'shipped'}});});
- const original=await db.orderLotAllocation.findFirstOrThrow({where:{orderId:o.id,state:'shipped'}});const key=randomUUID();const amend=()=>db.$transaction(tx=>amendShippedAllocation(tx,o.id,original.id,b.id,'Packing record correction','test',key));await amend();await amend();
+ const original=await db.orderLotAllocation.findFirstOrThrow({where:{orderId:o.id,state:'shipped'}});const key=randomUUID();const amend=()=>db.$transaction(tx=>amendShippedAllocation(tx,o.id,original.id,b.id,'Packing record correction','test',key,f.c.id));await amend();await amend();
  expect((await db.productLot.findUniqueOrThrow({where:{id:f.lot.id}})).onHand).toBe(500);expect((await db.productLot.findUniqueOrThrow({where:{id:b.id}})).onHand).toBe(197);expect((await db.orderLotAllocation.findUniqueOrThrow({where:{id:original.id}})).lotId).toBe(f.lot.id);
  expect((await readOrderCoas(db,f.b.id,o.id)).allocations[0]).toMatchObject({lotCode:'B',originalLotCode:f.lot.lotCode});
  });

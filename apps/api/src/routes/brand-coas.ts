@@ -1,8 +1,9 @@
+import {coaStorage} from '../services/coa-storage.ts';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getClients } from '../clients.ts';
 import { requireBrand } from '../middleware/guards.ts';
-import { publicCoaUrl, readOrderCoas } from '../services/coa-views.ts';
+import { brandCertificateKey, publicCoaUrl, readOrderCoas } from '../services/coa-views.ts';
 export async function brandCoaRoutes(app:FastifyInstance){
  const {prisma}=getClients();
  app.get('/api/brand/coas',{preHandler:requireBrand},async req=>{
@@ -11,5 +12,6 @@ export async function brandCoaRoutes(app:FastifyInstance){
  const [rows,total]=await Promise.all([prisma.coaRevision.findMany({where,skip:q.offset,take:q.limit,orderBy:[{createdAt:'desc'},{id:'asc'}],include:{document:{include:{product:true}},lots:{where:{state:'released',OR:[{expiresAt:null},{expiresAt:{gt:new Date()}}]},select:{lotCode:true}}}}),prisma.coaRevision.count({where})]);
  return {total,certificates:rows.map(r=>({id:r.id,product:r.document.product.name,lotCodes:r.lots.map(l=>l.lotCode),reportNumber:r.reportNumber,lab:r.lab,testDate:r.testDate.toISOString().slice(0,10),status:r.status,url:publicCoaUrl(r.publicId)}))};
  });
+ app.get('/api/brand/orders/:id/coas/:allocationId/download',{preHandler:requireBrand},async req=>{const {id,allocationId}=z.object({id:z.string().uuid(),allocationId:z.string().uuid()}).parse(req.params);const key=await brandCertificateKey(prisma,req.brand!.brandId,id,allocationId);return {url:await coaStorage().signDownload(key,300)};});
  app.get('/api/brand/orders/:id/coas',{preHandler:requireBrand},async req=>readOrderCoas(prisma,req.brand!.brandId,z.object({id:z.string().uuid()}).parse(req.params).id));
 }

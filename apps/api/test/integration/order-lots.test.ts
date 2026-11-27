@@ -33,7 +33,7 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='1')('shipment lot traceability',()=>
  expect(await getOrderLotReadiness(db,(await f.order(12)).id)).toBe('needs_allocation');
  });
  it('resolves late evidence once without modifying historical assignments',async()=>{
- const f=await lotFixture();const o=await f.order(12);await db.order.update({where:{id:o.id},data:{status:'shipped',traceabilityStatus:'exception'}});const a=[{orderItemId:o.items[0]!.id,lotId:f.lot.id,qty:12}];
+ const f=await lotFixture();const o=await f.order(12);await db.$transaction(async tx=>{await consumeConfirmedOrderLots(tx,o.id,'physical',true);await tx.order.update({where:{id:o.id},data:{status:'shipped'}});});const a=[{orderItemId:o.items[0]!.id,lotId:f.lot.id,qty:12,coaRevisionId:f.c.id}];
  await db.$transaction(tx=>resolveShipmentLotException(tx,o.id,a,'test','Packing log 123'));await expect(db.$transaction(tx=>resolveShipmentLotException(tx,o.id,a,'test','Packing log 123'))).rejects.toThrow();expect((await db.productLot.findUniqueOrThrow({where:{id:f.lot.id}})).onHand).toBe(488);
  });
  it('releases before item replacement and rejects confirmation using deleted IDs',async()=>{

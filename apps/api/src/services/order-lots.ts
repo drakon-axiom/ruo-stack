@@ -12,7 +12,7 @@ export async function getOrderLotReadiness(tx:Reader,orderId:string){
  const rows=await tx.orderLotAllocation.findMany({where:{orderId,state:terminal?'shipped':'reserved'},include:{lot:{include:{coaRevision:true,product:true}}}});
  if(terminal)return rows.length?'ready':'untracked';
  const tracked=o.items.filter(i=>i.product.lotTracking);if(!tracked.length)return 'untracked';
- if(await tx.order.count({where:{traceabilityStatus:'exception',items:{some:{productId:{in:tracked.map(i=>i.productId)}}}}}))return 'exception';
+ if(await tx.order.count({where:{traceabilityStatus:'exception',traceabilityItems:{some:{productId:{in:tracked.map(i=>i.productId)}}}}}))return 'exception';
  if(!rows.length)return 'needs_allocation';
  for(const i of tracked)if(rows.filter(r=>r.orderItemId===i.id).reduce((s,r)=>s+r.qty,0)!==i.qty)return 'needs_allocation';
  if(rows.some(r=>!eligibleLot(r.lot)||!['reviewed','published'].includes(r.lot.coaRevision.status)||r.lot.product.status!=='in_stock'||!r.lot.product.isPublished||r.lot.product.archived))return 'exception';
@@ -40,6 +40,7 @@ export async function consumeConfirmedOrderLots(tx:LotTx,orderId:string,shipment
  if(readiness!=='ready'||(!physicalShipment&&o.blocker!=='none')){
   if(!physicalShipment)throw Conflict('lots_not_ready','Confirm eligible physical lots before shipping');
   await releaseLotReservations(tx,orderId,'system',`exception-release:${orderId}:${randomUUID()}`);
+  await tx.orderTraceabilityItem.createMany({data:o.items.filter(i=>i.product.lotTracking).map(i=>({orderId,orderItemId:i.id,productId:i.productId,qty:i.qty})),skipDuplicates:true});
   await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'exception',traceabilityReason:'Shipment reported without complete eligible warehouse lot confirmation'}});
   for(const productId of new Set(o.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
   await writeAudit(tx,{actorType:'system',actorId:null,action:'lots.shipment_exception',targetType:'order',targetId:orderId,after:{shipmentKey}});return;
@@ -61,11 +62,13 @@ export async function resolveShipmentLotException(tx:LotTx,orderId:string,alloca
  if(!['shipped','delivered'].includes(o.status)||o.traceabilityStatus!=='exception'||await tx.orderLotAllocation.count({where:{orderId,state:'shipped'}}))throw Conflict('not_exception','Only unresolved shipments can accept late lot evidence');
  await lockProducts(tx,o.items.map(i=>i.productId));
  const totals=new Map<string,number>();for(const a of allocations){if(!Number.isInteger(a.qty)||a.qty<=0)throw Conflict('invalid_quantity','Positive whole units required');totals.set(a.orderItemId,(totals.get(a.orderItemId)??0)+a.qty);}
- for(const i of o.items.filter(i=>i.product.lotTracking))if(totals.get(i.id)!==i.qty)throw Conflict('incomplete_evidence','Account for every tracked unit');
+ const scope=await tx.orderTraceabilityItem.findMany({where:{orderId}});if(!scope.length)throw Conflict('scope_missing','Exception scope requires reconciliation');
+ for(const i of scope)if(totals.get(i.orderItemId)!==i.qty)throw Conflict('incomplete_evidence','Account for every tracked unit');
  for(const a of allocations){const item=o.items.find(i=>i.id===a.orderItemId);const lot=await tx.productLot.findUnique({where:{id:a.lotId}});
- if(!item?.product.lotTracking||!lot||lot.productId!==item.productId||lot.onHand-lot.reserved<a.qty)throw Conflict('invalid_evidence','Lot/product or available balance does not match; reconcile physical stock first');
+ if(!item||!scope.some(i=>i.orderItemId===item.id)||!lot||lot.productId!==item.productId||lot.onHand-lot.reserved<a.qty)throw Conflict('invalid_evidence','Lot/product or available balance does not match; reconcile physical stock first');
+ await requireHistoricalRevision(tx,a.coaRevisionId,item.productId);
  await tx.productLot.update({where:{id:lot.id},data:{onHand:{decrement:a.qty}}});
- await tx.orderLotAllocation.create({data:{orderId,orderItemId:item.id,lotId:lot.id,coaRevisionId:lot.coaRevisionId,lotCode:lot.lotCode,sku:item.product.canonicalSku,wooLineId:item.wooLineId,qty:a.qty,state:'shipped',confirmedBy:actor,confirmedAt:new Date()}});
+ await tx.orderLotAllocation.create({data:{orderId,orderItemId:item.id,lotId:lot.id,coaRevisionId:a.coaRevisionId!,lotCode:lot.lotCode,sku:item.product.canonicalSku,wooLineId:item.wooLineId,qty:a.qty,state:'shipped',confirmedBy:actor,confirmedAt:new Date()}});
  await tx.lotMovement.create({data:{lotId:lot.id,kind:'ship',onHandDelta:-a.qty,reservedDelta:0,orderId,actorId:actor,reason:`Late warehouse evidence: ${reason}`,operationKey:`resolve:${orderId}`}});
  }
  await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'ready',traceabilityReason:`Late confirmation: ${reason}`}});
@@ -74,14 +77,20 @@ export async function resolveShipmentLotException(tx:LotTx,orderId:string,alloca
  await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lots.exception_resolved',targetType:'order',targetId:orderId,reason,after:{allocations}});
 }
 
-export async function amendShippedAllocation(tx:LotTx,orderId:string,allocationId:string,lotId:string,reason:string,actor:string,key:string){
+export async function amendShippedAllocation(tx:LotTx,orderId:string,allocationId:string,lotId:string,reason:string,actor:string,key:string,revisionId?:string){
  if(!reason.trim())throw Conflict('reason_required','Warehouse evidence is required');const order=await lockOrder(tx,orderId);
- const op=await operation(tx,key,{kind:'amend',orderId,allocationId,lotId,reason});if(op.prior)return;
+ const op=await operation(tx,key,{kind:'amend',orderId,allocationId,lotId,reason,revisionId});if(op.prior)return;
  const original=await tx.orderLotAllocation.findFirst({where:{id:allocationId,orderId,state:'shipped'},include:{lot:true,amendments:{orderBy:[{createdAt:'desc'},{id:'desc'}],take:1}}});
  if(!original||!['shipped','delivered'].includes(order.status))throw Conflict('not_shipped','Only shipped assignments can be amended');await lockProducts(tx,[original.lot.productId]);
  const previous=original.amendments[0];const fromId=previous?.lotId??original.lotId;const target=await tx.productLot.findUniqueOrThrow({where:{id:lotId}});
  if(target.productId!==original.lot.productId||target.onHand-target.reserved<original.qty&&fromId!==lotId)throw Conflict('invalid_correction','Corrected lot must match the product and have sufficient unreserved stock');
  if(fromId!==lotId){await tx.productLot.update({where:{id:fromId},data:{onHand:{increment:original.qty}}});await tx.productLot.update({where:{id:lotId},data:{onHand:{decrement:original.qty}}});for(const [id,delta] of [[fromId,original.qty],[lotId,-original.qty]] as const)await tx.lotMovement.create({data:{lotId:id,kind:'correction',onHandDelta:delta,reservedDelta:0,orderId,actorId:actor,reason,operationKey:key}});}
- const amendment=await tx.lotAllocationAmendment.create({data:{allocationId,lotId,coaRevisionId:target.coaRevisionId,lotCode:target.lotCode,actorId:actor,reason}});await saveOperation(tx,key,op.fingerprint,amendment.id);
+ await requireHistoricalRevision(tx,revisionId,target.productId);
+ const amendment=await tx.lotAllocationAmendment.create({data:{allocationId,lotId,coaRevisionId:revisionId!,lotCode:target.lotCode,actorId:actor,reason}});await saveOperation(tx,key,op.fingerprint,amendment.id);
  await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lots.shipped_amendment',targetType:'order',targetId:orderId,before:{allocationId,lotId:fromId},after:{amendmentId:amendment.id,lotId},reason});await enqueueCoaWriteback(tx,'shipment',orderId,`amendment:${amendment.id}`);await enqueueCoaWriteback(tx,'product',target.productId);
+}
+
+async function requireHistoricalRevision(tx:LotTx,id:string|undefined,productId:string){
+ if(!id)throw Conflict('revision_required','Select the certificate revision evidenced by the warehouse; do not infer it from the current lot');
+ const r=await tx.coaRevision.findUnique({where:{id},include:{document:true}});if(!r?.objectKey||r.document.productId!==productId||!['reviewed','published','withdrawn'].includes(r.status))throw Conflict('invalid_revision','Certificate revision must be a reviewed report for the evidenced product');
 }

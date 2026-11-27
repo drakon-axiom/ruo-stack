@@ -66,10 +66,14 @@ export class CoaDocuments {
  withdrawCoaRevision(actor:CoaActor,id:string,reason:string){if(!reason.trim())throw BadRequest('reason_required','Withdrawal requires a reason');return this.transition(actor,id,['published','reviewed'],'withdrawn',reason);}
  async download(actor:CoaActor,id:string){authorize(actor,'view');const row=await this.db.coaRevision.findUnique({where:{id}});if(!row?.objectKey)throw NotFound();return this.storage.signDownload(row.objectKey,300);}
  async cleanupAbandonedUploads(){
-  const rows=await this.db.coaRevision.findMany({where:{status:'draft',createdAt:{lt:new Date(Date.now()-86400000)}},take:100});
-  for(const row of rows){const changed=await this.db.coaRevision.updateMany({where:{id:row.id,status:'draft',objectKey:null},data:{status:'abandoned'}});if(changed.count)await this.storage.remove(row.uploadKey);}
-  // Only staging keys are cleaned here. Immutable keys are never candidates.
-  const finals=await this.db.coaRevision.findMany({where:{objectKey:{not:null},createdAt:{lt:new Date(Date.now()-86400000)}},take:100});
-  for(const row of finals)await this.storage.remove(row.uploadKey);
+  const now=new Date();
+  const rows=await this.db.coaRevision.findMany({where:{uploadCleanedAt:null,createdAt:{lt:new Date(Date.now()-86400000)},AND:[{OR:[{nextCleanupAt:null},{nextCleanupAt:{lte:now}}]},{OR:[{status:{in:['draft','abandoned']}},{objectKey:{not:null}}]}]},orderBy:[{createdAt:'asc'},{id:'asc'}],take:100});
+  let cleaned=0,failed=0;
+  for(const row of rows){
+   if(row.status==='draft'){const changed=await this.db.coaRevision.updateMany({where:{id:row.id,status:'draft',objectKey:null},data:{status:'abandoned'}});if(!changed.count)continue;}
+   try{await this.storage.remove(row.uploadKey);await this.db.coaRevision.update({where:{id:row.id},data:{uploadCleanedAt:new Date(),nextCleanupAt:null}});cleaned++;}
+   catch{failed++;await this.db.coaRevision.update({where:{id:row.id},data:{cleanupAttempts:{increment:1},nextCleanupAt:new Date(Date.now()+Math.min(86400000,60000*2**Math.min(row.cleanupAttempts,10)))}});}
+  }
+  return {cleaned,failed};
  }
 }

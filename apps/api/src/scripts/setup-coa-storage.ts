@@ -1,12 +1,12 @@
+import {validateCoaStorageBoundary} from '../services/coa-storage-policy.ts';
 import { COA_MAX_BYTES } from '@ruostack/shared';
 import { getClients } from '../clients.ts';
 import { COA_BUCKET } from '../services/coa-storage.ts';
 const {supabaseAdmin,prisma}=getClients();
-const policies=await prisma.$queryRaw<{tablename:string;cmd:string;qual:string|null;with_check:string|null}[]>`SELECT tablename,cmd,qual,with_check FROM pg_policies WHERE schemaname='storage' AND permissive='PERMISSIVE' AND roles && ARRAY['anon','authenticated','public']::name[]`;
-for(const p of policies){
- const clauses=[p.qual,p.with_check].filter((v):v is string=>!!v);
- if(p.tablename!=='objects'||!['INSERT','UPDATE'].includes(p.cmd)||!clauses.length||clauses.some(v=>!v.startsWith("((bucket_id = 'brand-logos'::text) AND ")))throw new Error('Unrecognized permissive Storage policy; review COA bucket access before provisioning');
-}
+const policies=await prisma.$queryRaw<{tablename:string;policyname:string;cmd:string;qual:string|null;with_check:string|null}[]>`SELECT tablename,policyname,cmd,qual,with_check FROM pg_policies p WHERE schemaname='storage' AND permissive='PERMISSIVE' AND EXISTS (SELECT 1 FROM unnest(p.roles) r WHERE CASE WHEN r='public' THEN true ELSE pg_has_role('anon',r,'MEMBER') OR pg_has_role('authenticated',r,'MEMBER') END)`;
+const tables=await prisma.$queryRaw<{relname:string;relrowsecurity:boolean}[]>`SELECT c.relname,c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='storage' AND c.relname IN ('objects','buckets')`;
+const roles=await prisma.$queryRaw<{unsafe:boolean}[]>`SELECT EXISTS(SELECT 1 FROM pg_roles WHERE (rolbypassrls OR rolsuper) AND (pg_has_role('anon',rolname,'MEMBER') OR pg_has_role('authenticated',rolname,'MEMBER'))) AS unsafe`;
+validateCoaStorageBoundary({objectsRls:tables.some(t=>t.relname==='objects'&&t.relrowsecurity),bucketsRls:tables.some(t=>t.relname==='buckets'&&t.relrowsecurity),bypass:roles[0]?.unsafe??true,policies});
 await prisma.$disconnect();
 const {data,error}=await supabaseAdmin.storage.getBucket(COA_BUCKET);
 if(error && !['404','400'].includes(String(error.statusCode)))throw error;

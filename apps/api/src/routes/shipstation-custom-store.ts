@@ -1,5 +1,6 @@
+import {prepareShipstationExport} from '../services/shipstation-export.ts';
 import { enqueueCoaWriteback } from '../services/coa-outbox.ts';
-import { consumeConfirmedOrderLots, getOrderLotReadiness } from '../services/order-lots.ts';
+import { consumeConfirmedOrderLots } from '../services/order-lots.ts';
 import { lockOrder } from '../services/lot-inventory.ts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
@@ -98,33 +99,10 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
     });
 
     const orders = [];
-    for (const candidate of candidates) {
-      const readiness = await getOrderLotReadiness(prisma,candidate.id);
-      if (['shipped','delivered','cancelled'].includes(candidate.status) || readiness==='untracked' || readiness==='ready') orders.push(candidate);
-    }
+    for(const candidate of candidates){const current=await prepareShipstationExport(prisma,candidate.id);if(current)orders.push(current);}
     const xml = `<?xml version="1.0" encoding="utf-8"?>\n<Orders pages="${pages}">\n${orders
       .map(buildOrderXml)
       .join('\n')}\n</Orders>\n`;
-
-    // Stamp exportedAt on first export of fulfillable (paid) orders → powers the
-    // "At ShipStation" indicator. (Don't mark on_hold/cancelled/already-shipped.)
-    const firstSeen = orders
-      .filter((o) => !o.exportedAt && shipstationStatus(o) === 'paid')
-      .map((o) => o.id);
-    if (firstSeen.length > 0) {
-      const now = new Date();
-      await prisma.order.updateMany({ where: { id: { in: firstSeen } }, data: { exportedAt: now } });
-      for (const id of firstSeen) {
-        await writeAudit(prisma, {
-          actorType: 'system',
-          actorId: null,
-          action: AUDIT_ACTIONS.orderExported,
-          targetType: 'order',
-          targetId: id,
-          ip: req.ip,
-        });
-      }
-    }
 
     return reply.header('content-type', 'application/xml; charset=utf-8').send(xml);
   });

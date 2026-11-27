@@ -6,11 +6,15 @@ export function publicCoaUrl(id:string){const base=loadConfig().PUBLIC_API_BASE_
 export async function readPublicCoa(db:PrismaClient,publicId:string){
  const r=await db.coaRevision.findUnique({where:{publicId},include:{document:{include:{product:true}}}});
  if(!r||(!['published','withdrawn'].includes(r.status))||!r.publishedAt)throw NotFound();
- return {publicId:r.publicId,product:r.document.product.name,reportNumber:r.reportNumber,lab:r.lab,testDate:r.testDate.toISOString().slice(0,10),status:r.status,withdrawalReason:r.status==='withdrawn'?r.withdrawalReason:null,sha256:r.sha256};
+ return {publicId:r.publicId,product:r.document.product.name,reportNumber:r.reportNumber,lab:r.lab,testDate:r.testDate.toISOString().slice(0,10),status:r.status,withdrawalReason:r.status==='withdrawn'?'This report has been withdrawn. Contact the supplier.':null,sha256:r.sha256};
 }
 export async function readOrderCoas(db:PrismaClient,brandId:string,orderId:string){
  const order=await db.order.findFirst({where:{id:orderId,brandId}});if(!order)throw NotFound();
  const shipped=['shipped','delivered'].includes(order.status);
  const rows=shipped?await db.orderLotAllocation.findMany({where:{orderId,state:'shipped'},include:{coaRevision:true,amendments:{orderBy:[{createdAt:'desc'},{id:'desc'}],take:1,include:{coaRevision:true}}},orderBy:{createdAt:'asc'}}):[];
- return {readiness:await getOrderLotReadiness(db,orderId),reason:order.traceabilityReason,allocations:rows.map(original=>{const amendment=original.amendments[0];const r=amendment?{...original,lotCode:amendment.lotCode,coaRevisionId:amendment.coaRevisionId,coaRevision:amendment.coaRevision}:original;return ({originalLotCode:amendment?original.lotCode:null,correctionReason:amendment?.reason??null,id:r.id,sku:r.sku,qty:r.qty,lotCode:r.lotCode,revisionId:r.coaRevisionId,reportNumber:r.coaRevision.reportNumber,lab:r.coaRevision.lab,testDate:r.coaRevision.testDate.toISOString().slice(0,10),status:r.coaRevision.status,url:r.coaRevision.status==='published'?publicCoaUrl(r.coaRevision.publicId):null});})};
+ return {readiness:await getOrderLotReadiness(db,orderId),reason:order.traceabilityReason,allocations:rows.map(original=>{const amendment=original.amendments[0];const r=amendment?{...original,lotCode:amendment.lotCode,coaRevisionId:amendment.coaRevisionId,coaRevision:amendment.coaRevision}:original;return ({downloadPath:r.coaRevision.status!=='withdrawn'?`/api/brand/orders/${orderId}/coas/${r.id}/download`:null,originalLotCode:amendment?original.lotCode:null,correctionReason:amendment?.reason??null,id:r.id,sku:r.sku,qty:r.qty,lotCode:r.lotCode,revisionId:r.coaRevisionId,reportNumber:r.coaRevision.reportNumber,lab:r.coaRevision.lab,testDate:r.coaRevision.testDate.toISOString().slice(0,10),status:r.coaRevision.status,url:r.coaRevision.status==='published'?publicCoaUrl(r.coaRevision.publicId):null});})};
+}
+
+export async function brandCertificateKey(db:PrismaClient,brandId:string,orderId:string,allocationId:string){
+ const row=await db.orderLotAllocation.findFirst({where:{id:allocationId,orderId,state:'shipped',order:{brandId,status:{in:['shipped','delivered']}}},include:{coaRevision:true,amendments:{orderBy:[{createdAt:'desc'},{id:'desc'}],take:1,include:{coaRevision:true}}}});if(!row)throw NotFound();const revision=row.amendments[0]?.coaRevision??row.coaRevision;if(!['reviewed','published'].includes(revision.status)||!revision.objectKey)throw NotFound('Certificate unavailable or withdrawn');return revision.objectKey;
 }

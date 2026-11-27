@@ -1,0 +1,5 @@
+import type {PrismaClient} from '@ruostack/db';
+export async function lotImpact(db:PrismaClient,lotId:string,offset=0,limit=25){
+ const where={OR:[{lotId},{amendments:{some:{lotId}}}]};const [rows,total]=await Promise.all([db.orderLotAllocation.findMany({where,skip:offset,take:limit,orderBy:[{createdAt:'desc'},{id:'asc'}],include:{order:{select:{id:true,status:true,traceabilityStatus:true}},amendments:{orderBy:{createdAt:'desc'}}}}),db.orderLotAllocation.count({where})]);return {total,rows:rows.map(r=>({allocationId:r.id,orderId:r.orderId,qty:r.qty,allocationState:r.state,status:r.order.status,traceabilityStatus:r.order.traceabilityStatus,originalLot:r.lotCode,amendments:r.amendments.map(m=>({lotId:m.lotId,lotCode:m.lotCode,reason:m.reason}))}))};
+}
+export async function lotExceptions(db:PrismaClient,offset=0,limit=25){const where={traceabilityStatus:'exception'};const [orders,total]=await Promise.all([db.order.findMany({where,skip:offset,take:limit,orderBy:[{createdAt:'asc'},{id:'asc'}],select:{id:true,status:true,createdAt:true,traceabilityReason:true,traceabilityItems:true}}),db.order.count({where})]);return {orders,total};}

@@ -181,6 +181,8 @@ export async function importWooOrder(
           wholesaleTotalCents: wholesaleTotal,
           shippingTotalCents: shipping,
           walletChargeCents: walletCharge,
+          originStoreId: connection.id,
+          originStoreUrl: connection.storeUrl,
           sourceItems: sourceItems as unknown as Prisma.InputJsonValue,
           unmatchedSkus,
           ...(serviceCode ? { shippingServiceCode: serviceCode } : {}),

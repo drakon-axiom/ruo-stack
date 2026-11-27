@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { getPrisma } from '@ruostack/db';
 import { lotFixture } from '../helpers/lot-fixture.ts';
-import { readOrderCoas, readPublicCoa } from '../../src/services/coa-views.ts';
+import { brandCertificateKey, readOrderCoas, readPublicCoa } from '../../src/services/coa-views.ts';
 import { confirmOrderLots, consumeConfirmedOrderLots } from '../../src/services/order-lots.ts';
 const db=getPrisma();
 describe.skipIf(process.env.RUN_DB_TESTS!=='1')('certificate access',()=>{
@@ -17,8 +17,8 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='1')('certificate access',()=>{
  const f=await lotFixture();const o=await f.order(3);await expect(readOrderCoas(db,randomUUID(),o.id)).rejects.toMatchObject({statusCode:404});
  expect((await readOrderCoas(db,f.b.id,o.id)).allocations).toEqual([]);
  await db.$transaction(async tx=>{await confirmOrderLots(tx,o.id,[{orderItemId:o.items[0]!.id,lotId:f.lot.id,qty:3}],'test',randomUUID());await consumeConfirmedOrderLots(tx,o.id,'ship');await tx.order.update({where:{id:o.id},data:{status:'shipped'}});});
- const result=await readOrderCoas(db,f.b.id,o.id);expect(result.allocations[0]).toMatchObject({qty:3,revisionId:f.c.id,lotCode:f.lot.lotCode});
- await db.coaRevision.update({where:{id:f.c.id},data:{status:'withdrawn'}});expect((await readOrderCoas(db,f.b.id,o.id)).allocations[0]).toMatchObject({revisionId:f.c.id,status:'withdrawn',url:null});
+ const result=await readOrderCoas(db,f.b.id,o.id);const allocationId=result.allocations[0]!.id;expect(await brandCertificateKey(db,f.b.id,o.id,allocationId)).toBe(f.c.objectKey);await expect(brandCertificateKey(db,randomUUID(),o.id,allocationId)).rejects.toMatchObject({statusCode:404});expect(result.allocations[0]).toMatchObject({qty:3,revisionId:f.c.id,lotCode:f.lot.lotCode});
+ await db.coaRevision.update({where:{id:f.c.id},data:{status:'withdrawn'}});await expect(brandCertificateKey(db,f.b.id,o.id,allocationId)).rejects.toMatchObject({statusCode:404});expect((await readOrderCoas(db,f.b.id,o.id)).allocations[0]).toMatchObject({revisionId:f.c.id,status:'withdrawn',url:null});
  const legacy=await f.order(1);await db.order.update({where:{id:legacy.id},data:{status:'shipped'}});expect((await readOrderCoas(db,f.b.id,legacy.id)).readiness).toBe('untracked');
  });
 });

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getClients } from '../clients.ts';
 import { requireAdmin } from '../middleware/guards.ts';
-import { changeLotCertificate, ReceiveLotSchema, receiveLot, adjustLot, setLotState, lockProducts } from '../services/lot-inventory.ts';
+import { enableLotTracking, changeLotCertificate, ReceiveLotSchema, receiveLot, adjustLot, setLotState, lockProducts } from '../services/lot-inventory.ts';
 import { Conflict } from '../errors.ts';
 import { writeAudit } from '../audit.ts';
 export async function adminLotRoutes(app:FastifyInstance){
@@ -25,12 +25,6 @@ export async function adminLotRoutes(app:FastifyInstance){
  });
  app.post('/api/admin/catalog/:id/enable-lot-tracking',{preHandler:requireAdmin('catalog','write')},async req=>{
  const {id}=params.parse(req.params);const {reason}=z.object({reconciled:z.literal(true),reason:z.string().trim().min(1).max(1000)}).parse(req.body);
- await prisma.$transaction(async tx=>{
- await lockProducts(tx,[id]);if(!await tx.productLot.count({where:{productId:id}}))throw Conflict('opening_stock_required','Receive reconciled opening stock before enabling tracking');
- // Exported open orders may already be packed without lot records. Finish or
- // explicitly recall those from the warehouse before enabling this SKU.
- if(await tx.order.count({where:{items:{some:{productId:id}},status:{in:['ready_for_fulfillment','processing']},exportedAt:{not:null}}}))throw Conflict('exported_orders','Resolve exported open orders before enabling lot tracking');
- await tx.catalogProduct.update({where:{id},data:{lotTracking:true}});await writeAudit(tx,{actorType:'admin',actorId:req.admin!.adminUserId,action:'lot.tracking_enabled',targetType:'catalog_product',targetId:id,reason});
- });return {ok:true};
+ await prisma.$transaction(tx=>enableLotTracking(tx,id,reason,req.admin!.adminUserId));return {ok:true};
  });
 }
