@@ -1,3 +1,4 @@
+import { releaseLotReservations } from '../services/lot-inventory.ts';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
@@ -241,6 +242,7 @@ export async function brandOrderRoutes(app: FastifyInstance): Promise<void> {
         data: { status: 'cancelled', blocker: 'none' },
       });
       if (gate.count === 0) throw Conflict('not_cancellable', 'Order can no longer be cancelled — it may have shipped');
+      await releaseLotReservations(tx,id,userId,`cancel:${id}`);
       await writeAudit(tx, {
         actorType: 'brand',
         actorId: userId,

@@ -1,3 +1,4 @@
+import { OrderLots } from './fulfillment/OrderLots.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canWrite, fulfillmentState, FULFILLMENT_META } from '@ruostack/shared';
 import { api, ApiError } from '../lib/api.js';
@@ -39,6 +40,7 @@ const isPreShip = (o: Order) => o.status === 'ready_for_fulfillment' || o.status
 type Filter = 'ready_for_fulfillment' | 'processing' | 'shipped' | 'delivered' | 'all';
 
 export function Fulfillment() {
+  const [lotOrder,setLotOrder]=useState<string|null>(null);
   const { claims } = useAuth();
   const writable = claims ? canWrite(claims.role, 'fulfillment') : false;
   const [orders, setOrders] = useState<Order[]>([]);
@@ -102,6 +104,7 @@ export function Fulfillment() {
       minWidth: 260,
       cell: (o) => (
         <>
+          <Button variant="ghost" size="sm" onClick={()=>setLotOrder(o.id)}>Lots / COAs</Button>
           {writable && isPreShip(o) && (
             <div className="flex items-center justify-end gap-1.5">
               <Button variant="ghost" size="sm" onClick={() => setEditing(o)}>
@@ -164,6 +167,7 @@ export function Fulfillment() {
         empty={<EmptyState title="Nothing here" hint="No orders in this state." />}
       />
 
+      {lotOrder && <OrderLots key={lotOrder} orderId={lotOrder} writable={writable} onClose={()=>{setLotOrder(null);void load();}} />}
       {shipping && <ShipModal order={shipping} onClose={() => setShipping(null)} onShipped={() => { setShipping(null); load(); }} />}
       {editing && <EditDrawer order={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </>

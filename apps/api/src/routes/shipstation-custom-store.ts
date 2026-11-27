@@ -1,3 +1,5 @@
+import { consumeConfirmedOrderLots, getOrderLotReadiness } from '../services/order-lots.ts';
+import { lockOrder } from '../services/lot-inventory.ts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
 import { Prisma } from '@ruostack/db';
@@ -86,7 +88,7 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
     };
     const total = await prisma.order.count({ where });
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    const orders = await prisma.order.findMany({
+    const candidates = await prisma.order.findMany({
       where,
       orderBy: { updatedAt: 'asc' },
       skip: (q.page - 1) * PAGE_SIZE,
@@ -94,6 +96,11 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
       include: { brand: { select: { brandName: true } }, items: { include: { product: true } } },
     });
 
+    const orders = [];
+    for (const candidate of candidates) {
+      const readiness = await getOrderLotReadiness(prisma,candidate.id);
+      if (['shipped','delivered','cancelled'].includes(candidate.status) || readiness==='untracked' || readiness==='ready') orders.push(candidate);
+    }
     const xml = `<?xml version="1.0" encoding="utf-8"?>\n<Orders pages="${pages}">\n${orders
       .map(buildOrderXml)
       .join('\n')}\n</Orders>\n`;
@@ -172,6 +179,9 @@ export async function shipstationCustomStoreRoutes(app: FastifyInstance): Promis
     // Conditional transition: only ship an order still in a pre-ship state, so a
     // cancel that raced in between the reads above and here isn't overwritten.
     const gated = await prisma.$transaction(async (tx) => {
+      const locked = await lockOrder(tx,order.id);
+      if (!['ready_for_fulfillment','processing'].includes(locked.status)) return null;
+      await consumeConfirmedOrderLots(tx,order.id,`shipstation:${order.id}`,true);
       const g = await tx.order.updateMany({
         where: { id: order.id, status: { in: ['ready_for_fulfillment', 'processing'] } },
         data: {

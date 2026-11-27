@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { lockOrder, releaseLotReservations } from './lot-inventory.ts';
 import type { Prisma, PrismaClient } from '@ruostack/db';
 import { AUDIT_ACTIONS, type OrderEdit, wholesaleFieldFor } from '@ruostack/shared';
 import { writeAudit } from '../audit.ts';
@@ -88,6 +90,8 @@ export async function applyOrderEdit(
 
   return prisma.$transaction(async (tx) => {
     await lockBrandWallet(tx, order.brandId);
+    const current = await lockOrder(tx, order.id);
+    if (!['ready_for_fulfillment','processing'].includes(current.status)) throw BadRequest('not_editable','Order can no longer be edited');
     // Blocker precedence (same as intake): address > unmapped SKUs > funds. An
     // edit must NOT clear a needs_address / needs_mapping order just because funds
     // now cover it — unmatchedSkus persist on the order until it's remapped, and
@@ -99,10 +103,11 @@ export async function applyOrderEdit(
       blocker = 'needs_mapping';
     } else {
       const { available } = await getWalletSummary(tx, order.brandId);
-      const reservedSelf = order.blocker === 'none' ? order.walletChargeCents : 0;
+      const reservedSelf = current.blocker === 'none' ? current.walletChargeCents : 0;
       blocker = available + reservedSelf >= walletCharge ? 'none' : 'awaiting_funds';
     }
 
+    await releaseLotReservations(tx, order.id, actor.id ?? 'system', `edit:${order.id}:${randomUUID()}`);
     await tx.orderItem.deleteMany({ where: { orderId: order.id } });
     const updated = await tx.order.update({
       where: { id: order.id },

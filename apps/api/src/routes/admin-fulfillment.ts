@@ -1,3 +1,4 @@
+import { consumeConfirmedOrderLots } from '../services/order-lots.ts';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, OrderEditSchema, OrderShipSchema } from '@ruostack/shared';
@@ -149,6 +150,7 @@ export async function adminFulfillmentRoutes(app: FastifyInstance): Promise<void
 
     const carrier = body.carrier ?? order.shippingCarrier ?? 'USPS';
     const shipped = await prisma.$transaction(async (tx) => {
+      await consumeConfirmedOrderLots(tx,id,`manual-ship:${id}`);
       // Conditional transition: only ship an order still in a pre-ship state, so a
       // cancel that raced in between the read above and here isn't overwritten.
       const gate = await tx.order.updateMany({

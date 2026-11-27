@@ -44,10 +44,11 @@ export async function setLotState(tx:LotTx,id:string,state:'released'|'quarantin
 export function eligibleLot(lot:ProductLot){return lot.state==='released'&&(!lot.expiresAt||lot.expiresAt>new Date());}
 export async function reserveLots(tx:LotTx,orderId:string,raw:AllocationInput[],actor:string,key:string){
  const allocations=z.array(AllocationSchema).min(1).max(200).parse(raw).sort((a,b)=>a.orderItemId.localeCompare(b.orderItemId)||a.lotId.localeCompare(b.lotId));
+ let order=await lockOrder(tx,orderId);
  const op=await operation(tx,key,{kind:'reserve',orderId,allocations});if(op.prior)return;
- const order=await lockOrder(tx,orderId);
  if(!['ready_for_fulfillment','processing'].includes(order.status)||order.blocker!=='none')throw Conflict('order_not_released','Resolve order blockers before allocating lots');
  await lockProducts(tx,order.items.map(i=>i.productId));
+ order=await lockOrder(tx,orderId);
  if(await tx.orderLotAllocation.count({where:{orderId,state:'reserved'}}))throw Conflict('already_allocated','Release previous reservations before allocating');
  const seen=new Set<string>();const totals=new Map<string,number>();
  for(const a of allocations){const pair=`${a.orderItemId}:${a.lotId}`;if(seen.has(pair))throw Conflict('duplicate_allocation','Combine quantities for the same item and lot');seen.add(pair);totals.set(a.orderItemId,(totals.get(a.orderItemId)??0)+a.qty);}
@@ -63,8 +64,9 @@ export async function reserveLots(tx:LotTx,orderId:string,raw:AllocationInput[],
  await tx.order.update({where:{id:orderId},data:{traceabilityStatus:'needs_confirmation'}});await saveOperation(tx,key,op.fingerprint,orderId);
 }
 export async function releaseLotReservations(tx:LotTx,orderId:string,actor:string,key:string){
+ const order=await lockOrder(tx,orderId);
  const op=await operation(tx,key,{kind:'release',orderId});if(op.prior)return;
- const order=await lockOrder(tx,orderId);const rows=await tx.orderLotAllocation.findMany({where:{orderId,state:'reserved'},include:{lot:true},orderBy:{lotId:'asc'}});
+ const rows=await tx.orderLotAllocation.findMany({where:{orderId,state:'reserved'},include:{lot:true},orderBy:{lotId:'asc'}});
  await lockProducts(tx,rows.map(r=>r.lot.productId));
  for(const r of rows){await tx.productLot.update({where:{id:r.lotId},data:{reserved:{decrement:r.qty}}});await tx.orderLotAllocation.update({where:{id:r.id},data:{state:'released'}});await tx.lotMovement.create({data:{lotId:r.lotId,kind:'release',onHandDelta:0,reservedDelta:-r.qty,orderId,actorId:actor,reason:'Order reservation released',operationKey:key}});}
  if(!['shipped','delivered'].includes(order.status))await tx.order.update({where:{id:orderId},data:{traceabilityStatus:order.items.some(i=>i.product.lotTracking)?'needs_allocation':'untracked'}});
