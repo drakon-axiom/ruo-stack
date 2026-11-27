@@ -4,6 +4,11 @@ export type ActorType = (typeof ACTOR_TYPES)[number];
 
 /** Canonical action strings written on every mutating admin / sensitive brand action. */
 export const AUDIT_ACTIONS = {
+  coaUploadCreated: 'coa.upload_created',
+  coaFinalized: 'coa.finalized',
+  coaReviewed: 'coa.reviewed',
+  coaPublished: 'coa.published',
+  coaWithdrawn: 'coa.withdrawn',
   catalogCreated: 'catalog.created',
   catalogUpdated: 'catalog.updated',
   catalogPublished: 'catalog.published',

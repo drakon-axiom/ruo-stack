@@ -20,6 +20,7 @@ import { adminAuthRoutes } from './routes/admin-auth.ts';
 import { adminFulfillmentRoutes } from './routes/admin-fulfillment.ts';
 import { adminOverviewRoutes } from './routes/admin-overview.ts';
 import { adminBrandRoutes } from './routes/admin-brands.ts';
+import { adminCoaRoutes } from './routes/admin-coas.ts';
 import { adminCatalogRoutes } from './routes/admin-catalog.ts';
 import { adminCatalogImportRoutes } from './routes/admin-catalog-import.ts';
 import { adminUsersRoutes } from './routes/admin-users.ts';
@@ -97,6 +98,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(shippingRatesRoutes);
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
+  await app.register(adminCoaRoutes);
   await app.register(adminCatalogImportRoutes);
   await app.register(adminUsersRoutes);
   await app.register(adminFulfillmentRoutes);

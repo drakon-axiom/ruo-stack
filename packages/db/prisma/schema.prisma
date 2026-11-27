@@ -368,6 +368,7 @@ model CatalogProduct {
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
+  coaDocuments CoaDocument[]
   brandPrices   BrandProductPrice[]
   orderItems    OrderItem[]
   aliases       ProductAlias[]
@@ -989,4 +990,38 @@ model ProductProvisioning {
   @@unique([connectionId, wooProductId])
   @@index([brandId])
   @@map("product_provisioning")
+}
+
+model CoaDocument {
+ id String @id @default(uuid()) @db.Uuid
+ productId String @map("product_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at")
+ product CatalogProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+ revisions CoaRevision[]
+ @@index([productId])
+ @@map("coa_document")
+}
+model CoaRevision {
+ id String @id @default(uuid()) @db.Uuid
+ documentId String @map("document_id") @db.Uuid
+ publicId String @unique @default(uuid()) @map("public_id") @db.Uuid
+ uploadKey String @unique @map("upload_key")
+ objectKey String? @unique @map("object_key")
+ filename String
+ sizeBytes Int @map("size_bytes")
+ sha256 String?
+ lab String
+ reportNumber String @map("report_number")
+ testDate DateTime @map("test_date") @db.Date
+ status String @default("draft")
+ uploadedBy String @map("uploaded_by") @db.Uuid
+ reviewedBy String? @map("reviewed_by") @db.Uuid
+ reviewedAt DateTime? @map("reviewed_at")
+ publishedAt DateTime? @map("published_at")
+ withdrawalReason String? @map("withdrawal_reason")
+ createdAt DateTime @default(now()) @map("created_at")
+ document CoaDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+ @@index([documentId, createdAt])
+ @@index([status, createdAt])
+ @@map("coa_revision")
 }

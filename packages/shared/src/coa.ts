@@ -13,3 +13,17 @@ export const CoaReferenceSchema = z.string().trim().max(2048).refine(value =>
   !value || classifyLegacyCoa(value).kind === 'url' || (value.length <= 120 && !/^[a-z][a-z\d+.-]*:|[\/\\]/i.test(value)),
   'Use an HTTPS URL without credentials, or a plain COA reference (up to 120 characters)',
 );
+
+export const CoaUploadSchema = z.object({
+ productId:z.string().uuid(), documentId:z.string().uuid().optional(),
+ filename:z.string().trim().min(1).max(200).regex(/\.pdf$/i),
+ sizeBytes:z.number().int().positive().max(COA_MAX_BYTES),
+ lab:z.string().trim().min(1).max(200),reportNumber:z.string().trim().min(1).max(200),
+ testDate:z.string().date(),
+});
+export type CoaUploadInput=z.infer<typeof CoaUploadSchema>;
+export interface CoaRevisionDto {
+ id:string;documentId:string;publicId:string;filename:string;sizeBytes:number;
+ lab:string;reportNumber:string;testDate:string;status:string;createdAt:string;
+ sha256:string|null;withdrawalReason:string|null;
+}
