@@ -667,7 +667,7 @@ function EditDrawer({
         <Field label="Weight">
           <Input value={weight} disabled={!writable} onChange={(e) => setWeight(e.target.value)} />
         </Field>
-        <Field label="COA id">
+        <Field label="Legacy COA URL or reference">
           <Input value={coa} disabled={!writable} onChange={(e) => setCoa(e.target.value)} />
         </Field>
       </div>

@@ -1,3 +1,4 @@
+import { CoaReferenceSchema } from './coa.ts';
 import { z } from 'zod';
 import { ADMIN_ROLES } from './realm.ts';
 
@@ -72,7 +73,7 @@ export const CatalogCreateSchema = z.object({
   width: z.number().nonnegative().optional(),
   height: z.number().nonnegative().optional(),
   packaging_rule: z.string().max(200).optional(),
-  coa_id: z.string().max(120).optional(),
+  coa_id: CoaReferenceSchema.optional(),
   images: z.array(z.string().url()).default([]),
 });
 export type CatalogCreate = z.infer<typeof CatalogCreateSchema>;

@@ -1,3 +1,4 @@
+import { classifyLegacyCoa } from '@ruostack/shared';
 import { useEffect, useState } from 'react';
 import {
   Badge,
@@ -37,14 +38,17 @@ function CopyLink({ value }: { value: string }) {
   );
 }
 
-// Certificates of Analysis — third-party batch testing, set by the operator per
-// product (CatalogProduct.coaId). Brands can view + share these with customers.
+// Legacy references remain visible without asserting laboratory verification.
 export function Coas() {
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [products, setProducts] = useState<Product[] | null>(null);
 
   useEffect(() => {
-    api<{ products: Product[] }>('/api/brand/catalog').then((r) => setProducts(r.products));
-  }, []);
+    let active = true; setError(false); setProducts(null);
+    api<{ products: Product[] }>('/api/brand/catalog').then((r) => { if (active) setProducts(r.products); }).catch(() => { if (active) { setError(true); setProducts([]); } });
+    return () => { active = false; };
+  }, [attempt]);
 
   const withCoa = (products ?? []).filter((p) => p.coaId);
 
@@ -59,9 +63,8 @@ export function Coas() {
       key: 'status',
       header: 'Status',
       cell: () => (
-        <Badge tone="success">
-          <Check aria-hidden className="h-3 w-3" />
-          Third-party verified
+        <Badge tone="neutral">
+          Legacy reference
         </Badge>
       ),
     },
@@ -69,7 +72,7 @@ export function Coas() {
       key: 'cert',
       header: 'Certificate',
       align: 'right',
-      cell: (p) => (
+      cell: (p) => classifyLegacyCoa(p.coaId).kind !== 'url' ? <span>{p.coaId}</span> : (
         <div className="flex items-center justify-end gap-2">
           <a
             className={buttonClass('ghost', 'sm')}
@@ -89,7 +92,7 @@ export function Coas() {
     <>
       <PageHeader
         title="Certificates of Analysis"
-        subtitle="Every product is independently third-party verified. Share these COAs with your customers for transparency."
+        subtitle="Available certificates and legacy references. A reference alone is not verification."
       />
 
       <DataTable
@@ -98,10 +101,10 @@ export function Coas() {
         rows={withCoa}
         rowKey={(p) => p.id}
         loading={products === null}
-        empty={
+        empty={error ? <EmptyState title="Could not load COAs" action={<Button onClick={() => setAttempt(a => a + 1)}>Retry</Button>} /> :
           <EmptyState
             title="No COAs available yet"
-            hint="Certificates appear here as products are batch-tested. Check back soon."
+            hint="Documents and references appear here when added to the catalog."
           />
         }
       />

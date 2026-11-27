@@ -1,3 +1,4 @@
+import { CoaReferenceSchema } from './coa.ts';
 import { buildCsv } from './csv.ts';
 
 /**
@@ -102,7 +103,7 @@ const COLUMN_SPEC: Record<ImportColumn, ColumnSpec> = {
   width: { kind: 'number', existing: 'width' },
   height: { kind: 'number', existing: 'height' },
   packaging_rule: { kind: 'string', max: 200, existing: 'packagingRule' },
-  coa_id: { kind: 'string', max: 120, existing: 'coaId' },
+  coa_id: { kind: 'string', max: 2048, existing: 'coaId' },
   images: { kind: 'urls', existing: 'images' },
 };
 
@@ -285,6 +286,7 @@ function coerce(col: ImportColumn, raw: string): { value: unknown } | { error: R
       return { value: urls };
     }
     default: {
+      if (col === 'coa_id' && !CoaReferenceSchema.safeParse(v).success) return { error: { field: col, code: 'bad_url', message: 'Use a safe HTTPS URL or a plain COA reference.' } };
       if (spec.max !== undefined && v.length > spec.max) {
         return { error: { field: col, code: 'too_long', message: `This value is ${v.length} characters; the limit is ${spec.max}.` } };
       }

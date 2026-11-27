@@ -15,3 +15,5 @@ export * from './announcements.ts';
 export * from './provisioning.ts';
 export * from './csv.ts';
 export * from './catalog-import.ts';
+
+export * from './coa.ts';

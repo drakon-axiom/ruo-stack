@@ -21,7 +21,7 @@ export const WELCOME_SLIDES: readonly WelcomeSlide[] = [
   },
   {
     title: 'The catalog is your product line',
-    body: 'Browse the research peptide catalog, set your own retail price on each product, and push them to your store. Every product carries a COA you can hand to customers.',
+    body: 'Browse the research peptide catalog, set your own retail price on each product, and push them to your store. View available COA documents and references in the COAs section.',
   },
   {
     title: 'Orders run themselves',
