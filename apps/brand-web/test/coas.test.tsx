@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { Coas } from '../src/screens/Coas.js';
 const f=vi.hoisted(()=>({api:vi.fn()}));
 vi.mock('../src/lib/api.js',()=>({api:f.api}));
+vi.mock('../src/screens/coas/CertificateLibrary.js',()=>({CertificateLibrary:()=>null}));
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 it('shows opaque references without linking or claiming verification',async()=>{
  f.api.mockResolvedValue({products:[{id:'1',name:'Product',coaId:'COA-123'}]});

@@ -1,3 +1,4 @@
+import { CertificateLibrary } from './coas/CertificateLibrary.js';
 import { classifyLegacyCoa } from '@ruostack/shared';
 import { useEffect, useState } from 'react';
 import {
@@ -95,6 +96,8 @@ export function Coas() {
         subtitle="Available certificates and legacy references. A reference alone is not verification."
       />
 
+      <CertificateLibrary />
+      <h2 className="text-lg font-semibold">Legacy references</h2>
       <DataTable
         caption="Certificates of analysis by product"
         columns={columns}

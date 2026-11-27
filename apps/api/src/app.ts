@@ -1,3 +1,5 @@
+import { brandCoaRoutes } from './routes/brand-coas.ts';
+import { publicCoaRoutes } from './routes/public-coas.ts';
 import { adminOrderLotRoutes } from './routes/admin-order-lots.ts';
 import { adminLotRoutes } from './routes/admin-lots.ts';
 import { STATUS_CODES } from 'node:http';
@@ -89,6 +91,8 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Brand realm (Supabase Auth JWTs) and admin realm (option a) routes.
   await app.register(brandRoutes);
+  await app.register(brandCoaRoutes);
+  await app.register(publicCoaRoutes);
   await app.register(brandBillingRoutes);
   await app.register(brandOrderRoutes);
   await app.register(brandOverviewRoutes);

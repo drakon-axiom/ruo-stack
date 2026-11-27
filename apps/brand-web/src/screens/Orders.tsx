@@ -1,3 +1,4 @@
+import { OrderCertificates } from './coas/OrderCertificates.js';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -100,6 +101,7 @@ const FILTERS: Filter[] = ['all', 'ready_for_fulfillment', 'shipped', 'delivered
 const filterLabel = (k: Filter) => (k === 'all' ? 'All' : k.replace(/_/g, ' '));
 
 export function Orders() {
+  const [coaOrder,setCoaOrder]=useState<string|null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [creating, setCreating] = useState(false);
@@ -171,12 +173,7 @@ export function Orders() {
       key: 'actions',
       header: '',
       align: 'right',
-      cell: (o) =>
-        isEditable(o) ? (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(o)}>
-            Edit
-          </Button>
-        ) : null,
+      cell: (o) => <><Button variant="ghost" size="sm" onClick={()=>setCoaOrder(o.id)}>COAs</Button>{isEditable(o)&&<Button variant="ghost" size="sm" onClick={()=>setEditing(o)}>Edit</Button>}</>,
     },
   ];
 
@@ -241,6 +238,7 @@ export function Orders() {
         }
       />
 
+      {coaOrder&&<OrderCertificates orderId={coaOrder} onClose={()=>setCoaOrder(null)}/>}
       {creating && (
         <OrderDrawer
           prefill={prefill ?? undefined}
