@@ -6,6 +6,7 @@ import { enqueueCoaWriteback } from '../../src/services/coa-outbox.ts';
 import { drainCoaWritebacks, performCoaWriteback } from '../../src/services/coa-writeback.ts';
 import {applyOrderEdit} from '../../src/services/order-edit.ts';
 import { encryptStoreCreds } from '../../src/services/woo.ts';
+process.env.PUBLIC_API_BASE_URL='https://backend.test';
 const db=getPrisma();
 describe.skipIf(process.env.RUN_DB_TESTS!=='1')('durable COA writeback',()=>{
  afterAll(()=>db.$disconnect());

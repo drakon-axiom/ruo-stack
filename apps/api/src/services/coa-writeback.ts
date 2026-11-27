@@ -15,6 +15,7 @@ export async function performCoaWriteback(db:PrismaClient,job:CoaWritebackJob,re
   if(!/^\d+$/.test(order.externalOrderId))throw new Error('Invalid external order ID');
   const conn=await db.brandStoreConnection.findFirst({where:{brandId:order.brandId,platform:'woocommerce'}});if(!conn)throw new Error('Store disconnected; reconnect before retry');
   const creds=decryptStoreCreds(conn);
+  if(order.lotAllocations.some(a=>a.coaRevision.publishedAt)&&!publicCoaUrl('test'))throw new Error('PUBLIC_API_BASE_URL is required before writing published certificates');
   const line_items=wooCoaLines(order.lotAllocations.map(a=>({wooLineId:a.wooLineId,lotCode:a.lotCode,qty:a.qty,url:a.coaRevision.publishedAt?publicCoaUrl(a.coaRevision.publicId):null})));
   // Persist certificate metadata before transitioning to completed, which may
   // trigger the store's customer email. Retrying PUT never appends duplicate notes.
