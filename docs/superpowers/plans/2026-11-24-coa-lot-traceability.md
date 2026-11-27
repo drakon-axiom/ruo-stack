@@ -8,7 +8,7 @@
 
 **Tech Stack:** Existing TypeScript/Fastify API, Prisma/PostgreSQL, React portals, Supabase Storage, ShipStation Custom Store integration and WooCommerce PHP plugin.
 
-**Spec:** `docs/superpowers/specs/2026-11-24-coa-lot-traceability-design.md` (proposed; workflow decisions must be settled before execution).
+**Spec:** `docs/superpowers/specs/2026-11-24-coa-lot-traceability-design.md` (approved 2026-11-27; warehouse-confirmed lots, single shipment/location, whole SKU units).
 
 ## Global Constraints
 
@@ -136,4 +136,4 @@ Receive Lot A = 500 units with COA A; receive Lot B = 200 with COA B. Fulfill on
 
 ## Implementation gate
 
-This is a proposed plan, not a deployment request. Confirm the warehouse lot-selection source, single-shipment scope, quantity unit and publication permissions before starting schema/fulfillment implementation. If those answers differ, revise Tasks 4–7 first. No application code, production data or deployment has been changed in preparing this plan.
+User approved execution on 2026-11-27. Warehouse-confirmed lots, one stock location, one shipment per order and whole SKU units apply. Opening stock reconciliation, public document selection and warehouse sign-off remain operator rollout gates.

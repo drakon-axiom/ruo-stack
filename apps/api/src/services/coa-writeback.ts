@@ -10,13 +10,14 @@ export function wooCoaLines(rows:{wooLineId:string|null;lotCode:string;qty:numbe
 }
 export async function performCoaWriteback(db:PrismaClient,job:CoaWritebackJob,request:typeof wooRequest=wooRequest){
  if(job.kind==='shipment'){
-  const order=await db.order.findUniqueOrThrow({where:{id:job.targetId},include:{lotAllocations:{where:{state:'shipped'},include:{coaRevision:true}}}});
+  const order=await db.order.findUniqueOrThrow({where:{id:job.targetId},include:{lotAllocations:{where:{state:'shipped'},include:{coaRevision:true,amendments:{orderBy:[{createdAt:'desc'},{id:'desc'}],take:1,include:{coaRevision:true}}}}}});
   if(order.source!=='woocommerce'||!order.externalOrderId)return;
   if(!/^\d+$/.test(order.externalOrderId))throw new Error('Invalid external order ID');
   const conn=await db.brandStoreConnection.findFirst({where:{brandId:order.brandId,platform:'woocommerce'}});if(!conn)throw new Error('Store disconnected; reconnect before retry');
   const creds=decryptStoreCreds(conn);
-  if(order.lotAllocations.some(a=>a.coaRevision.publishedAt)&&!publicCoaUrl('test'))throw new Error('PUBLIC_API_BASE_URL is required before writing published certificates');
-  const line_items=wooCoaLines(order.lotAllocations.map(a=>({wooLineId:a.wooLineId,lotCode:a.lotCode,qty:a.qty,url:a.coaRevision.publishedAt?publicCoaUrl(a.coaRevision.publicId):null})));
+  const effective=order.lotAllocations.map(a=>a.amendments[0]?{...a,lotCode:a.amendments[0].lotCode,coaRevision:a.amendments[0].coaRevision}:a);
+  if(effective.some(a=>a.coaRevision.publishedAt)&&!publicCoaUrl('test'))throw new Error('PUBLIC_API_BASE_URL is required before writing published certificates');
+  const line_items=wooCoaLines(effective.map(a=>({wooLineId:a.wooLineId,lotCode:a.lotCode,qty:a.qty,url:a.coaRevision.publishedAt?publicCoaUrl(a.coaRevision.publicId):null})));
   // Persist certificate metadata before transitioning to completed, which may
   // trigger the store's customer email. Retrying PUT never appends duplicate notes.
   if(line_items.length)await request(creds,'PUT',`/orders/${order.externalOrderId}`,{line_items});

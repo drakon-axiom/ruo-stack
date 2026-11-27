@@ -1,4 +1,4 @@
-# COA documents and lot traceability — proposed design
+# COA documents and lot traceability — approved design
 
 Status: proposal for review, not an approved implementation. No runtime or production changes are part of this document.
 

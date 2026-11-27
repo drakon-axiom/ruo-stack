@@ -1028,6 +1028,7 @@ model CoaRevision {
  createdAt DateTime @default(now()) @map("created_at")
  lots ProductLot[]
  allocations OrderLotAllocation[]
+ amendments LotAllocationAmendment[]
  document CoaDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
  @@index([documentId, createdAt])
  @@index([status, createdAt])
@@ -1048,6 +1049,7 @@ model ProductLot {
  coaRevision CoaRevision @relation(fields:[coaRevisionId],references:[id],onDelete:Restrict)
  movements LotMovement[]
  allocations OrderLotAllocation[]
+ amendments LotAllocationAmendment[]
  @@unique([productId,lotCode])
  @@index([productId,state])
  @@map("product_lot")
@@ -1084,6 +1086,7 @@ model OrderLotAllocation {
  sku String
  wooLineId String? @map("woo_line_id")
  qty Int
+ amendments LotAllocationAmendment[]
  state String @default("reserved")
  confirmedBy String? @map("confirmed_by")
  confirmedAt DateTime? @map("confirmed_at")
@@ -1108,4 +1111,20 @@ model CoaWritebackJob {
  completedAt DateTime? @map("completed_at")
  @@index([status,nextAttemptAt])
  @@map("coa_writeback_job")
+}
+
+model LotAllocationAmendment {
+ id String @id @default(uuid()) @db.Uuid
+ allocationId String @map("allocation_id") @db.Uuid
+ lotId String @map("lot_id") @db.Uuid
+ coaRevisionId String @map("coa_revision_id") @db.Uuid
+ lotCode String @map("lot_code")
+ actorId String @map("actor_id")
+ reason String
+ createdAt DateTime @default(now()) @map("created_at")
+ allocation OrderLotAllocation @relation(fields:[allocationId],references:[id],onDelete:Restrict)
+ lot ProductLot @relation(fields:[lotId],references:[id],onDelete:Restrict)
+ coaRevision CoaRevision @relation(fields:[coaRevisionId],references:[id],onDelete:Restrict)
+ @@index([allocationId,createdAt])
+ @@map("lot_allocation_amendment")
 }

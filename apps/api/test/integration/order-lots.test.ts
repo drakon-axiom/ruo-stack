@@ -7,6 +7,7 @@ import { confirmOrderLots, consumeConfirmedOrderLots, getOrderLotReadiness, reso
 const db=getPrisma();
 describe.skipIf(process.env.RUN_DB_TESTS!=='1')('shipment lot traceability',()=>{
  afterAll(()=>db.$disconnect());
+ it('keeps disabled SKUs compatible without inventing historical allocations',async()=>{const f=await lotFixture();await db.catalogProduct.update({where:{id:f.p.id},data:{lotTracking:false}});const o=await f.order(12);expect(await getOrderLotReadiness(db,o.id)).toBe('untracked');await db.$transaction(tx=>consumeConfirmedOrderLots(tx,o.id,'legacy'));expect((await db.productLot.findUniqueOrThrow({where:{id:f.lot.id}})).onHand).toBe(500);expect(await db.orderLotAllocation.count({where:{orderId:o.id}})).toBe(0);});
  it('consumes split lots exactly once and preserves immutable snapshots',async()=>{
  const f=await lotFixture();const b=await db.$transaction(tx=>receiveLot(tx,{...f.input,lotCode:'B',qty:200},'test',randomUUID()));await db.$transaction(tx=>setLotState(tx,b.id,'released','Reviewed','test'));
  const o=await f.order(12);const selections=[{orderItemId:o.items[0]!.id,lotId:f.lot.id,qty:3},{orderItemId:o.items[0]!.id,lotId:b.id,qty:9}];

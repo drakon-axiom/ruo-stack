@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@ruostack/db';
 import { Conflict } from '../errors.ts';
 import { writeAudit } from '../audit.ts';
-import { eligibleLot, lockOrder, lockProducts, reserveLots, releaseLotReservations, type AllocationInput, type LotTx } from './lot-inventory.ts';
+import { operation, saveOperation, eligibleLot, lockOrder, lockProducts, reserveLots, releaseLotReservations, type AllocationInput, type LotTx } from './lot-inventory.ts';
 type Reader=Pick<PrismaClient,'order'|'orderLotAllocation'>;
 export async function getOrderLotReadiness(tx:Reader,orderId:string){
  const o=await tx.order.findUniqueOrThrow({where:{id:orderId},include:{items:{include:{product:true}}}});
@@ -72,4 +72,16 @@ export async function resolveShipmentLotException(tx:LotTx,orderId:string,alloca
  await enqueueCoaWriteback(tx,'shipment',orderId,`late-evidence:${orderId}`);
  for(const productId of new Set(o.items.map(i=>i.productId)))await enqueueCoaWriteback(tx,'product',productId);
  await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lots.exception_resolved',targetType:'order',targetId:orderId,reason,after:{allocations}});
+}
+
+export async function amendShippedAllocation(tx:LotTx,orderId:string,allocationId:string,lotId:string,reason:string,actor:string,key:string){
+ if(!reason.trim())throw Conflict('reason_required','Warehouse evidence is required');const order=await lockOrder(tx,orderId);
+ const op=await operation(tx,key,{kind:'amend',orderId,allocationId,lotId,reason});if(op.prior)return;
+ const original=await tx.orderLotAllocation.findFirst({where:{id:allocationId,orderId,state:'shipped'},include:{lot:true,amendments:{orderBy:[{createdAt:'desc'},{id:'desc'}],take:1}}});
+ if(!original||!['shipped','delivered'].includes(order.status))throw Conflict('not_shipped','Only shipped assignments can be amended');await lockProducts(tx,[original.lot.productId]);
+ const previous=original.amendments[0];const fromId=previous?.lotId??original.lotId;const target=await tx.productLot.findUniqueOrThrow({where:{id:lotId}});
+ if(target.productId!==original.lot.productId||target.onHand-target.reserved<original.qty&&fromId!==lotId)throw Conflict('invalid_correction','Corrected lot must match the product and have sufficient unreserved stock');
+ if(fromId!==lotId){await tx.productLot.update({where:{id:fromId},data:{onHand:{increment:original.qty}}});await tx.productLot.update({where:{id:lotId},data:{onHand:{decrement:original.qty}}});for(const [id,delta] of [[fromId,original.qty],[lotId,-original.qty]] as const)await tx.lotMovement.create({data:{lotId:id,kind:'correction',onHandDelta:delta,reservedDelta:0,orderId,actorId:actor,reason,operationKey:key}});}
+ const amendment=await tx.lotAllocationAmendment.create({data:{allocationId,lotId,coaRevisionId:target.coaRevisionId,lotCode:target.lotCode,actorId:actor,reason}});await saveOperation(tx,key,op.fingerprint,amendment.id);
+ await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lots.shipped_amendment',targetType:'order',targetId:orderId,before:{allocationId,lotId:fromId},after:{amendmentId:amendment.id,lotId},reason});await enqueueCoaWriteback(tx,'shipment',orderId,`amendment:${amendment.id}`);await enqueueCoaWriteback(tx,'product',target.productId);
 }

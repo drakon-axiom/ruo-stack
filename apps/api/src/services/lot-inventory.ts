@@ -11,12 +11,12 @@ export const AllocationSchema=z.object({orderItemId:z.string().uuid(),lotId:z.st
 export type AllocationInput=z.infer<typeof AllocationSchema>;
 export async function lockOrder(tx:LotTx,id:string){await tx.$queryRaw`SELECT id FROM "order" WHERE id=${id}::uuid FOR UPDATE`;return tx.order.findUniqueOrThrow({where:{id},include:{items:{include:{product:true}}}});}
 export async function lockProducts(tx:LotTx,ids:string[]){for(const id of [...new Set(ids)].sort())await tx.$queryRaw`SELECT id FROM catalog_product WHERE id=${id}::uuid FOR UPDATE`;}
-async function operation(tx:LotTx,key:string,input:unknown){
+export async function operation(tx:LotTx,key:string,input:unknown){
  z.string().min(1).max(200).parse(key);const fingerprint=createHash('sha256').update(JSON.stringify(input)).digest('hex');
  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`lot:${key}`},0))::text`;
  const prior=await tx.lotOperation.findUnique({where:{key}});if(prior&&prior.fingerprint!==fingerprint)throw Conflict('idempotency_conflict','Key was already used for a different inventory operation');return {prior,fingerprint};
 }
-async function saveOperation(tx:LotTx,key:string,fingerprint:string,resultId?:string){await tx.lotOperation.create({data:{key,fingerprint,resultId}});}
+export async function saveOperation(tx:LotTx,key:string,fingerprint:string,resultId?:string){await tx.lotOperation.create({data:{key,fingerprint,resultId}});}
 async function approvedRevision(tx:LotTx,id:string,productId:string){
  await tx.$queryRaw`SELECT id FROM coa_revision WHERE id=${id}::uuid FOR SHARE`;
  const r=await tx.coaRevision.findUnique({where:{id},include:{document:true}});
@@ -86,4 +86,10 @@ export async function applyLotAvailability<T extends {id:string;status:string;lo
  const [lots,exceptions]=await Promise.all([tx.productLot.findMany({where:{productId:{in:ids},state:'released',OR:[{expiresAt:null},{expiresAt:{gt:new Date()}}],coaRevision:{status:{in:['reviewed','published']}}}}),tx.order.findMany({where:{traceabilityStatus:'exception',items:{some:{productId:{in:ids}}}},select:{items:{select:{productId:true}}}})]);
  const blocked=new Set(exceptions.flatMap(o=>o.items.map(i=>i.productId)));const available=new Set(lots.filter(l=>l.onHand>l.reserved).map(l=>l.productId));
  return products.map(p=>p.lotTracking&&p.status==='in_stock'&&(!available.has(p.id)||blocked.has(p.id))?{...p,status:'out_of_stock'}:p);
+}
+
+export async function changeLotCertificate(tx:LotTx,id:string,revisionId:string,reason:string,actor:string){
+ z.string().trim().min(1).max(1000).parse(reason);const initial=await tx.productLot.findUniqueOrThrow({where:{id}});await lockProducts(tx,[initial.productId]);const lot=await tx.productLot.findUniqueOrThrow({where:{id}});
+ if(lot.state!=='quarantined'||lot.reserved)throw Conflict('lot_in_use','Quarantine the lot and release reservations before changing its current certificate');await approvedRevision(tx,revisionId,lot.productId);
+ await tx.productLot.update({where:{id},data:{coaRevisionId:revisionId}});await writeAudit(tx,{actorType:'admin',actorId:actor,action:'lot.certificate_changed',targetType:'product_lot',targetId:id,before:{revisionId:lot.coaRevisionId},after:{revisionId},reason});await enqueueCoaWriteback(tx,'product',lot.productId);
 }
