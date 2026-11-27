@@ -1,3 +1,4 @@
+import { adminLotRoutes } from './routes/admin-lots.ts';
 import { STATUS_CODES } from 'node:http';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
@@ -99,6 +100,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminAuthRoutes);
   await app.register(adminCatalogRoutes);
   await app.register(adminCoaRoutes);
+  await app.register(adminLotRoutes);
   await app.register(adminCatalogImportRoutes);
   await app.register(adminUsersRoutes);
   await app.register(adminFulfillmentRoutes);

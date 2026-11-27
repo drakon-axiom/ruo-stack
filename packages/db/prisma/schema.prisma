@@ -368,6 +368,8 @@ model CatalogProduct {
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
+  lotTracking Boolean @default(false) @map("lot_tracking")
+  lots ProductLot[]
   coaDocuments CoaDocument[]
   brandPrices   BrandProductPrice[]
   orderItems    OrderItem[]
@@ -794,6 +796,9 @@ model Order {
   box   Box?        @relation(fields: [boxId], references: [id], onDelete: SetNull)
   items OrderItem[]
   claims Claim[]
+  lotAllocations OrderLotAllocation[]
+  traceabilityStatus String @default("untracked") @map("traceability_status")
+  traceabilityReason String? @map("traceability_reason")
 
   // Store-order idempotency: at most one order per (brand, source, external id).
   // externalOrderId is NULL for manual orders — Postgres treats NULLs as distinct,
@@ -868,6 +873,7 @@ model OrderItem {
   orderId           String   @map("order_id") @db.Uuid
   productId         String   @map("product_id") @db.Uuid
   qty               Int
+  wooLineId String? @map("woo_line_id")
   unitWholesaleCents Int     @map("unit_wholesale_cents") // snapshot at the brand's tier
   createdAt         DateTime @default(now()) @map("created_at")
 
@@ -1020,8 +1026,72 @@ model CoaRevision {
  publishedAt DateTime? @map("published_at")
  withdrawalReason String? @map("withdrawal_reason")
  createdAt DateTime @default(now()) @map("created_at")
+ lots ProductLot[]
+ allocations OrderLotAllocation[]
  document CoaDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
  @@index([documentId, createdAt])
  @@index([status, createdAt])
  @@map("coa_revision")
+}
+
+model ProductLot {
+ id String @id @default(uuid()) @db.Uuid
+ productId String @map("product_id") @db.Uuid
+ lotCode String @map("lot_code")
+ coaRevisionId String @map("coa_revision_id") @db.Uuid
+ state String @default("quarantined")
+ receivedAt DateTime @default(now()) @map("received_at")
+ expiresAt DateTime? @map("expires_at")
+ onHand Int @default(0) @map("on_hand")
+ reserved Int @default(0)
+ product CatalogProduct @relation(fields:[productId],references:[id],onDelete:Restrict)
+ coaRevision CoaRevision @relation(fields:[coaRevisionId],references:[id],onDelete:Restrict)
+ movements LotMovement[]
+ allocations OrderLotAllocation[]
+ @@unique([productId,lotCode])
+ @@index([productId,state])
+ @@map("product_lot")
+}
+model LotOperation {
+ key String @id
+ fingerprint String
+ resultId String? @map("result_id")
+ createdAt DateTime @default(now()) @map("created_at")
+ @@map("lot_operation")
+}
+model LotMovement {
+ id String @id @default(uuid()) @db.Uuid
+ lotId String @map("lot_id") @db.Uuid
+ kind String
+ onHandDelta Int @map("on_hand_delta")
+ reservedDelta Int @map("reserved_delta")
+ orderId String? @map("order_id") @db.Uuid
+ actorId String? @map("actor_id")
+ reason String
+ operationKey String @map("operation_key")
+ createdAt DateTime @default(now()) @map("created_at")
+ lot ProductLot @relation(fields:[lotId],references:[id],onDelete:Restrict)
+ @@index([lotId,createdAt])
+ @@map("lot_movement")
+}
+model OrderLotAllocation {
+ id String @id @default(uuid()) @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ orderItemId String @map("order_item_id") @db.Uuid
+ lotId String @map("lot_id") @db.Uuid
+ coaRevisionId String @map("coa_revision_id") @db.Uuid
+ lotCode String @map("lot_code")
+ sku String
+ wooLineId String? @map("woo_line_id")
+ qty Int
+ state String @default("reserved")
+ confirmedBy String? @map("confirmed_by")
+ confirmedAt DateTime? @map("confirmed_at")
+ createdAt DateTime @default(now()) @map("created_at")
+ order Order @relation(fields:[orderId],references:[id],onDelete:Restrict)
+ lot ProductLot @relation(fields:[lotId],references:[id],onDelete:Restrict)
+ coaRevision CoaRevision @relation(fields:[coaRevisionId],references:[id],onDelete:Restrict)
+ @@index([orderId,state])
+ @@index([lotId,state])
+ @@map("order_lot_allocation")
 }

@@ -1,3 +1,4 @@
+import { ProductLots } from './catalog/ProductLots.js';
 import { ProductCoas } from './catalog/ProductCoas.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -672,6 +673,7 @@ function EditDrawer({
           <Input value={coa} disabled={!writable} onChange={(e) => setCoa(e.target.value)} />
         </Field>
       </div>
+      <ProductLots key={`lots:${product.id}`} productId={product.id} writable={writable} />
       <ProductCoas key={product.id} productId={product.id} writable={writable} />
       <Field label="Packaging rule">
         <Input value={packaging} disabled={!writable} onChange={(e) => setPackaging(e.target.value)} />
